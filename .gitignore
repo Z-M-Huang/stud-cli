@@ -7,3 +7,8 @@ yarn-error.log*
 .env.local
 *.tgz
 .vcp/
+
+dist/
+coverage/
+.bun/
+*.tsbuildinfo
