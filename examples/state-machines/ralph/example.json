@@ -1,0 +1,7 @@
+{
+  "entry": "Discovery",
+  "projectRoot": "/path/to/your/.stud",
+  "maxDiscoveryTurns": 5,
+  "maxBuildTurns": 50,
+  "completionTokenBudget": 100000
+}

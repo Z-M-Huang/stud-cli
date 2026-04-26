@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import("../dist/cli/index.js")
-  .then(({ main }) => {
-    const code = main(process.argv.slice(2));
+  .then(async ({ default: main }) => {
+    const code = await main(process.argv.slice(2));
     process.exit(code);
   })
   .catch((err) => {

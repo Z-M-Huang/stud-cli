@@ -1,0 +1,14 @@
+{
+  "src/core/message-loop.ts": {
+    "lines": { "pct": 95 },
+    "branches": { "pct": 92 }
+  },
+  "src/core/event-bus.ts": {
+    "lines": { "pct": 100 },
+    "branches": { "pct": 100 }
+  },
+  "src/contracts/tools.ts": {
+    "lines": { "pct": 91 },
+    "branches": { "pct": 90 }
+  }
+}

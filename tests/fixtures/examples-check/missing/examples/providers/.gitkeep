@@ -1,0 +1,2 @@
+A providers/ category dir with zero example subdirectories — should report
+categoriesMissingExamples: ["providers", ...].

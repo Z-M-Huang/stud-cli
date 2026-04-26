@@ -1,0 +1,177 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+
+import type { compactHistory as CompactHistory } from "../../../src/core/context/compactor.ts";
+import type { hasOverflow as HasOverflow } from "../../../src/core/context/memory.ts";
+import type { stubBus as StubBus } from "../../helpers/context-fixtures.ts";
+
+interface CompactorModule {
+  readonly compactHistory: typeof CompactHistory;
+}
+
+interface MemoryModule {
+  readonly hasOverflow: typeof HasOverflow;
+}
+
+interface FixturesModule {
+  readonly stubBus: typeof StubBus;
+}
+
+interface AuditRecord {
+  readonly class?: string;
+  readonly [key: string]: unknown;
+}
+
+interface HistoryMessage {
+  readonly role: "system" | "user" | "assistant" | "tool";
+  readonly content: string;
+  readonly turnId: string;
+}
+
+interface MockAuditWriter {
+  readonly records: readonly AuditRecord[];
+  write(record: AuditRecord): Promise<void>;
+}
+
+const { compactHistory } = (await import(
+  new URL("../../../src/core/context/compactor.ts", import.meta.url).href
+)) as CompactorModule;
+const { hasOverflow } = (await import(
+  new URL("../../../src/core/context/memory.ts", import.meta.url).href
+)) as MemoryModule;
+const { stubBus } = (await import(
+  new URL("../../helpers/context-fixtures.ts", import.meta.url).href
+)) as FixturesModule;
+
+function mockAudit(): MockAuditWriter {
+  const records: AuditRecord[] = [];
+  return {
+    get records(): readonly AuditRecord[] {
+      return records;
+    },
+    write(record: AuditRecord): Promise<void> {
+      records.push(record);
+      return Promise.resolve();
+    },
+  };
+}
+
+describe("hasOverflow", () => {
+  it("returns true when tokens > window", () => {
+    assert.equal(hasOverflow(101, 100), true);
+  });
+
+  it("returns false when tokens <= window", () => {
+    assert.equal(hasOverflow(100, 100), false);
+  });
+});
+
+describe("compactHistory", () => {
+  it("summarizes earliest segment; preserves originalTurnIds", async () => {
+    const audit = mockAudit();
+    const history: readonly HistoryMessage[] = [
+      { role: "user", content: "m1", turnId: "t1" },
+      { role: "assistant", content: "r1", turnId: "t1" },
+      { role: "user", content: "m2", turnId: "t2" },
+      { role: "assistant", content: "r2", turnId: "t2" },
+      { role: "user", content: "m3", turnId: "t3" },
+    ];
+
+    const out = await compactHistory({
+      history,
+      targetTokens: 4,
+      summarize: (messages) =>
+        Promise.resolve(
+          `SUMMARY[${(messages as readonly { readonly turnId?: string }[]).map((m) => m.turnId).join(",")}]`,
+        ),
+      audit,
+      eventBus: stubBus(),
+    });
+
+    assert.ok(out.summarySegments.length > 0);
+    assert.ok(out.summarySegments[0]?.originalTurnIds.includes("t1"));
+    assert.ok(audit.records.some((record) => record.class === "Compaction"));
+  });
+
+  it("post-compaction still over window → Validation/ContextOverflow", async () => {
+    const promise = compactHistory({
+      history: [
+        { role: "user", content: "x".repeat(10_000), turnId: "t1" },
+      ] as readonly HistoryMessage[],
+      targetTokens: 1,
+      summarize: () => Promise.resolve("x".repeat(10_000)),
+      audit: mockAudit(),
+      eventBus: stubBus(),
+    });
+
+    await assert.rejects(promise, (error: unknown) => {
+      assert.ok(typeof error === "object" && error !== null);
+      const candidate = error as {
+        readonly class?: string;
+        readonly context?: Readonly<Record<string, unknown>>;
+      };
+      assert.equal(candidate.class, "Validation");
+      assert.equal(candidate.context?.["code"], "ContextOverflow");
+      return true;
+    });
+  });
+
+  it("summarize throws → ProviderTransient/SummarizeFailed", async () => {
+    const promise = compactHistory({
+      history: [{ role: "user", content: "m", turnId: "t1" }] as readonly HistoryMessage[],
+      targetTokens: 1,
+      summarize: () => Promise.reject(new Error("upstream")),
+      audit: mockAudit(),
+      eventBus: stubBus(),
+    });
+
+    await assert.rejects(promise, (error: unknown) => {
+      assert.ok(typeof error === "object" && error !== null);
+      const candidate = error as {
+        readonly class?: string;
+        readonly context?: Readonly<Record<string, unknown>>;
+      };
+      assert.equal(candidate.class, "ProviderTransient");
+      assert.equal(candidate.context?.["code"], "SummarizeFailed");
+      return true;
+    });
+  });
+
+  it("only history is touched — fragments are not passed here", async () => {
+    const history: readonly HistoryMessage[] = [
+      { role: "user", content: "m1", turnId: "t1" },
+      { role: "user", content: "m2", turnId: "t2" },
+    ];
+
+    const out = await compactHistory({
+      history,
+      targetTokens: 4,
+      summarize: () => Promise.resolve("S"),
+      audit: mockAudit(),
+      eventBus: stubBus(),
+    });
+
+    assert.ok(out.messages.length >= 1);
+  });
+
+  it("emits CompactionInvoked then CompactionPerformed in order", async () => {
+    const bus = stubBus();
+
+    await compactHistory({
+      history: [
+        { role: "user", content: "m1", turnId: "t1" },
+        { role: "user", content: "m2", turnId: "t2" },
+      ] as readonly HistoryMessage[],
+      targetTokens: 1,
+      summarize: () => Promise.resolve("S"),
+      audit: mockAudit(),
+      eventBus: bus,
+    });
+
+    const names = bus.events.map((event) => event.name);
+    const i = names.indexOf("CompactionInvoked");
+    const j = names.indexOf("CompactionPerformed");
+    assert.ok(i >= 0);
+    assert.ok(j > i);
+  });
+});

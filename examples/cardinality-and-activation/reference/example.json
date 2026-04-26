@@ -1,0 +1,11 @@
+[
+  { "category": "Provider", "loaded": "unlimited", "active": "unlimited" },
+  { "category": "Tool", "loaded": "unlimited", "active": "unlimited" },
+  { "category": "Hook", "loaded": "unlimited", "active": "unlimited" },
+  { "category": "UI", "loaded": "unlimited", "active": "unlimited" },
+  { "category": "Logger", "loaded": "unlimited", "active": "unlimited" },
+  { "category": "StateMachine", "loaded": "unlimited", "active": "one-attached" },
+  { "category": "Command", "loaded": "unlimited", "active": "unlimited" },
+  { "category": "SessionStore", "loaded": "unlimited", "active": "one" },
+  { "category": "ContextProvider", "loaded": "unlimited", "active": "unlimited" }
+]

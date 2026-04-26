@@ -96,6 +96,7 @@ Rules:
 ## 6. Runtime target and module rules
 
 - Canonical runtime for `src/` and CI tests: **Node `>=22`**. Bun is a local-dev convenience (install, script runner).
+- Test invocation: **`node --import tsx --test`**. `tsx` is registered only at test time as a TypeScript loader so `.js`-style NodeNext imports resolve directly to `.ts` source. Production runtime never touches `tsx` — `bin/stud-cli.js` loads built `dist/*.js` only.
 - Module system is **NodeNext**. Source is ESM (`"type": "module"`). Relative imports include explicit extensions (`./foo.js`, not `./foo`).
 - No Bun globals (`Bun.*`, `bun:*` imports, `Bun.file`, `Bun.env`) outside `tests/` or `scripts/`. The Bun runtime is allowed to typecheck tests via `tsconfig.test.json` (which includes `@types/bun`); `tsconfig.json` intentionally does not.
 - Publish output goes to `dist/` via `tsc`. `bin/stud-cli.js` is a thin launcher (`#!/usr/bin/env node` + dynamic `import('../dist/cli/index.js')`). Do not introduce a bundler.

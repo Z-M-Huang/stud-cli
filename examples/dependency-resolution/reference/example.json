@@ -1,0 +1,30 @@
+[
+  {
+    "extId": "logger-core",
+    "kind": "Logger",
+    "dependsOn": []
+  },
+  {
+    "extId": "session-fs",
+    "kind": "SessionStore",
+    "dependsOn": []
+  },
+  {
+    "extId": "tool-bash",
+    "kind": "Tool",
+    "dependsOn": [{ "kind": "category", "category": "Logger" }]
+  },
+  {
+    "extId": "tool-edit",
+    "kind": "Tool",
+    "dependsOn": [{ "kind": "category", "category": "Logger" }]
+  },
+  {
+    "extId": "sm-default",
+    "kind": "StateMachine",
+    "dependsOn": [
+      { "kind": "ext", "extId": "session-fs" },
+      { "kind": "category", "category": "Tool" }
+    ]
+  }
+]

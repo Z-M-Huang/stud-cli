@@ -1,0 +1,5 @@
+{
+  "path": ".stud/logs/observability.ndjson",
+  "rotateAtBytes": 1048576,
+  "maxRotatedFiles": 5
+}

@@ -1,0 +1,54 @@
+[
+  {
+    "extId": "reference-tool",
+    "check": "shape",
+    "ok": true
+  },
+  {
+    "extId": "reference-tool",
+    "check": "cardinality",
+    "ok": true
+  },
+  {
+    "extId": "reference-tool",
+    "check": "config-fixtures-valid",
+    "ok": true
+  },
+  {
+    "extId": "reference-tool",
+    "check": "config-fixtures-invalid",
+    "ok": true
+  },
+  {
+    "extId": "reference-tool",
+    "check": "config-fixtures-worst-plausible",
+    "ok": true
+  },
+  {
+    "extId": "reference-tool",
+    "check": "lifecycle-order",
+    "ok": true
+  },
+  {
+    "extId": "reference-tool",
+    "check": "idempotent-dispose",
+    "ok": true
+  },
+  {
+    "extId": "reference-tool",
+    "check": "typed-error-semantics",
+    "ok": true
+  },
+  {
+    "extId": "non-idempotent-dispose-tool",
+    "check": "idempotent-dispose",
+    "ok": false,
+    "detail": "dispose() threw on second invocation: Error: dispose called twice — not idempotent"
+  },
+  {
+    "extId": "permissive-schema-tool",
+    "check": "config-fixtures-invalid",
+    "ok": false,
+    "detail": "Invalid fixture was accepted — configSchema is too permissive"
+  }
+]

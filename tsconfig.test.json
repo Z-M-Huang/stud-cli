@@ -5,5 +5,5 @@
     "rootDir": ".",
     "noEmit": true
   },
-  "include": ["tests/**/*", "src/**/*"]
+  "include": ["tests/**/*", "src/**/*", "scripts/**/*"]
 }

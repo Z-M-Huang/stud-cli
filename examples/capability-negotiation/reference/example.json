@@ -1,0 +1,9 @@
+[
+  { "name": "streaming", "level": "hard" },
+  { "name": "toolCalling", "level": "hard" },
+  { "name": "structuredOutput", "level": "preferred" },
+  { "name": "multimodal", "level": "probed" },
+  { "name": "reasoning", "level": "probed" },
+  { "name": "contextWindow", "level": "hard", "minimum": 32000 },
+  { "name": "promptCaching", "level": "preferred" }
+]

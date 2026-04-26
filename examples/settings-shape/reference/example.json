@@ -1,0 +1,8 @@
+{
+  "securityMode": {
+    "mode": "ask"
+  },
+  "active": {
+    "sessionStore": "core-session-store"
+  }
+}

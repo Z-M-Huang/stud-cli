@@ -1,0 +1,5 @@
+{
+  "defaultTimeoutMs": 30000,
+  "maxOutputBytes": 1048576,
+  "blockedPrefixes": []
+}

@@ -1,0 +1,6 @@
+{
+  "hooks": {
+    "TOOL_CALL/pre": ["guard-hook", "transform-hook", "observer-hook"],
+    "COMPOSE_REQUEST/post": ["context-strip-hook"]
+  }
+}

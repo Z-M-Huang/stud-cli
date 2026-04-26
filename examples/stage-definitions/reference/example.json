@@ -1,0 +1,18 @@
+{
+  "id": "plan",
+  "body": "You are a planning assistant. Your task is: ${ctx.task}.\n\nProduce a numbered implementation plan. When done, call submit_plan.",
+  "allowedTools": ["read_file", "list_files", "grep"],
+  "turnCap": 5,
+  "completionTool": "submit_plan",
+  "completionSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["steps"],
+    "properties": {
+      "steps": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}

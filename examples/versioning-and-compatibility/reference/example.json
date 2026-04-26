@@ -1,0 +1,13 @@
+{
+  "name": "Tools",
+  "contractVersion": "1.0.0",
+  "changelog": [
+    {
+      "fromVersion": "0.9.0",
+      "toVersion": "1.0.0",
+      "breaking": ["added-required-field"],
+      "notes": "Initial stable release. Added required `gated` and `deriveApprovalKey` fields to the Tools contract.",
+      "affectedExtensions": []
+    }
+  ]
+}

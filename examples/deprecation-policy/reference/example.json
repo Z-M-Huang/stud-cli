@@ -1,0 +1,8 @@
+{
+  "field": "sensitivity",
+  "phase": "soft",
+  "softIntroducedIn": "1.1.0",
+  "hardRemovedIn": "2.0.0",
+  "replacedBy": "confidentialityLevel",
+  "note": "Renamed for clarity; use confidentialityLevel going forward."
+}

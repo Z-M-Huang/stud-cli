@@ -1,0 +1,87 @@
+import { createAnthropicAdapter } from "./adapter.js";
+import { anthropicConfigSchema, type AnthropicConfig } from "./config.schema.js";
+import { activate, deactivate, dispose, init } from "./lifecycle.js";
+
+import type { ProviderContract, ProviderStreamEvent } from "../../../contracts/providers.js";
+
+const defaultConfig: AnthropicConfig = {
+  apiKeyRef: { kind: "env", name: "ANTHROPIC_API_KEY" },
+  model: "claude-opus-4-7",
+};
+
+export const contract: ProviderContract<AnthropicConfig> = {
+  kind: "Provider",
+  contractVersion: "1.0.0",
+  requiredCoreVersion: ">=1.0.0 <2.0.0",
+  lifecycle: { init, activate, deactivate, dispose },
+  configSchema: anthropicConfigSchema,
+  loadedCardinality: "unlimited",
+  activeCardinality: "unlimited",
+  stateSlot: null,
+  discoveryRules: { folder: "providers", manifestKey: "anthropic" },
+  reloadBehavior: "between-turns",
+  protocol: "anthropic",
+  capabilities: {
+    streaming: "hard",
+    toolCalling: "hard",
+    structuredOutput: "preferred",
+    multimodal: "preferred",
+    reasoning: "preferred",
+    contextWindow: "probed",
+    promptCaching: "probed",
+  },
+  surface: {
+    async *request(args, host, signal): AsyncGenerator<ProviderStreamEvent> {
+      const adapter = createAnthropicAdapter(
+        {
+          ...defaultConfig,
+          model: args.modelId,
+        },
+        host,
+      );
+
+      for await (const event of adapter.request(
+        {
+          messages: args.messages,
+          tools: args.tools,
+          params: {
+            ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+            ...(args.temperature !== undefined ? { temperature: args.temperature } : {}),
+          },
+          signal,
+        },
+        host,
+      )) {
+        if (event.kind === "text-delta") {
+          yield { type: "text-delta", delta: event.text };
+          continue;
+        }
+
+        if (event.kind === "tool-call") {
+          yield {
+            type: "tool-call",
+            toolCallId: event.callId,
+            toolName: event.name,
+            args: (event.args ?? {}) as Readonly<Record<string, unknown>>,
+          };
+          continue;
+        }
+
+        if (event.kind === "finish") {
+          yield {
+            type: "finish",
+            reason:
+              event.reason === "tool_calls"
+                ? "tool-calls"
+                : event.reason === "content_filter"
+                  ? "content-filter"
+                  : event.reason,
+          };
+        }
+      }
+    },
+  },
+};
+
+export { anthropicConfigSchema, createAnthropicAdapter };
+export type { AnthropicConfig };

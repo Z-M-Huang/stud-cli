@@ -1,0 +1,44 @@
+[
+  {
+    "field": "validationSeverity",
+    "softSinceVersion": "1.1.0",
+    "hardAtVersion": "2.0.0",
+    "replacement": "Validation-Pipeline default disable behavior",
+    "note": "Q-3 removed validationSeverity from the meta-contract. Failed extensions are disabled and surfaced at startup."
+  },
+  {
+    "field": "tools.sensitivity",
+    "softSinceVersion": "1.1.0",
+    "hardAtVersion": "2.0.0",
+    "replacement": "tools.gated + tools.deriveApprovalKey",
+    "note": "Q-8 replaced sensitivity with approval gates and per-argument approval keys."
+  },
+  {
+    "field": "context-providers.capabilities",
+    "softSinceVersion": "1.1.0",
+    "hardAtVersion": "2.0.0",
+    "replacement": "Context Assembly forbidden-source validation",
+    "note": "Q-6 removed the context-provider capability enum and made env/settings/secret surfacing an unconditional hard ban."
+  },
+  {
+    "field": "context-providers.capabilities.surfacesEnvValues",
+    "softSinceVersion": "1.1.0",
+    "hardAtVersion": "2.0.0",
+    "replacement": "Context Assembly forbidden-source validation",
+    "note": "Q-6 removed opt-in env surfacing through Context Providers."
+  },
+  {
+    "field": "context-providers.allowSurfacingEnv",
+    "softSinceVersion": "1.1.0",
+    "hardAtVersion": "2.0.0",
+    "replacement": "Context Assembly forbidden-source validation",
+    "note": "Q-6 superseded prior consent fields for env surfacing."
+  },
+  {
+    "field": "context-providers.targetStage",
+    "softSinceVersion": "1.1.0",
+    "hardAtVersion": "2.0.0",
+    "replacement": "context-providers.provide for COMPOSE_REQUEST",
+    "note": "Q-6 finalized v1 Context Providers as COMPOSE_REQUEST contributors only."
+  }
+]

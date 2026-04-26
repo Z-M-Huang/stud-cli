@@ -1,0 +1,1 @@
+{ "apiKeyRef": { "kind": "env", "name": "X" }, "model": "m" }

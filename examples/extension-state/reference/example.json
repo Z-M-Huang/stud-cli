@@ -1,0 +1,15 @@
+{
+  "extId": "my-state-machine",
+  "slotVersion": "1.0.0",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["currentState"],
+    "properties": {
+      "currentState": { "type": "string" },
+      "stepCount": { "type": "integer", "minimum": 0 }
+    }
+  },
+  "driftPolicy": "reject"
+}

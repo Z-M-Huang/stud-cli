@@ -12,5 +12,23 @@ pre-commit:
 
 pre-push:
   commands:
-    verify:
-      run: bun run typecheck && bun run lint && bun run test
+    typecheck:
+      run: bun run typecheck
+    lint:
+      run: bun run lint
+    format:
+      run: bun run format:check
+    test:
+      run: bun run test
+    coverage:
+      run: bun run test:coverage
+    banned-vocab:
+      run: bun run banned-vocab
+    ban-bun-globals:
+      run: bun run ban-bun-globals
+    boundary-check:
+      run: bun run boundary-check
+    wiki-drift:
+      run: bun run wiki-drift
+    examples-check:
+      run: bun run examples-check

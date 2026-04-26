@@ -1,0 +1,7 @@
+{
+  "apiKeyRef": {
+    "kind": "env",
+    "name": "OPENAI_API_KEY"
+  },
+  "model": "gpt-4o"
+}

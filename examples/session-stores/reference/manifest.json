@@ -1,0 +1,18 @@
+{
+  "sessionId": "01910000-0000-7000-8000-000000000001",
+  "projectRoot": "/home/user/my-project/.stud",
+  "mode": "ask",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello, world!"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello! How can I help you today?"
+    }
+  ],
+  "storeId": "filesystem",
+  "createdAt": 1745136000000,
+  "updatedAt": 1745136060000
+}

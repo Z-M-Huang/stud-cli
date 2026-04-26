@@ -1,0 +1,22 @@
+{
+  "passed": ["example-tool"],
+  "disabled": [
+    {
+      "stage": "configSchema",
+      "extId": "bad-logger",
+      "fieldPath": "/configSchema/additionalProperties",
+      "error": {
+        "class": "Validation",
+        "context": {
+          "code": "ConfigSchemaViolation",
+          "extId": "bad-logger",
+          "field": "additionalProperties"
+        }
+      }
+    }
+  ],
+  "counters": {
+    "warnings": 0,
+    "errors": 1
+  }
+}

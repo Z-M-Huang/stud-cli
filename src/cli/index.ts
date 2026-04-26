@@ -1,30 +1,24 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fallbackErrorShape } from "./error-utils.js";
+import { parseLaunchArgs } from "./launch-args.js";
+import { runShell } from "./shell.js";
 
-interface PackageManifest {
-  readonly name: string;
-  readonly version: string;
-  readonly homepage: string;
+function toStructuredError(error: unknown): ReturnType<typeof fallbackErrorShape> {
+  return fallbackErrorShape(error, "Validation", "LaunchFailure");
 }
 
-function readPackageManifest(): PackageManifest {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const manifestPath = resolve(here, "..", "..", "package.json");
-  const raw = readFileSync(manifestPath, "utf8");
-  return JSON.parse(raw) as PackageManifest;
-}
-
-export function main(argv: readonly string[]): number {
-  const pkg = readPackageManifest();
-  if (argv.includes("-v") || argv.includes("--version")) {
-    process.stdout.write(`${pkg.version}\n`);
-    return 0;
+async function main(argv: readonly string[]): Promise<number> {
+  try {
+    const args = parseLaunchArgs(argv, { cwd: () => process.cwd() });
+    const handle = await runShell(args);
+    return handle.exitCode;
+  } catch (error) {
+    process.stderr.write(
+      `${JSON.stringify({ surface: "cli.validation-error", error: toStructuredError(error) })}\n`,
+    );
+    return 1;
   }
-  process.stdout.write(
-    `stud-cli v${pkg.version}\n` +
-      `Placeholder release. A bare-bones, fully customizable coding CLI is in design.\n` +
-      `Track progress: ${pkg.homepage}\n`,
-  );
-  return 0;
 }
+
+export { main };
+// eslint-disable-next-line import-x/no-default-export
+export default main;

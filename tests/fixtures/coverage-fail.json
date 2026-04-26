@@ -1,0 +1,10 @@
+{
+  "src/core/message-loop.ts": {
+    "lines": { "pct": 75 },
+    "branches": { "pct": 60 }
+  },
+  "src/cli/index.ts": {
+    "lines": { "pct": 50 },
+    "branches": { "pct": 40 }
+  }
+}

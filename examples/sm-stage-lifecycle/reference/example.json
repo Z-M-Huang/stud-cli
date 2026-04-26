@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SM Stage Lifecycle — reference stage execution examples",
+  "description": "Illustrates sequential and parallel stage transitions with grantStageTool tuple binding.",
+  "sequential": {
+    "description": "Plan → Build sequential transition. After Plan's Exit, Next returns a sequential NextResult.",
+    "stageExecutionId": "exec-plan-001",
+    "attempt": 1,
+    "proposalId": "prop-fs-read-001",
+    "tool": "fs.read",
+    "argsDigest": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+    "boundTokenKey": "exec-plan-001\u00001\u0000prop-fs-read-001\u0000fs.read\u0000a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+    "nextResult": {
+      "nextStages": ["Build"],
+      "execution": "sequential"
+    },
+    "phaseOrder": ["Setup", "Init", "CheckGate", "Act", "Assert", "Exit", "Next"]
+  },
+  "parallel": {
+    "description": "Build → [Test, Lint] parallel fan-out with Review join. Q-4: fail-fast on any sibling failure.",
+    "stageExecutionId": "exec-build-001",
+    "nextResult": {
+      "nextStages": ["Test", "Lint"],
+      "execution": "parallel",
+      "join": "Review"
+    },
+    "failFastOutcome": {
+      "description": "Q-4 resolution: if Test sibling fails, the compound turn aborts immediately.",
+      "ok": false,
+      "error": {
+        "class": "ExtensionHost",
+        "code": "ParallelSiblingFailure",
+        "failedSibling": "Test"
+      }
+    },
+    "joinRunsOnly": "when every sibling reaches Exit with verdict ok"
+  },
+  "ctxAccessMatrix": {
+    "description": "StageContext access rules per phase (AC-33).",
+    "Setup": ["read", "write"],
+    "Init": ["read"],
+    "CheckGate": ["read"],
+    "Act": [],
+    "Assert": ["read"],
+    "Exit": ["read"],
+    "Next": ["read"]
+  },
+  "smAttach": {
+    "description": "AC-35: on a resumed session, state slots are delivered before attach fires.",
+    "lifecycleOrder": ["init", "activate", "slot-delivery", "attach"]
+  }
+}
