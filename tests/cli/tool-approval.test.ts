@@ -232,6 +232,54 @@ function installReadFetchMock(getProjectRoot: () => string): () => void {
   };
 }
 
+function installBashAliasFetchMock(): () => void {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+
+  globalThis.fetch = (() => {
+    calls += 1;
+    if (calls === 1) {
+      return Promise.resolve(
+        new Response(
+          sseResponse([
+            JSON.stringify({
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        index: 0,
+                        id: "call_bash_pwd",
+                        function: {
+                          name: "bash",
+                          arguments: JSON.stringify({ cmd: "pwd" }),
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            }),
+            JSON.stringify({ choices: [{ finish_reason: "tool_calls" }] }),
+          ]),
+          { status: 200, headers: { "content-type": "text/event-stream" } },
+        ),
+      );
+    }
+
+    return Promise.resolve(
+      new Response(
+        sseResponse([JSON.stringify({ choices: [{ delta: { content: "Bash executed." } }] })]),
+        { status: 200, headers: { "content-type": "text/event-stream" } },
+      ),
+    );
+  }) as unknown as typeof fetch;
+
+  return () => {
+    globalThis.fetch = originalFetch;
+  };
+}
+
 describe("tool approval cache", () => {
   it("reuses a remembered directory approval for descendant paths", async () => {
     const home = await mkdtemp(join(tmpdir(), "stud-home-"));
@@ -287,6 +335,38 @@ describe("tool approval cache", () => {
       assert.deepEqual(prompt.selectPrompts, []);
       assert.equal(stdout.includes("assistant error"), false);
       assert.equal(stdout.match(/^tool: read$/gmu)?.length, 1);
+    } finally {
+      restoreFetch();
+      await rm(home, { recursive: true, force: true });
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts common bash command aliases before schema validation", async () => {
+    const home = await mkdtemp(join(tmpdir(), "stud-home-"));
+    const cwd = await mkdtemp(join(tmpdir(), "stud-project-"));
+    const projectRoot = join(cwd, ".stud");
+    const restoreFetch = installBashAliasFetchMock();
+    await mkdir(projectRoot, { recursive: true });
+
+    try {
+      await seedTrustedOpenAICompatibleProject(home, projectRoot);
+      const prompt = new RecordingPrompt({
+        selectAnswers: ["approve"],
+        inputAnswers: ["check cwd", "/exit"],
+      });
+      const stdout = await captureStdout(async () => {
+        await runShell(launchArgs({ headless: false, projectRoot }), {
+          homedir: () => home,
+          prompt,
+          sessionIdFactory: () => "session-bash-alias",
+        });
+      });
+
+      assert.deepEqual(prompt.selectPrompts, ["Allow tool 'bash' for 'pwd'?"]);
+      assert.equal(stdout.includes("assistant error"), false);
+      assert.equal(stdout.match(/^tool: bash$/gmu)?.length, 1);
+      assert.equal(stdout.includes("Bash executed."), true);
     } finally {
       restoreFetch();
       await rm(home, { recursive: true, force: true });

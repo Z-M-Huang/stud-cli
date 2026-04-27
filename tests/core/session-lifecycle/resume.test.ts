@@ -32,49 +32,45 @@ import type { SessionManifest } from "../../../src/core/session/manifest/types.j
 // ---------------------------------------------------------------------------
 
 const MANIFEST_WITH_SM: SessionManifest = {
-  schemaVersion: "1.0",
   sessionId: "s1",
   projectRoot: "/x/.stud",
   mode: "ask",
-  createdAtMonotonic: "1",
-  updatedAtMonotonic: "2",
   messages: [{ id: "m1", role: "user", content: "hi", monotonicTs: "1" }],
-  writtenByStore: "fs.reference",
-  smState: { smExtId: "missing.sm", slotVersion: "1", slot: {} },
+  storeId: "fs.reference",
+  createdAt: 1,
+  updatedAt: 2,
+  smState: { smExtId: "missing.sm", stateSlotRef: "state/missing-sm.json" },
 };
 
 const MANIFEST_WITHOUT_SM: SessionManifest = {
-  schemaVersion: "1.0",
   sessionId: "s3",
   projectRoot: "/z/.stud",
   mode: "ask",
-  createdAtMonotonic: "3",
-  updatedAtMonotonic: "4",
   messages: [],
-  writtenByStore: "fs.reference",
+  storeId: "fs.reference",
+  createdAt: 3,
+  updatedAt: 4,
 };
 
 const MANIFEST_THROW_SM: SessionManifest = {
-  schemaVersion: "1.0",
   sessionId: "s2",
   projectRoot: "/y/.stud",
   mode: "yolo",
-  createdAtMonotonic: "2",
-  updatedAtMonotonic: "3",
   messages: [],
-  writtenByStore: "fs.reference",
-  smState: { smExtId: "bad.sm", slotVersion: "2", slot: null },
+  storeId: "fs.reference",
+  createdAt: 2,
+  updatedAt: 3,
+  smState: { smExtId: "bad.sm", stateSlotRef: "state/bad-sm.json" },
 };
 
 const MANIFEST_ACTIVE: SessionManifest = {
-  schemaVersion: "1.0",
   sessionId: "s4",
   projectRoot: "/w/.stud",
   mode: "ask",
-  createdAtMonotonic: "4",
-  updatedAtMonotonic: "5",
   messages: [],
-  writtenByStore: "fs.reference",
+  storeId: "fs.reference",
+  createdAt: 4,
+  updatedAt: 5,
 };
 
 // ---------------------------------------------------------------------------
@@ -117,8 +113,7 @@ describe("resumeSession — SM attach: success", () => {
       recovery,
       activeStoreId: "fs.reference",
       lifecycleMachine: machine,
-      attachSm: (_smExtId: string, _slot: unknown, _slotVersion: string) =>
-        Promise.resolve("attached" as const),
+      attachSm: (_smExtId: string, _stateSlotRef: string) => Promise.resolve("attached" as const),
     });
 
     assert.equal(
@@ -153,8 +148,7 @@ describe("resumeSession — SM attach: success", () => {
       },
       activeStoreId: "fs.reference",
       lifecycleMachine: machine,
-      attachSm: (_smExtId: string, _slot: unknown, _slotVersion: string) =>
-        Promise.resolve("attached" as const),
+      attachSm: (_smExtId: string, _stateSlotRef: string) => Promise.resolve("attached" as const),
     });
 
     assert.equal(
@@ -185,8 +179,7 @@ describe("resumeSession — SM skip: absent extension ( Q-2)", () => {
       recovery,
       activeStoreId: "fs.reference",
       lifecycleMachine: machine,
-      attachSm: (_smExtId: string, _slot: unknown, _slotVersion: string) =>
-        Promise.resolve("skipped" as const),
+      attachSm: (_smExtId: string, _stateSlotRef: string) => Promise.resolve("skipped" as const),
     });
 
     assert.equal(outcome.messages.length, 1, "message history must be restored");
@@ -216,7 +209,7 @@ describe("resumeSession — SM skip: absent extension ( Q-2)", () => {
       recovery,
       activeStoreId: "fs.reference",
       lifecycleMachine: machine,
-      attachSm: (_smExtId: string, _slot: unknown, _slotVersion: string) =>
+      attachSm: (_smExtId: string, _stateSlotRef: string) =>
         Promise.reject(new Error("SM load failure")),
     });
 
@@ -240,7 +233,7 @@ describe("resumeSession — SM skip: no smState in manifest ( Q-2)", () => {
       },
       activeStoreId: "fs.reference",
       lifecycleMachine: machine,
-      attachSm: (_smExtId: string, _slot: unknown, _slotVersion: string) => {
+      attachSm: (_smExtId: string, _stateSlotRef: string) => {
         attachCalled = true;
         return Promise.resolve("attached" as const);
       },
@@ -263,8 +256,7 @@ describe("resumeSession — SM skip: no smState in manifest ( Q-2)", () => {
       },
       activeStoreId: "fs.reference",
       lifecycleMachine: machine,
-      attachSm: (_smExtId: string, _slot: unknown, _slotVersion: string) =>
-        Promise.resolve("attached" as const),
+      attachSm: (_smExtId: string, _stateSlotRef: string) => Promise.resolve("attached" as const),
     });
 
     assert.equal(machine.state(), "Active", "lifecycle machine must end in Active state");
@@ -281,14 +273,13 @@ describe("resumeSession — Session/ResumeMismatch", () => {
     const machine = createSessionStateMachine({ bus, deliverSmSlots: noopDeliver });
 
     const mismatchManifest: SessionManifest = {
-      schemaVersion: "1.0",
       sessionId: "s5",
       projectRoot: "/v/.stud",
       mode: "ask",
-      createdAtMonotonic: "5",
-      updatedAtMonotonic: "6",
       messages: [],
-      writtenByStore: "sqlite.store",
+      storeId: "sqlite.store",
+      createdAt: 5,
+      updatedAt: 6,
     };
 
     const recovery = {
@@ -309,8 +300,7 @@ describe("resumeSession — Session/ResumeMismatch", () => {
         recovery,
         activeStoreId: "fs.reference",
         lifecycleMachine: machine,
-        attachSm: (_smExtId: string, _slot: unknown, _slotVersion: string) =>
-          Promise.resolve("skipped" as const),
+        attachSm: (_smExtId: string, _stateSlotRef: string) => Promise.resolve("skipped" as const),
       });
     } catch (e) {
       err = e;
@@ -340,8 +330,7 @@ describe("resumeSession — Session/NoSnapshot", () => {
         },
         activeStoreId: "fs.reference",
         lifecycleMachine: machine,
-        attachSm: (_smExtId: string, _slot: unknown, _slotVersion: string) =>
-          Promise.resolve("skipped" as const),
+        attachSm: (_smExtId: string, _stateSlotRef: string) => Promise.resolve("skipped" as const),
       });
     } catch (e) {
       err = e;

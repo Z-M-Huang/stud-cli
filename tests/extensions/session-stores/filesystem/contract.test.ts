@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -9,7 +9,6 @@ import { assertContract } from "../../../helpers/contract-conformance.js";
 import { mockHost } from "../../../helpers/mock-host.js";
 
 import type { SessionManifest as ContractManifest } from "../../../../src/contracts/session-store.js";
-import type { SessionManifest as CoreManifest } from "../../../../src/core/session/manifest/types.js";
 
 async function withTempRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
   const root = await mkdtemp(join(tmpdir(), "stud-fs-store-"));
@@ -29,20 +28,6 @@ function contractManifest(overrides?: Partial<ContractManifest>): ContractManife
     storeId: contract.storeId,
     createdAt: 1,
     updatedAt: 2,
-    ...overrides,
-  };
-}
-
-function coreManifest(overrides?: Partial<CoreManifest>): CoreManifest {
-  return {
-    schemaVersion: "1.0",
-    sessionId: "s1",
-    projectRoot: "/tmp/proj/.stud",
-    mode: "ask",
-    createdAtMonotonic: "1",
-    updatedAtMonotonic: "2",
-    messages: [],
-    writtenByStore: contract.storeId,
     ...overrides,
   };
 }
@@ -76,22 +61,21 @@ describe("filesystem session store", () => {
     });
   });
 
-  it("writes slim manifest under <project-root>/sessions/<sessionId>.json", async () => {
+  it("writes slim manifest under <root>/sessions/<sessionId>/manifest.json", async () => {
     await withTempRoot(async (root) => {
       const { host, recorders } = await initHost(root);
       const result = await contract.write(contractManifest({ projectRoot: root }), [], host);
       assert.equal(result.ok, true);
-      const filePath = join(root, "sessions", "s1.json");
+      const filePath = join(root, "sessions", "s1", "manifest.json");
       const stored = JSON.parse(await readFile(filePath, "utf-8")) as Record<string, unknown>;
       assert.deepEqual(Object.keys(stored).sort(), [
-        "createdAtMonotonic",
+        "createdAt",
         "messages",
         "mode",
         "projectRoot",
-        "schemaVersion",
         "sessionId",
-        "updatedAtMonotonic",
-        "writtenByStore",
+        "storeId",
+        "updatedAt",
       ]);
       assert.equal(stored["projectRoot"], root);
       assert.equal(
@@ -118,7 +102,7 @@ describe("filesystem session store", () => {
         assert.equal(readResult.manifest.storeId, contract.storeId);
         assert.equal(readResult.manifest.createdAt, 123);
         assert.equal(readResult.manifest.updatedAt, 456);
-        assert.deepEqual(readResult.manifest.messages[0]?.["content"], manifest.messages[0]);
+        assert.deepEqual(readResult.manifest.messages[0], manifest.messages[0]);
       }
     });
   });
@@ -130,13 +114,10 @@ describe("filesystem session store", () => {
   it("returns Session/ResumeMismatch when manifest was written by a different store", async () => {
     await withTempRoot(async (root) => {
       const { host } = await initHost(root);
+      await mkdir(join(root, "sessions", "s1"), { recursive: true });
       await writeFile(
-        join(root, "sessions", "s1.json"),
-        JSON.stringify(
-          coreManifest({ projectRoot: root, writtenByStore: "sqlite-store" }),
-          null,
-          2,
-        ),
+        join(root, "sessions", "s1", "manifest.json"),
+        JSON.stringify(contractManifest({ projectRoot: root, storeId: "sqlite-store" }), null, 2),
       );
       const result = await contract.read("s1", host);
       assert.equal(result.ok, false);

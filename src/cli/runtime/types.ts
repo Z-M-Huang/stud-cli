@@ -4,6 +4,7 @@ import { contract as geminiContract } from "../../extensions/providers/gemini/in
 import { contract as openaiCompatibleContract } from "../../extensions/providers/openai-compatible/index.js";
 
 import type { ProviderContract, ProviderToolDefinition } from "../../contracts/providers.js";
+import type { SessionManifest } from "../../contracts/session-store.js";
 import type { SecurityMode, Settings as ContractSettings } from "../../contracts/settings-shape.js";
 import type { ToolTerminal } from "../../core/errors/index.js";
 import type { HostAPI } from "../../core/host/host-api.js";
@@ -92,6 +93,9 @@ export interface SessionBootstrap {
   readonly projectRoot: string;
   readonly projectTrusted: boolean;
   readonly securityMode: SecurityMode;
+  readonly manifest: SessionManifest;
+  readonly resumed: boolean;
+  readonly yolo: boolean;
 }
 
 export type ProjectTrustOutcome = "aborted" | "declined" | "not-applicable" | "trusted";

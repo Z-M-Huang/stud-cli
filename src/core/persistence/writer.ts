@@ -49,7 +49,7 @@ export function createSnapshotWriter(deps: {
 
   return {
     async writeSnapshot(manifest: SessionManifest): Promise<void> {
-      //  precondition: reject manifests with a blank/absent writtenByStore
+      // Precondition: reject manifests with a blank/absent storeId
       // before any I/O so that cross-store mismatch detection can fire on the
       // next resume. Throws Session/ManifestDrift if the field is unset.
       assertCrashSafe(manifest);

@@ -18,8 +18,8 @@
  *   2. A manifest with an `smState.smExtId` that no longer matches a
  *      loaded SM extension still resumes — the slot is simply unread.
  *   3. A manifest written by Store A and resumed by Store B throws
- *      `Session/ResumeMismatch` (the only piece of identity the manifest
- *      DOES track is `writtenByStore`).
+ *      `Session/ResumeMismatch` (the only piece of store identity the manifest
+ *      DOES track is `storeId`).
  *
  * Wiki: flows/Session-Resume-Drift.md + contracts/Session-Store.md
  */
@@ -138,13 +138,13 @@ describe("Session-Resume-Drift", () => {
     };
     await persistAndDispose(manifest, projectRoot);
 
-    // Tamper with the persisted manifest's writtenByStore field to
+    // Tamper with the persisted manifest's storeId field to
     // simulate a manifest that came from a different store.
     const sessionsDir = join(projectRoot, "sessions");
-    const filePath = join(sessionsDir, `${sessionId}.json`);
+    const filePath = join(sessionsDir, sessionId, "manifest.json");
     const raw = await readFile(filePath, "utf-8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    parsed["writtenByStore"] = "some-other-store";
+    parsed["storeId"] = "some-other-store";
     await writeFile(filePath, JSON.stringify(parsed));
 
     const result = await readBack(sessionId, projectRoot);

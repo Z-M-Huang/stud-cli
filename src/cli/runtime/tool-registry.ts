@@ -22,6 +22,7 @@ import { asSchema } from "ai";
 import { ToolTerminal } from "../../core/errors/index.js";
 
 import { studHome } from "./storage.js";
+import { coerceBashArgs } from "./tool-arg-coercion.js";
 import {
   DEFAULT_TOOL_TIMEOUT_MS,
   DEFAULT_WEB_CONTENT_BYTES,
@@ -166,6 +167,7 @@ async function loadAgentoolTool(options: {
   readonly tool: AgentoolLike;
   readonly gated: boolean;
   readonly approvalScope: LoadedTool["approvalScope"];
+  readonly prepareArgs?: ((args: unknown) => unknown) | undefined;
   readonly normalizeArgs: LoadedTool["normalizeArgs"];
   readonly deriveApprovalKey: LoadedTool["deriveApprovalKey"];
 }): Promise<LoadedTool> {
@@ -179,7 +181,7 @@ async function loadAgentoolTool(options: {
       if (schema.validate === undefined) {
         return { ok: true, value: args };
       }
-      const result = await schema.validate(args);
+      const result = await schema.validate(options.prepareArgs?.(args) ?? args);
       return result.success
         ? { ok: true, value: result.value }
         : { ok: false, errors: { message: result.error.message } };
@@ -252,7 +254,9 @@ function loadUrlScopedTool(id: string, tool: AgentoolLike): Promise<LoadedTool> 
     tool,
     gated: true,
     approvalScope: "exact",
-    normalizeArgs: passthroughArgs,
+    normalizeArgs(args) {
+      return passthroughArgs(id, args);
+    },
     deriveApprovalKey(args) {
       const record = argsRecord(id, args);
       return urlApprovalKey(record.ok ? record.value?.["url"] : undefined);
@@ -265,13 +269,17 @@ function loadPlainTool(
   tool: AgentoolLike,
   gated: boolean,
   deriveApprovalKey: LoadedTool["deriveApprovalKey"],
+  prepareArgs?: (args: unknown) => unknown,
 ): Promise<LoadedTool> {
   return loadAgentoolTool({
     id,
     tool,
     gated,
     approvalScope: "exact",
-    normalizeArgs: passthroughArgs,
+    prepareArgs,
+    normalizeArgs(args) {
+      return passthroughArgs(id, args);
+    },
     deriveApprovalKey,
   });
 }
@@ -292,6 +300,7 @@ function filesystemToolPromises(root: string): readonly Promise<LoadedTool>[] {
           ? deriveCommandPrefix(record.value["command"])
           : "";
       },
+      coerceBashArgs,
     ),
     loadPathScopedTool({
       id: "glob",

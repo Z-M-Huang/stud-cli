@@ -3,11 +3,17 @@ import { join, resolve } from "node:path";
 
 import Ajv from "ajv";
 
-import { Session, Validation } from "../../core/errors/index.js";
+import { Validation } from "../../core/errors/index.js";
 import { evaluateProjectTrust } from "../../core/project/trust-gate.js";
 import { openTrustStore } from "../../core/security/trust/store.js";
 import { mergeSettings } from "../../core/settings/validator.js";
 
+import {
+  newSessionBootstrap,
+  readTrustedProjectSettings,
+  resumeUnavailable,
+} from "./bootstrap-session.js";
+import { readLatestSessionManifest } from "./session-store.js";
 import {
   appendAudit,
   atomicWriteJson,
@@ -376,27 +382,82 @@ async function resolveProjectTrust(
   return "trusted";
 }
 
+async function bootstrapResumedSession(args: {
+  readonly prompt: PromptIO | undefined;
+  readonly launchArgs: LaunchArgs;
+  readonly globalRoot: string;
+  readonly globalSettingsPath: string;
+  readonly secretsPath: string;
+  readonly globalSettings: Settings;
+  readonly deps: ResolvedShellDeps;
+}): Promise<SessionBootstrap> {
+  const manifest = await readLatestSessionManifest(args.globalRoot);
+  if (manifest === null) {
+    resumeUnavailable();
+  }
+
+  const globalSettings = await ensureProviderSettings(
+    args.launchArgs,
+    args.prompt,
+    args.globalSettingsPath,
+    args.secretsPath,
+    args.globalSettings,
+    args.deps,
+  );
+  const project = await readTrustedProjectSettings({
+    projectRoot: manifest.projectRoot,
+    globalRoot: args.globalRoot,
+    deps: args.deps,
+    canonicalProjectPath,
+  });
+  const mergedSettings = mergeSettings(undefined, globalSettings, project.settings) as Settings;
+  const provider = configuredProvider(mergedSettings);
+  if (provider === null) {
+    throw new Validation("No usable provider is configured after resume", undefined, {
+      code: "MissingHeadlessDefaults",
+    });
+  }
+
+  return {
+    sessionId: manifest.sessionId,
+    provider,
+    projectRoot: manifest.projectRoot,
+    projectTrusted: project.projectTrusted,
+    securityMode: manifest.mode,
+    manifest,
+    resumed: true,
+    yolo: args.launchArgs.yolo,
+  };
+}
+
 export async function bootstrapSession(
   args: LaunchArgs,
   prompt: PromptIO | undefined,
   deps: ResolvedShellDeps,
 ): Promise<SessionBootstrap | null> {
-  if (args.continue) {
-    throw new Session("Resume request did not match an available session", undefined, {
-      code: "ResumeMismatch",
-    });
-  }
-
   const globalRoot = studHome(deps.homedir());
   const globalSettingsPath = join(globalRoot, "settings.json");
   const secretsPath = join(globalRoot, "secrets.json");
+  const loadedGlobalSettings = (await loadSettingsFile(globalSettingsPath)) ?? {};
+  if (args.continue) {
+    return bootstrapResumedSession({
+      prompt,
+      launchArgs: args,
+      globalRoot,
+      globalSettingsPath,
+      secretsPath,
+      globalSettings: loadedGlobalSettings,
+      deps,
+    });
+  }
+
   const projectSettingsPath = join(args.projectRoot, "settings.json");
   const globalSettings = await ensureProviderSettings(
     args,
     prompt,
     globalSettingsPath,
     secretsPath,
-    (await loadSettingsFile(globalSettingsPath)) ?? {},
+    loadedGlobalSettings,
     deps,
   );
 
@@ -418,11 +479,11 @@ export async function bootstrapSession(
     });
   }
 
-  return {
-    sessionId: deps.sessionIdFactory(),
+  return newSessionBootstrap({
+    launchArgs: args,
     provider,
-    projectRoot: args.projectRoot,
     projectTrusted: trustOutcome === "trusted",
     securityMode: resolveSecurityMode(args, mergedSettings),
-  };
+    deps,
+  });
 }

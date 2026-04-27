@@ -4,7 +4,10 @@ import { Session, ToolTerminal } from "../../core/errors/index.js";
 
 import { providerLabel } from "./bootstrap.js";
 import { createProviderHost } from "./provider-host.js";
-import { studHome } from "./storage.js";
+import { handleRuntimeCommand } from "./session-commands.js";
+import { persistSessionManifest, sessionLifecycleAudit } from "./session-store.js";
+import { appendAudit, studHome } from "./storage.js";
+import { createApprovalCache, ensureToolApproval } from "./tool-approval.js";
 import {
   disposeBundledTools,
   initializeBundledTools,
@@ -27,6 +30,7 @@ import type {
   ProviderMessage,
   ProviderToolDefinition,
 } from "../../contracts/providers.js";
+import type { SessionManifest } from "../../contracts/session-store.js";
 import type { HostAPI } from "../../core/host/host-api.js";
 import type { PromptIO } from "../prompt.js";
 
@@ -111,100 +115,44 @@ function toolResultMessage(
   };
 }
 
-function approvalCacheKey(toolId: string, approvalKey: string): string {
-  return `${toolId}:${approvalKey}`;
+function providerMessagesFromManifest(manifest: SessionManifest): ProviderMessage[] {
+  return manifest.messages
+    .map((message): ProviderMessage | null => {
+      const role = message["role"];
+      if (role !== "user" && role !== "assistant" && role !== "tool") {
+        return null;
+      }
+      return {
+        role,
+        content: message["content"] as ProviderMessage["content"],
+      };
+    })
+    .filter((message): message is ProviderMessage => message !== null);
 }
 
-function splitPathApprovalKey(approvalKey: string): readonly string[] {
-  if (approvalKey.length === 0) {
-    return [""];
-  }
-  return approvalKey.split("|").filter((part) => part.length > 0);
+function manifestMessagesFromHistory(
+  history: readonly ProviderMessage[],
+): SessionManifest["messages"] {
+  return history.map((message, index) => ({
+    id: `m${index + 1}`,
+    role: message.role,
+    content: message.content,
+    monotonicTs: String(index + 1),
+  }));
 }
 
-function pathApprovalCovers(approvedKey: string, requestedKey: string): boolean {
-  return (
-    approvedKey.length === 0 ||
-    approvedKey === requestedKey ||
-    requestedKey.startsWith(`${approvedKey}/`)
+async function persistHistorySnapshot(args: {
+  readonly manifest: SessionManifest;
+  readonly history: readonly ProviderMessage[];
+  readonly deps: ResolvedShellDeps;
+}): Promise<SessionManifest> {
+  return persistSessionManifest(
+    {
+      ...args.manifest,
+      messages: manifestMessagesFromHistory(args.history),
+    },
+    args.deps,
   );
-}
-
-function isPathApprovalCovered(
-  approvedToolKeys: ReadonlySet<string>,
-  toolId: string,
-  requestedKey: string,
-): boolean {
-  const prefix = `${toolId}:`;
-  for (const approvedCacheKey of approvedToolKeys) {
-    if (!approvedCacheKey.startsWith(prefix)) {
-      continue;
-    }
-    if (pathApprovalCovers(approvedCacheKey.slice(prefix.length), requestedKey)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function isToolApproved(
-  tool: LoadedTool,
-  approvalKey: string,
-  approvedToolKeys: ReadonlySet<string>,
-): boolean {
-  if (tool.approvalScope === "exact") {
-    return approvedToolKeys.has(approvalCacheKey(tool.id, approvalKey));
-  }
-
-  return splitPathApprovalKey(approvalKey).every((requestedKey) =>
-    isPathApprovalCovered(approvedToolKeys, tool.id, requestedKey),
-  );
-}
-
-function rememberToolApproval(
-  tool: LoadedTool,
-  approvalKey: string,
-  approvedToolKeys: Set<string>,
-): void {
-  if (tool.approvalScope === "path-set") {
-    for (const pathKey of splitPathApprovalKey(approvalKey)) {
-      approvedToolKeys.add(approvalCacheKey(tool.id, pathKey));
-    }
-    return;
-  }
-
-  approvedToolKeys.add(approvalCacheKey(tool.id, approvalKey));
-}
-
-async function ensureToolApproval(
-  session: SessionBootstrap,
-  prompt: PromptIO,
-  tool: LoadedTool,
-  args: unknown,
-  workspaceRoot: string,
-  approvedToolKeys: Set<string>,
-): Promise<boolean> {
-  if (!tool.gated || session.securityMode === "yolo") {
-    return true;
-  }
-
-  const approvalKey = tool.deriveApprovalKey(args, workspaceRoot);
-  if (isToolApproved(tool, approvalKey, approvedToolKeys)) {
-    return true;
-  }
-
-  const decision = await prompt.select(
-    `Allow tool '${tool.id}' for '${approvalKey.length > 0 ? approvalKey : "."}'?`,
-    [
-      { value: "approve", label: "approve and remember for this session" },
-      { value: "deny", label: "deny" },
-    ] as const,
-  );
-  if (decision === "approve") {
-    rememberToolApproval(tool, approvalKey, approvedToolKeys);
-    return true;
-  }
-  return false;
 }
 
 async function runAssistantIteration(args: {
@@ -274,7 +222,7 @@ async function resolveToolCallResult(args: {
   readonly toolMap: ReadonlyMap<string, LoadedTool>;
   readonly session: SessionBootstrap;
   readonly prompt: PromptIO;
-  readonly approvedToolKeys: Set<string>;
+  readonly approvalCache: ReturnType<typeof createApprovalCache>;
   readonly workspaceRoot: string;
   readonly deps: ResolvedShellDeps;
 }): Promise<RuntimeToolResult> {
@@ -298,14 +246,15 @@ async function resolveToolCallResult(args: {
   }
 
   if (
-    !(await ensureToolApproval(
-      args.session,
-      args.prompt,
+    !(await ensureToolApproval({
+      session: args.session,
+      prompt: args.prompt,
       tool,
-      normalized.value,
-      args.workspaceRoot,
-      args.approvedToolKeys,
-    ))
+      callArgs: normalized.value,
+      workspaceRoot: args.workspaceRoot,
+      cache: args.approvalCache,
+      deps: args.deps,
+    }))
   ) {
     return {
       ok: false,
@@ -327,7 +276,7 @@ async function continueAssistantTurn(args: {
   readonly history: ProviderMessage[];
   readonly tools: readonly LoadedTool[];
   readonly toolDefinitions: readonly ProviderToolDefinition[];
-  readonly approvedToolKeys: Set<string>;
+  readonly approvalCache: ReturnType<typeof createApprovalCache>;
   readonly deps: ResolvedShellDeps;
   readonly prompt: PromptIO;
 }): Promise<void> {
@@ -350,7 +299,7 @@ async function continueAssistantTurn(args: {
             toolMap,
             session: args.session,
             prompt: args.prompt,
-            approvedToolKeys: args.approvedToolKeys,
+            approvalCache: args.approvalCache,
             workspaceRoot,
             deps: args.deps,
           }),
@@ -382,8 +331,18 @@ export async function runProviderSession(
   await descriptor.contract.lifecycle.activate?.(host);
   loadedTools.push(...(await initializeBundledTools(session, deps, prompt)));
 
-  const history: ProviderMessage[] = [];
-  const approvedToolKeys = new Set<string>();
+  let manifest = await persistSessionManifest(session.manifest, deps);
+  await appendAudit(
+    studHome(deps.homedir()),
+    sessionLifecycleAudit(
+      session.resumed ? "SessionResumed" : "SessionStarted",
+      session.sessionId,
+      deps,
+    ),
+  );
+
+  const history = providerMessagesFromManifest(manifest);
+  const approvalCache = createApprovalCache(loadedTools);
   deps.stdout.write(`${sessionBanner(session)}\n`);
 
   try {
@@ -395,6 +354,22 @@ export async function runProviderSession(
       if (trimmed === "/exit" || trimmed === "/quit") {
         break;
       }
+      const command = await handleRuntimeCommand({
+        line: trimmed,
+        session,
+        tools: loadedTools,
+        manifest,
+        history,
+        deps,
+        persist: (currentManifest, currentHistory) =>
+          persistHistorySnapshot({ manifest: currentManifest, history: currentHistory, deps }),
+      });
+      if (command === "exit") {
+        break;
+      }
+      if (command === "handled") {
+        continue;
+      }
 
       history.push({ role: "user", content: trimmed });
       try {
@@ -405,15 +380,24 @@ export async function runProviderSession(
           history,
           tools: loadedTools,
           toolDefinitions: providerToolDefinitions(loadedTools),
-          approvedToolKeys,
+          approvalCache,
           deps,
           prompt,
         });
+        manifest = await persistHistorySnapshot({ manifest, history, deps });
+        await appendAudit(
+          studHome(deps.homedir()),
+          sessionLifecycleAudit("SessionPersisted", session.sessionId, deps),
+        );
       } catch (error) {
         deps.stdout.write(`${renderTurnError(session, error)}\n`);
       }
     }
   } finally {
+    await appendAudit(
+      studHome(deps.homedir()),
+      sessionLifecycleAudit("SessionClosed", session.sessionId, deps),
+    );
     await disposeBundledTools();
     await descriptor.contract.lifecycle.deactivate?.(host);
     await descriptor.contract.lifecycle.dispose?.(host);

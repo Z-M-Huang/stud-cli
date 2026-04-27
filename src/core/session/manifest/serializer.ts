@@ -4,9 +4,8 @@
  * `serializeManifest` emits pretty-printed JSON with stable (alphabetical) key
  * order so that diffs between manifest versions are readable.
  *
- * `parseManifest` validates the raw JSON string against SESSION_MANIFEST_SCHEMA,
- * then confirms `schemaVersion === '1.0'`. On any failure it throws a typed
- * `Validation` error with the appropriate code.
+ * `parseManifest` validates the raw JSON string against SESSION_MANIFEST_SCHEMA.
+ * On any failure it throws a typed `Validation` error with the appropriate code.
  *
  * Note: `$schema` is stripped before passing to AJV v6 (the version pinned in
  * package.json), which rejects the draft 2020-12 meta-schema URI.
@@ -76,8 +75,7 @@ export function serializeManifest(m: SessionManifest): string {
  * Parse and validate a raw JSON string into a `SessionManifest`.
  *
  * Throws:
- *   - `Validation` / `ManifestShapeInvalid`          — JSON parse failure or schema validation failure.
- *   - `Validation` / `ManifestSchemaVersionMismatch` — `schemaVersion !== '1.0'`.
+ *   - `Validation` / `ManifestShapeInvalid` — JSON parse failure or schema validation failure.
  *
  * @param raw — the raw JSON string read from disk.
  * @returns   a validated `SessionManifest`.
@@ -99,16 +97,5 @@ export function parseManifest(raw: string): SessionManifest {
     });
   }
 
-  // After schema validation, `parsed` has the correct shape.
-  const candidate = parsed as SessionManifest;
-
-  if (candidate.schemaVersion !== "1.0") {
-    throw new Validation("session manifest schemaVersion is not supported", undefined, {
-      code: "ManifestSchemaVersionMismatch",
-      expected: "1.0",
-      actual: candidate.schemaVersion,
-    });
-  }
-
-  return candidate;
+  return parsed as SessionManifest;
 }

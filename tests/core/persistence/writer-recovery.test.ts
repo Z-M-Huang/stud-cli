@@ -5,14 +5,14 @@
  * Covers:
  *   1. writeSnapshot awaits the store write then emits SessionPersisted.
  *   2. writeSnapshot surfaces Session/StoreUnavailable when the store write fails.
- *   3. writeSnapshot throws Session/ManifestDrift when writtenByStore is blank
+ *   3. writeSnapshot throws Session/ManifestDrift when storeId is blank
  *      ( precondition — assertCrashSafe is called before any I/O).
  *   4. SessionPersisted envelope carries correlationId, payload, and monotonicTs.
  *   5. assertStoreCompatible throws Session/ResumeMismatch on store-id mismatch.
  *   6. assertStoreCompatible is a no-op when the store ids match.
  *   7. readLastSnapshot delegates to the store.
- *   8. assertCrashSafe rejects a manifest with a blank writtenByStore.
- *   9. assertCrashSafe accepts a manifest with a populated writtenByStore.
+ *   8. assertCrashSafe rejects a manifest with a blank storeId.
+ *   9. assertCrashSafe accepts a manifest with a populated storeId.
  *
  *  parallel fan-out note:
  *   "Parallel fan-out siblings commit a single compound-turn snapshot at the
@@ -40,14 +40,13 @@ import type { SessionManifest } from "../../../src/core/session/manifest/types.j
 // ---------------------------------------------------------------------------
 
 const MINIMAL: SessionManifest = {
-  schemaVersion: "1.0",
   sessionId: "sess-abc",
   projectRoot: "/x/.stud",
   mode: "ask",
-  createdAtMonotonic: "1",
-  updatedAtMonotonic: "2",
   messages: [],
-  writtenByStore: "fs.reference",
+  storeId: "fs.reference",
+  createdAt: 1,
+  updatedAt: 2,
 };
 
 // ---------------------------------------------------------------------------
@@ -136,8 +135,8 @@ describe("createSnapshotWriter — turn-boundary writes", () => {
 // createSnapshotWriter —  precondition guard (assertCrashSafe)
 // ---------------------------------------------------------------------------
 
-describe("createSnapshotWriter —  precondition guard", () => {
-  it("throws Session/ManifestDrift when writtenByStore is blank, before any I/O", async () => {
+describe("createSnapshotWriter — precondition guard", () => {
+  it("throws Session/ManifestDrift when storeId is blank, before any I/O", async () => {
     // assertCrashSafe runs before store.write; store must not be called.
     const bus = createEventBus({ monotonic: () => 0n });
     let storeWritten = false;
@@ -153,30 +152,30 @@ describe("createSnapshotWriter —  precondition guard", () => {
     });
     let caught: unknown;
     try {
-      await w.writeSnapshot({ ...MINIMAL, writtenByStore: "" });
+      await w.writeSnapshot({ ...MINIMAL, storeId: "" });
     } catch (e) {
       caught = e;
     }
-    assert.ok(caught !== undefined, "must throw on blank writtenByStore");
+    assert.ok(caught !== undefined, "must throw on blank storeId");
     assert.equal((caught as { class: string }).class, "Session");
     assert.equal((caught as { context: { code: string } }).context.code, "ManifestDrift");
     assert.equal(storeWritten, false, "store.write must not be called when precondition fails");
   });
 
-  it("throws Session/ManifestDrift when writtenByStore is undefined", async () => {
+  it("throws Session/ManifestDrift when storeId is undefined", async () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const w = createSnapshotWriter({
       store: { write: () => Promise.resolve(), id: "fs.reference" },
       bus,
     });
-    const bad = { ...MINIMAL, writtenByStore: undefined } as unknown as SessionManifest;
+    const bad = { ...MINIMAL, storeId: undefined } as unknown as SessionManifest;
     let caught: unknown;
     try {
       await w.writeSnapshot(bad);
     } catch (e) {
       caught = e;
     }
-    assert.ok(caught !== undefined, "must throw when writtenByStore is undefined");
+    assert.ok(caught !== undefined, "must throw when storeId is undefined");
     assert.equal((caught as { class: string }).class, "Session");
     assert.equal((caught as { context: { code: string } }).context.code, "ManifestDrift");
   });
@@ -231,45 +230,45 @@ describe("createCrashRecovery", () => {
 // ---------------------------------------------------------------------------
 
 describe("assertCrashSafe", () => {
-  it("accepts a manifest with a non-empty writtenByStore", () => {
+  it("accepts a manifest with a non-empty storeId", () => {
     assertCrashSafe(MINIMAL);
   });
 
-  it("throws Session/ManifestDrift when writtenByStore is absent (undefined)", () => {
-    const bad = { ...MINIMAL, writtenByStore: undefined } as unknown as SessionManifest;
+  it("throws Session/ManifestDrift when storeId is absent (undefined)", () => {
+    const bad = { ...MINIMAL, storeId: undefined } as unknown as SessionManifest;
     let caught: unknown;
     try {
       assertCrashSafe(bad);
     } catch (e) {
       caught = e;
     }
-    assert.ok(caught !== undefined, "must throw when writtenByStore is undefined");
+    assert.ok(caught !== undefined, "must throw when storeId is undefined");
     assert.equal((caught as { class: string }).class, "Session");
     assert.equal((caught as { context: { code: string } }).context.code, "ManifestDrift");
   });
 
-  it("throws Session/ManifestDrift when writtenByStore is an empty string", () => {
-    const bad = { ...MINIMAL, writtenByStore: "" };
+  it("throws Session/ManifestDrift when storeId is an empty string", () => {
+    const bad = { ...MINIMAL, storeId: "" };
     let caught: unknown;
     try {
       assertCrashSafe(bad);
     } catch (e) {
       caught = e;
     }
-    assert.ok(caught !== undefined, "must throw on blank writtenByStore");
+    assert.ok(caught !== undefined, "must throw on blank storeId");
     assert.equal((caught as { class: string }).class, "Session");
     assert.equal((caught as { context: { code: string } }).context.code, "ManifestDrift");
   });
 
-  it("throws Session/ManifestDrift when writtenByStore is whitespace only", () => {
-    const bad = { ...MINIMAL, writtenByStore: "   " };
+  it("throws Session/ManifestDrift when storeId is whitespace only", () => {
+    const bad = { ...MINIMAL, storeId: "   " };
     let caught: unknown;
     try {
       assertCrashSafe(bad);
     } catch (e) {
       caught = e;
     }
-    assert.ok(caught !== undefined, "must throw on whitespace-only writtenByStore");
+    assert.ok(caught !== undefined, "must throw on whitespace-only storeId");
     assert.equal((caught as { class: string }).class, "Session");
     assert.equal((caught as { context: { code: string } }).context.code, "ManifestDrift");
   });
@@ -278,7 +277,7 @@ describe("assertCrashSafe", () => {
     const bad = {
       ...MINIMAL,
       sessionId: undefined,
-      writtenByStore: "",
+      storeId: "",
     } as unknown as SessionManifest;
     let caught: unknown;
     try {
@@ -286,7 +285,7 @@ describe("assertCrashSafe", () => {
     } catch (e) {
       caught = e;
     }
-    assert.ok(caught !== undefined, "must throw when writtenByStore is blank");
+    assert.ok(caught !== undefined, "must throw when storeId is blank");
     assert.equal((caught as { class: string }).class, "Session");
     assert.equal((caught as { context: { code: string } }).context.code, "ManifestDrift");
   });

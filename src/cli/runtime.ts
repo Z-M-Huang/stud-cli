@@ -5,6 +5,7 @@ import { Validation } from "../core/errors/index.js";
 
 import { createPromptIO } from "./prompt.js";
 import { bootstrapSession } from "./runtime/bootstrap.js";
+import { createHeadlessPrompt } from "./runtime/headless-prompt.js";
 import { runProviderSession } from "./runtime/session-loop.js";
 import { resolvePackageVersion } from "./runtime/storage.js";
 
@@ -49,9 +50,7 @@ export async function runRuntime(args: LaunchArgs, deps: ShellDeps = {}): Promis
       return { exitCode: 0, session: { id: null } };
     }
     if (args.headless) {
-      throw new Validation("Headless session execution is not yet implemented", undefined, {
-        code: "HeadlessSessionUnsupported",
-      });
+      prompt = await createHeadlessPrompt(resolved, { yolo: args.yolo });
     }
     if (prompt === undefined) {
       throw new Validation("Interactive session startup requires a prompt surface", undefined, {

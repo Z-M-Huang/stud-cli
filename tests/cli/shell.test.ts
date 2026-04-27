@@ -111,12 +111,10 @@ async function withTempHome(run: (home: string) => Promise<void>): Promise<void>
     await rm(home, { recursive: true, force: true });
   }
 }
-
 interface CapturedOpenAIRequest {
   readonly url: string;
   readonly body: Readonly<Record<string, unknown>>;
 }
-
 async function seedTrustedOpenAICompatibleProject(
   home: string,
   projectRoot: string,
@@ -155,14 +153,12 @@ async function seedTrustedOpenAICompatibleProject(
     }),
   );
 }
-
 function installReadToolFetchMock(getProjectRoot: () => string): {
   readonly calls: CapturedOpenAIRequest[];
   readonly restore: () => void;
 } {
   const originalFetch = globalThis.fetch;
   const calls: CapturedOpenAIRequest[] = [];
-
   globalThis.fetch = ((input, init) => {
     const body = typeof init?.body === "string" ? init.body : "{}";
     calls.push({
@@ -220,7 +216,6 @@ function installReadToolFetchMock(getProjectRoot: () => string): {
     },
   };
 }
-
 describe("runShell (basic paths)", () => {
   it("returns exitCode 0 and prints stable help when --help is requested", async () => {
     const captured: { handle?: Awaited<ReturnType<typeof runShell>> } = {};
@@ -427,11 +422,15 @@ describe("runShell (error surfaces)", () => {
 
   it("propagates Session.ResumeMismatch through the TUI startup-error view", async () => {
     let handleExitCode = 0;
-    const output = await captureStderr(async () => {
-      const handle = await runShell(launchArgs({ continue: true, rawArgv: ["--continue"] }));
-      handleExitCode = handle.exitCode;
+    let output = "";
+    await withTempHome(async (home) => {
+      output = await captureStderr(async () => {
+        const handle = await runShell(launchArgs({ continue: true, rawArgv: ["--continue"] }), {
+          homedir: () => home,
+        });
+        handleExitCode = handle.exitCode;
+      });
     });
-
     const payload = readStructuredStderr(output);
     const error = structuredError(payload);
     assert.equal(handleExitCode, 1);
@@ -439,7 +438,9 @@ describe("runShell (error surfaces)", () => {
     assert.equal(error["class"], "Session");
     assert.equal(error["code"], "ResumeMismatch");
   });
+});
 
+describe("runShell (provider error surfaces)", () => {
   it("surfaces turn-time provider errors with an OpenAI-compatible /v1 hint", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (() =>
@@ -488,7 +489,6 @@ describe("runShell (error surfaces)", () => {
       globalThis.fetch = originalFetch;
     }
   });
-
   it("main() returns 0 on a clean --help path", async () => {
     let code = 0;
     await captureStdout(async () => {

@@ -25,14 +25,13 @@ import type { SessionManifest } from "../../../../src/core/session/manifest/type
 // ---------------------------------------------------------------------------
 
 const BASE: SessionManifest = {
-  schemaVersion: "1.0",
   sessionId: "s",
   projectRoot: "/x/.stud",
   mode: "ask",
-  createdAtMonotonic: "1",
-  updatedAtMonotonic: "2",
   messages: [],
-  writtenByStore: "fs.reference",
+  storeId: "fs.reference",
+  createdAt: 1,
+  updatedAt: 2,
 };
 
 // ---------------------------------------------------------------------------
@@ -45,8 +44,7 @@ describe("assertManifestClean — clean detection", () => {
       ...BASE,
       smState: {
         smExtId: "ext.sm",
-        slotVersion: "1",
-        slot: { apiKeyRef: { kind: "env", name: "MY_KEY" } },
+        stateSlotRef: "state/ext-sm.json",
       },
     };
     // Must not throw — reference object is well-formed and plaintext absent.
@@ -99,12 +97,7 @@ describe("assertManifestClean — clean detection", () => {
   it("throws Validation/MalformedSecretReference when kind is known but name is missing", () => {
     const manifest: SessionManifest = {
       ...BASE,
-      smState: {
-        smExtId: "ext.sm",
-        slotVersion: "1",
-        // kind is 'env' but name is absent → malformed reference
-        slot: { apiKeyRef: { kind: "env" } },
-      },
+      messages: [{ content: { apiKeyRef: { kind: "env" } } }],
     };
     let err: unknown;
     try {
@@ -119,26 +112,18 @@ describe("assertManifestClean — clean detection", () => {
 });
 
 describe("assertManifestClean — reference kinds and edge cases", () => {
-  it("accepts a keyring reference in smState.slot without throwing", () => {
+  it("accepts a keyring reference in opaque message content without throwing", () => {
     const manifest: SessionManifest = {
       ...BASE,
-      smState: {
-        smExtId: "ext.sm",
-        slotVersion: "1",
-        slot: { tokenRef: { kind: "keyring", name: "MY_TOKEN" } },
-      },
+      messages: [{ content: { tokenRef: { kind: "keyring", name: "MY_TOKEN" } } }],
     };
     assertManifestClean(manifest, ["resolved-token-value"]);
   });
 
-  it("accepts a file reference in smState.slot without throwing", () => {
+  it("accepts a file reference in opaque message content without throwing", () => {
     const manifest: SessionManifest = {
       ...BASE,
-      smState: {
-        smExtId: "ext.sm",
-        slotVersion: "1",
-        slot: { certRef: { kind: "file", name: "/run/secrets/cert.pem" } },
-      },
+      messages: [{ content: { certRef: { kind: "file", name: "/run/secrets/cert.pem" } } }],
     };
     assertManifestClean(manifest, ["BEGIN CERTIFICATE"]);
   });
@@ -156,14 +141,10 @@ describe("assertManifestClean — reference kinds and edge cases", () => {
     assertManifestClean(manifest, [""]);
   });
 
-  it("throws Session/SecretLeak when secret appears in nested slot field", () => {
+  it("throws Session/SecretLeak when secret appears in nested message content", () => {
     const manifest: SessionManifest = {
       ...BASE,
-      smState: {
-        smExtId: "ext.sm",
-        slotVersion: "1",
-        slot: { nested: { deep: "super-secret-value" } },
-      },
+      messages: [{ content: { nested: { deep: "super-secret-value" } } }],
     };
     let err: unknown;
     try {

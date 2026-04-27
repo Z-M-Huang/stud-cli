@@ -61,7 +61,7 @@ async function recoverManifest(filePath: string): Promise<SessionManifest> {
 }
 
 function sessionPath(state: StoreState, sessionId: string): string {
-  return join(state.sessionsDir, `${basename(sessionId)}.json`);
+  return join(state.sessionsDir, basename(sessionId), "manifest.json");
 }
 
 export function configForHost(host: HostAPI): StoreState | undefined {
@@ -105,7 +105,7 @@ export async function persistManifest(manifest: SessionManifest, host: HostAPI):
   const state = stateForHost(host);
   const filePath = sessionPath(state, manifest.sessionId);
   try {
-    await mkdir(state.sessionsDir, { recursive: true });
+    await mkdir(join(state.sessionsDir, basename(manifest.sessionId)), { recursive: true });
     await writeCrashSafe(filePath, serializeManifest(manifest));
     await host.audit.write({
       severity: "info",
@@ -134,11 +134,11 @@ export async function resumeManifest(sessionId: string, host: HostAPI): Promise<
       path: filePath,
     });
   }
-  if (manifest.writtenByStore !== FILESYSTEM_STORE_ID) {
+  if (manifest.storeId !== FILESYSTEM_STORE_ID) {
     throw new Session("session manifest was written by a different store", undefined, {
       code: "ResumeMismatch",
       sessionId,
-      manifestStoreId: manifest.writtenByStore,
+      manifestStoreId: manifest.storeId,
       activeStoreId: FILESYSTEM_STORE_ID,
     });
   }
@@ -155,7 +155,7 @@ export async function listManifests(host: HostAPI): Promise<readonly string[]> {
   const state = stateForHost(host);
   try {
     const names = await readdir(state.sessionsDir);
-    return names.filter((name) => name.endsWith(".json")).map((name) => name.slice(0, -5));
+    return names;
   } catch (err) {
     throw new Session("filesystem session store failed to list manifests", err, {
       code: "StoreUnavailable",

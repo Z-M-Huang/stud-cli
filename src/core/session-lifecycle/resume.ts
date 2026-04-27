@@ -69,11 +69,7 @@ export async function resumeSession(deps: {
   readonly recovery: CrashRecovery;
   readonly activeStoreId: string;
   readonly lifecycleMachine: SessionStateMachine;
-  readonly attachSm: (
-    smExtId: string,
-    slot: unknown,
-    slotVersion: string,
-  ) => Promise<"attached" | "skipped">;
+  readonly attachSm: (smExtId: string, stateSlotRef: string) => Promise<"attached" | "skipped">;
 }): Promise<ResumeOutcome> {
   const { recovery, activeStoreId, lifecycleMachine, attachSm } = deps;
 
@@ -87,16 +83,16 @@ export async function resumeSession(deps: {
 
   // Step 2: Assert that the active store matches the one that wrote the manifest.
   // Throws Session/ResumeMismatch if they differ (invariant #4).
-  recovery.assertStoreCompatible(manifest.writtenByStore, activeStoreId);
+  recovery.assertStoreCompatible(manifest.storeId, activeStoreId);
 
   // Step 3: Attempt SM attach when smState is present.
   let smRestored = false;
   const skippedExtensions: { extId: string; reason: string }[] = [];
 
   if (manifest.smState !== undefined) {
-    const { smExtId, slot, slotVersion } = manifest.smState;
+    const { smExtId, stateSlotRef } = manifest.smState;
     try {
-      const result = await attachSm(smExtId, slot, slotVersion);
+      const result = await attachSm(smExtId, stateSlotRef);
       if (result === "attached") {
         smRestored = true;
       } else {

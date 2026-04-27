@@ -13,7 +13,7 @@
  *      SessionActive (begin-turn), SessionPersisted (snapshot),
  *      SessionClosed (shutdown), and SessionResumed (resume).
  *   4. No `Session/ResumeMismatch` is thrown when the launching store's
- *      `storeId` matches the persisted manifest's `writtenByStore`.
+ *      `storeId` matches the persisted manifest's `storeId`.
  *
  * Wiki: flows/Session-Resume.md + core/Session-Lifecycle.md
  */

@@ -137,7 +137,10 @@ async function runDeviceCodeThenSecondTurn(): Promise<AuthRunResult> {
   await filesystemStore.lifecycle.deactivate?.(host);
   await filesystemStore.lifecycle.dispose?.(host);
 
-  const manifestBytes = await readFile(join(projectRoot, "sessions", `${sessionId}.json`), "utf-8");
+  const manifestBytes = await readFile(
+    join(projectRoot, "sessions", sessionId, "manifest.json"),
+    "utf-8",
+  );
 
   return {
     devicePrompted: interactor.prompts.some((p) => p.kind === "Auth.DeviceCode"),

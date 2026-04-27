@@ -57,13 +57,16 @@ Most coding CLIs hard-wire one provider, one toolset, and one workflow — integ
 - entering a directory with `<cwd>/.stud/` now triggers a real project-trust decision before project settings are read.
 - `stud-cli --version` and `stud-cli --help` work again.
 - a minimal interactive chat loop now starts after bootstrap.
+- sessions persist under `~/.stud/sessions/<sessionId>/manifest.json`, and `stud-cli --continue` resumes the latest session.
+- `--headless` consumes stdin for a single turn; interaction prompts emit a structured headless-required error unless `--yolo` is set.
+- the default runtime toolset is backed by `agentool` and includes all non-`task-*` tools (`bash`, `glob`, `grep`, `read`, `edit`, `write`, `multi-edit`, `diff`, `lsp`, `web-fetch`, `http-request`, `memory`, `sleep`, `web-search`, `tool-search`, and `ask-user`).
 
 What is still incomplete:
 
-- `--continue` still returns `Session/ResumeMismatch`.
-- `--headless` session execution is not wired yet.
 - bundled-provider quality is uneven: `openai-compatible`, `gemini`, and `cli-wrapper` are the practical paths today; the Anthropic adapter is still incomplete.
 - the full extension-discovery/runtime graph described in the wiki is not what the CLI boot path uses yet; bundled providers are statically registered for now.
+- the default TUI is still a line-oriented shell surface, not the full reference TUI described in the wiki.
+- MCP, dynamic extension discovery/reload, SM runtime attach, and capability-negotiated provider/model switching are still integration gaps.
 
 | Phase                                 | Scope                                                               | State       |
 | ------------------------------------- | ------------------------------------------------------------------- | ----------- |
@@ -102,6 +105,7 @@ The resulting global files live under `~/.stud/`:
 - `trust.json` for project trust decisions
 - `secrets.json` for locally stored secret references used by non-env auth paths
 - `audit.jsonl` for bootstrap-side audit records
+- `sessions/<sessionId>/manifest.json` for durable session history
 
 ## Architecture
 
