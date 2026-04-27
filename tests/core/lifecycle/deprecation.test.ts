@@ -123,19 +123,18 @@ describe("checkDeprecation", () => {
     assert.equal(result.status, "soft");
   });
 
-  it("returns cloned bundled registry entries", () => {
-    const first = loadDeprecationRegistry()[0];
-    const second = loadDeprecationRegistry()[0];
+  it("loadDeprecationRegistry returns a fresh array each call (no shared mutable state)", () => {
+    // Wiki: Deprecation-Policy.md — "Once live, a surface never returns from
+    // deprecation silently." No surface has been live in any release yet
+    // (v1.0.0 is the first), so the bundled registry is intentionally empty.
+    // This test pins the cloning contract on the empty registry; future
+    // deprecations populate it after their soft window opens at v1.1.0+.
+    const first = loadDeprecationRegistry();
+    const second = loadDeprecationRegistry();
 
-    assert.notEqual(first, second);
-  });
-
-  it("loads the bundled Q-N dropped fields registry", () => {
-    const fields = loadDeprecationRegistry().map((entry) => entry.field);
-
-    assert.ok(fields.includes("validationSeverity"));
-    assert.ok(fields.includes("tools.sensitivity"));
-    assert.ok(fields.includes("context-providers.capabilities"));
+    assert.notEqual(first, second, "loadDeprecationRegistry must return a fresh array each call");
+    assert.deepEqual(first, [], "no surface has been live in any release; registry is empty");
+    assert.deepEqual(second, []);
   });
 });
 
