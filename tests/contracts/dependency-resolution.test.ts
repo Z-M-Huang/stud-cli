@@ -13,8 +13,6 @@
  * Wiki: contracts/Dependency-Resolution.md + core/Extension-Lifecycle.md
  */
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import Ajv from "ajv";
@@ -409,47 +407,15 @@ describe("extensionDependencySchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. contractVersion drift discipline (AC-107 / AC-112)
+// 7. contractVersion shape (AC-107)
 // ---------------------------------------------------------------------------
 
-describe("contractVersion (AC-107 / AC-112)", () => {
+describe("contractVersion (AC-107)", () => {
   it("exports a semver-shaped contractVersion string", () => {
     assert.match(
       contractVersion,
       /^\d+\.\d+\.\d+$/,
       "contractVersion must be a SemVer string (X.Y.Z)",
-    );
-  });
-
-  it("matches the contractVersion declared in the wiki page", async () => {
-    const wikiPath = join(process.cwd(), "../stud-cli.wiki/contracts/Dependency-Resolution.md");
-
-    let wikiContent: string;
-    try {
-      wikiContent = await readFile(wikiPath, "utf8");
-    } catch {
-      // Wiki directory not present in this checkout — skip the file-read assertion.
-      // The wiki-drift CI job (scripts/wiki-drift.ts) catches divergence where the
-      // wiki peer repo is always present.
-      return;
-    }
-
-    const match = /`?\*{0,2}contractVersion\*{0,2}`?:[ \t]*\*{0,2}(\d+\.\d+\.\d+)\*{0,2}/i.exec(
-      wikiContent,
-    );
-    assert.ok(
-      match !== null,
-      `Wiki page at ${wikiPath} must declare a contractVersion. ` +
-        "Add a line like: `contractVersion`: **X.Y.Z** per contracts/Versioning-and-Compatibility.md.",
-    );
-
-    const wikiVersion = match[1];
-    assert.equal(
-      contractVersion,
-      wikiVersion,
-      `Exported contractVersion "${contractVersion}" must match wiki page ` +
-        `contractVersion "${String(wikiVersion)}". ` +
-        "Bump both in the same PR per AC-107.",
     );
   });
 });

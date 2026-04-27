@@ -35,7 +35,6 @@ export default tseslint.config(
             "eslint.config.js",
             "scripts/*.ts",
             "tests/scripts/*.ts",
-            "tests/wiki/*.ts",
             "tests/ci/*.ts",
             "tests/cli/*.ts",
             // tests/core/<category>/*.ts — added as new test directories land.

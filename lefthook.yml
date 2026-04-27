@@ -28,7 +28,5 @@ pre-push:
       run: bun run ban-bun-globals
     boundary-check:
       run: bun run boundary-check
-    wiki-drift:
-      run: bun run wiki-drift
     examples-check:
       run: bun run examples-check

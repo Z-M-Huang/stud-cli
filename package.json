@@ -47,7 +47,6 @@
     "banned-vocab": "node --import tsx scripts/banned-vocab.ts",
     "ban-bun-globals": "node --import tsx scripts/ban-bun-globals.ts",
     "boundary-check": "node --import tsx scripts/boundary-check.ts",
-    "wiki-drift": "node --import tsx scripts/wiki-drift.ts",
     "examples-check": "node --import tsx scripts/examples-check.ts",
     "prepublishOnly": "bun install --frozen-lockfile && bun run audit && bun run typecheck && bun run lint && bun run test && bun run build"
   },

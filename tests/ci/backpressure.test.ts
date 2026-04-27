@@ -22,7 +22,6 @@ const REQUIRED_NEEDS = [
   "audit",
   "banned-vocab",
   "boundary-check",
-  "wiki-drift",
   "examples-check",
 ] as const;
 

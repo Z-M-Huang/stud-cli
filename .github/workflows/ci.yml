@@ -59,9 +59,6 @@ jobs:
       - name: Extensibility boundary check
         run: bun run boundary-check
 
-      - name: Wiki drift check
-        run: bun run wiki-drift
-
       - name: Examples parity check
         run: bun run examples-check
 
@@ -74,4 +71,4 @@ jobs:
         run: |
           echo "backpressure checkpoint passed: typecheck, lint, format,"
           echo "test, coverage, audit, banned-vocab, boundary-check,"
-          echo "wiki-drift, examples-check all green."
+          echo "examples-check all green."

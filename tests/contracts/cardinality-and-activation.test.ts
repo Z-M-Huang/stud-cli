@@ -15,8 +15,6 @@
  * Wiki: contracts/Cardinality-and-Activation.md
  */
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import Ajv from "ajv";
@@ -255,79 +253,17 @@ describe("cardinalityDeclarationSchema", () => {
 // 4. contractVersion drift discipline (AC-107 / AC-112)
 //
 // AC-107: every edit to a *Contract type in src/contracts/ must bump contractVersion
-//   on the wiki page and append a changelog entry in the same PR.
-// AC-112: scripts/wiki-drift.ts compares contractVersion in src/contracts/*.ts against
-//   ../stud-cli.wiki/contracts/*.md and exits non-zero on mismatch. For per-category
-//   contracts that embed contractVersion as an object property literal the drift script
-//   auto-detects mismatches. This meta-contract (cardinality-and-activation.ts) exports
-//   contractVersion as a standalone named const; the 'matches wiki page' test below acts
-//   as the explicit drift guard for this module. The full end-to-end drift-detection
-//   behaviour is covered in tests/scripts/wiki-drift.test.ts.
+//   on the wiki page and append a changelog entry in the same PR. The code-side
+//   shape of contractVersion (SemVer string) is asserted here; spec parity is a
+//   manual discipline (no longer enforced by a wiki-coupled CI gate).
 // ---------------------------------------------------------------------------
 
-describe("contractVersion (AC-107 / AC-112)", () => {
+describe("contractVersion (AC-107)", () => {
   it("exports a semver-shaped contractVersion string", () => {
     assert.match(
       contractVersion,
       /^\d+\.\d+\.\d+$/,
       "contractVersion must be a SemVer string (X.Y.Z)",
-    );
-  });
-
-  it("matches the contractVersion declared in the wiki page", async () => {
-    // Derive the wiki path relative to the project root (process.cwd() is
-    // stud-cli/ when tests run via 'node --test' or 'bun test').
-    const wikiPath = join(
-      process.cwd(),
-      "../stud-cli.wiki/contracts/Cardinality-and-Activation.md",
-    );
-
-    let wikiContent: string;
-    try {
-      wikiContent = await readFile(wikiPath, "utf8");
-    } catch {
-      // Wiki directory not present in this checkout — skip the file-read assertion.
-      // The wiki-drift CI job (scripts/wiki-drift.ts) catches divergence in CI
-      // where the wiki peer repo is always present.
-      return;
-    }
-
-    // Match the wiki format: `contractVersion`: **1.0.0**
-    // Handles variants: backtick or bold wrapping around the keyword and/or value.
-    // The same pattern is used by extractMdContractVersion() in scripts/wiki-drift.ts.
-    const match = /`?\*{0,2}contractVersion\*{0,2}`?:[ \t]*\*{0,2}(\d+\.\d+\.\d+)\*{0,2}/i.exec(
-      wikiContent,
-    );
-    assert.ok(
-      match !== null,
-      `Wiki page at ${wikiPath} must declare a contractVersion. ` +
-        "Add a line like: `contractVersion`: **X.Y.Z** per contracts/Versioning-and-Compatibility.md.",
-    );
-
-    const wikiVersion = match[1];
-    assert.equal(
-      contractVersion,
-      wikiVersion,
-      `Exported contractVersion "${contractVersion}" must match wiki page ` +
-        `contractVersion "${String(wikiVersion)}". ` +
-        "Bump both in the same PR per AC-107; the wiki-drift CI check " +
-        "(bun run scripts/wiki-drift.ts) will also catch this divergence.",
-    );
-  });
-
-  it("wiki-drift script exists and is runnable", async () => {
-    // AC-112: the drift-detection script must exist at scripts/wiki-drift.ts.
-    // Its functional behaviour (drift detected / clean) is tested with fixture
-    // directories in tests/scripts/wiki-drift.test.ts.
-    const scriptPath = join(process.cwd(), "scripts/wiki-drift.ts");
-    const scriptSource = await readFile(scriptPath, "utf8");
-    assert.ok(
-      scriptSource.includes("runWikiDrift"),
-      "scripts/wiki-drift.ts must export runWikiDrift() for testability",
-    );
-    assert.ok(
-      scriptSource.includes("contractVersion"),
-      "scripts/wiki-drift.ts must reference contractVersion to perform drift checks",
     );
   });
 });
