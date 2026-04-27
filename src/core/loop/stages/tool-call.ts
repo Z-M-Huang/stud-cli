@@ -7,10 +7,15 @@
  *   3. Collect per-call results without failing the whole turn on individual
  *      tool errors.
  *   4. Preserve input order in the returned results and continue to
- *      COMPOSE_REQUEST.
+ *      COMPOSE_REQUEST. On halt, terminate the turn instead.
  *
  * Error handling:
  *   - Denials are recorded as ToolTerminal/ApprovalDenied results.
+ *   - Halt verdicts (Q-7 emit-and-halt) terminate the turn cleanly via
+ *     `next: "END_OF_TURN"`. The halted call is NOT synthesised as
+ *     `ApprovalDenied`; pending later calls are skipped; no executor is
+ *     dispatched. The host's `raiseApproval` callback already emitted the
+ *     `HeadlessInteractionRequired` event by the time the halt reaches here.
  *   - Executor-thrown typed errors are serialized per call.
  *   - Non-typed thrown values are coerced to ToolTerminal/ToolExecutionFailed.
  *   - Cancellation/ToolCancelled and Cancellation/TurnCancelled are recorded per
@@ -43,7 +48,11 @@ export type ApprovalStack = (call: {
   id: string;
   name: string;
   args: unknown;
-}) => Promise<{ decision: "approve" } | { decision: "deny"; reason: string }>;
+}) => Promise<
+  | { decision: "approve" }
+  | { decision: "deny"; reason: string }
+  | { decision: "halt"; reason: string }
+>;
 
 export type ToolExecutor = (name: string, args: unknown, signal: AbortSignal) => Promise<unknown>;
 
@@ -99,7 +108,7 @@ export function toolCallStage(deps: {
   readonly approvalStack: ApprovalStack;
   readonly executor: ToolExecutor;
   readonly turnSignal: AbortSignal;
-}): StageHandler<ToolCallInput, { results: readonly ToolCallResult[] }> {
+}): StageHandler<ToolCallInput, { results: readonly ToolCallResult[]; halt?: { reason: string } }> {
   const { approvalStack, executor, turnSignal } = deps;
 
   return async function toolCall(input) {
@@ -113,6 +122,22 @@ export function toolCallStage(deps: {
       if (decision.decision === "approve") {
         approvedCalls.push(call);
         continue;
+      }
+      if (decision.decision === "halt") {
+        // Q-7 emit-and-halt: terminate the turn before dispatching any
+        // executor. Do not synthesise ApprovalDenied for the halted call
+        // and do not process remaining calls. The host's raiseApproval
+        // callback already emitted the structured permission-required
+        // event before returning halt.
+        return {
+          next: "END_OF_TURN" as const,
+          payload: {
+            results: toolCalls
+              .filter((toolCall) => resultsById.has(toolCall.id))
+              .map((toolCall) => resultsById.get(toolCall.id)!),
+            halt: { reason: decision.reason },
+          },
+        };
       }
       resultsById.set(call.id, deniedResult(call)(decision.reason));
     }

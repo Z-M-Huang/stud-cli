@@ -140,7 +140,7 @@ function baseInput(overrides: Partial<StackInput>): StackInput {
     proposalId: "prop-1",
     mode: askMode,
     cache: dummyCache(),
-    headless: true,
+    raiseApproval: () => Promise.resolve({ kind: "approve" }),
     guardHooks: [],
     audit: { write: () => Promise.resolve() },
     ...overrides,

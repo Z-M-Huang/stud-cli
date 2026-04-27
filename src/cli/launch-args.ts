@@ -27,7 +27,6 @@ export function formatHelp(): string {
     "  --yolo                    Skip prompts in headless and tool approvals in interactive mode.",
     "  --mode <ask|yolo|allowlist>",
     "                            Set the session security mode at session start.",
-    "  --project-root <path>     Set the project root (default: <cwd>/.stud).",
     "  --sm <id>                 Attach the named state machine at session start.",
     "  --help                    Print this help and exit.",
     "",
@@ -43,7 +42,10 @@ export function parseLaunchArgs(
   let headless = false;
   let yolo = false;
   let mode: SecurityMode | null = null;
-  let projectRoot = join(env.cwd(), ".stud");
+  // Project root is always <cwd>/.stud per safety invariant #5 (no walk-up,
+  // no override). Wiki: runtime/Launch-Arguments.md "Flags not accepted" lists
+  // --project-root as out-of-scope for v1.
+  const projectRoot = join(env.cwd(), ".stud");
   let sm: string | null = null;
   let help = false;
 
@@ -76,11 +78,6 @@ export function parseLaunchArgs(
           });
         }
         mode = value as SecurityMode;
-        index += 1;
-        break;
-      }
-      case "--project-root": {
-        projectRoot = requireValue(argv, index, "--project-root");
         index += 1;
         break;
       }

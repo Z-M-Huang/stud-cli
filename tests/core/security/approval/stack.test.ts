@@ -16,7 +16,21 @@ import type {
   AuditWriter,
   GuardHookHandle,
 } from "../../../../src/core/security/approval/stack.js";
+import type {
+  RaiseApproval,
+  RaiseApprovalOutcome,
+} from "../../../../src/core/security/modes/gate.js";
 import type { SecurityModeRecord } from "../../../../src/core/security/modes/mode.js";
+
+// Default raiseApproval stub: every call resolves to "approve". Use only for
+// SM-envelope / SM-grant-token / yolo paths where the gate's raiseApproval
+// is unreachable. For ask-mode tests, build an explicit stub.
+const defaultRaiseApproval: RaiseApproval = () =>
+  Promise.resolve({ kind: "approve" } satisfies RaiseApprovalOutcome);
+
+const raiseApprovalUnreachable: RaiseApproval = () => {
+  throw new Error("raiseApproval was invoked but the test path should never reach the gate");
+};
 
 function buildTool(toolId: string): ToolContract {
   return {
@@ -148,7 +162,7 @@ async function runEnvelopeApprove(): Promise<void> {
     proposalId: "p1",
     mode: buildModeRecord("allowlist", []),
     cache: buildMemoryCache(),
-    headless: false,
+    raiseApproval: defaultRaiseApproval,
     guardHooks: [],
     audit: buildMockAudit(),
   });
@@ -166,7 +180,7 @@ async function runSmDenyInYolo(): Promise<void> {
     proposalId: "p1",
     mode: buildModeRecord("yolo", []),
     cache: buildMemoryCache(),
-    headless: false,
+    raiseApproval: defaultRaiseApproval,
     guardHooks: [],
     audit: buildMockAudit(),
   });
@@ -185,7 +199,7 @@ async function runSingleUseGrantToken(): Promise<void> {
     proposalId: "p1-reuse",
     mode: buildModeRecord("allowlist", []),
     cache: buildMemoryCache(),
-    headless: false,
+    raiseApproval: defaultRaiseApproval,
     guardHooks: [],
     audit: buildMockAudit(),
   } as const;
@@ -212,7 +226,7 @@ async function runModeGatePath(): Promise<void> {
     proposalId: "p1",
     mode: buildModeRecord("allowlist", ["read:*"]),
     cache: buildMemoryCache(),
-    headless: false,
+    raiseApproval: defaultRaiseApproval,
     guardHooks: [],
     audit: buildMockAudit(),
   });
@@ -231,12 +245,7 @@ async function runModeGateAskApproval(): Promise<void> {
     proposalId: "p1-ask",
     mode: buildModeRecord("ask", []),
     cache,
-    interactor: {
-      approve() {
-        return Promise.resolve(true);
-      },
-    },
-    headless: false,
+    raiseApproval: defaultRaiseApproval,
     guardHooks: [],
     audit: buildMockAudit(),
   });
@@ -256,7 +265,7 @@ async function runSmDeferBlocks(): Promise<void> {
     proposalId: "p1-defer",
     mode: buildModeRecord("yolo", []),
     cache: buildMemoryCache(),
-    headless: false,
+    raiseApproval: defaultRaiseApproval,
     guardHooks: [],
     audit: buildMockAudit(),
   });
@@ -279,7 +288,7 @@ async function runSmApproveWithoutStageExecutionId(): Promise<void> {
     proposalId: "p1-no-stage",
     mode: buildModeRecord("allowlist", []),
     cache: buildMemoryCache(),
-    headless: false,
+    raiseApproval: defaultRaiseApproval,
     guardHooks: [],
     audit: buildMockAudit(),
   });
@@ -302,7 +311,7 @@ async function runSmWithoutGrantStageTool(): Promise<void> {
     proposalId: "p1-no-grant",
     mode: buildModeRecord("yolo", []),
     cache: buildMemoryCache(),
-    headless: false,
+    raiseApproval: defaultRaiseApproval,
     guardHooks: [],
     audit: buildMockAudit(),
   });
@@ -326,7 +335,7 @@ async function runGuardDenial(): Promise<void> {
     proposalId: "p1-guard",
     mode: buildModeRecord("yolo", []),
     cache: buildMemoryCache(),
-    headless: false,
+    raiseApproval: defaultRaiseApproval,
     guardHooks: [buildMockGuard({ deny: true, code: "BashPolicyBlocked", calls })],
     audit: buildMockAudit(),
   });
@@ -346,7 +355,7 @@ async function runAuditEmission(): Promise<void> {
     proposalId: "p1-audit",
     mode: buildModeRecord("yolo", []),
     cache: buildMemoryCache(),
-    headless: false,
+    raiseApproval: defaultRaiseApproval,
     guardHooks: [],
     audit,
   });
@@ -359,6 +368,67 @@ function runDigestStability(): void {
   const b = digestArgs({ b: 2, a: 1 });
   assert.equal(a.sha256, b.sha256);
 }
+
+async function runGateHaltPropagatesAsStackHalt(): Promise<void> {
+  // Q-7: when raiseApproval halts (e.g. headless without --yolo), the gate's
+  // halt verdict propagates as a stack halt with source "mode-gate". Guard
+  // hooks MUST NOT run on halt; audit MUST record decision: "halt".
+  const guardCalls = { count: 0 };
+  const audit = buildMockAudit();
+  const decision = await runApprovalStack({
+    toolId: "read",
+    args: { path: "/halt.md" },
+    tool: buildTool("read"),
+    sm: null,
+    stageExecutionId: null,
+    attempt: 1,
+    proposalId: "p1-halt",
+    mode: buildModeRecord("ask", []),
+    cache: buildMemoryCache(),
+    raiseApproval: () =>
+      Promise.resolve({
+        kind: "halt",
+        reason: "headless: no interactor and no --yolo escape",
+      } satisfies RaiseApprovalOutcome),
+    guardHooks: [buildMockGuard({ deny: true, code: "ShouldNotRun", calls: guardCalls })],
+    audit,
+  });
+
+  assert.deepEqual(decision, {
+    kind: "halt",
+    source: "mode-gate",
+    reason: "headless: no interactor and no --yolo escape",
+  });
+  // Q-7: guards do NOT run on halt.
+  assert.equal(guardCalls.count, 0);
+  // Audit emits decision: "halt".
+  assert.equal(audit.records.length, 1);
+  assert.equal(audit.records[0]?.["decision"], "halt");
+  assert.equal(audit.records[0]?.["source"], "mode-gate");
+}
+
+async function runHaltLeavesCacheUntouched(): Promise<void> {
+  // Q-7 partial-state safety: a halt path must not write the approval cache.
+  const cache = buildMemoryCache();
+  await runApprovalStack({
+    toolId: "read",
+    args: { path: "/halt-cache.md" },
+    tool: buildTool("read"),
+    sm: null,
+    stageExecutionId: null,
+    attempt: 1,
+    proposalId: "p1-halt-cache",
+    mode: buildModeRecord("ask", []),
+    cache,
+    raiseApproval: () =>
+      Promise.resolve({ kind: "halt", reason: "halted" } satisfies RaiseApprovalOutcome),
+    guardHooks: [],
+    audit: buildMockAudit(),
+  });
+  assert.equal(cache.has({ toolId: "read", approvalKey: "read:/halt-cache.md" }), false);
+}
+
+void raiseApprovalUnreachable;
 
 async function runCancellationAudit(): Promise<void> {
   const audit = buildMockAudit();
@@ -373,16 +443,12 @@ async function runCancellationAudit(): Promise<void> {
       proposalId: "p1-cancel",
       mode: buildModeRecord("ask", []),
       cache: buildMemoryCache(),
-      interactor: {
-        approve() {
-          return Promise.reject(
-            new Cancellation("approval cancelled", undefined, {
-              code: "TurnCancelled",
-            }),
-          );
-        },
-      },
-      headless: false,
+      raiseApproval: () =>
+        Promise.reject(
+          new Cancellation("approval cancelled", undefined, {
+            code: "TurnCancelled",
+          }),
+        ),
       guardHooks: [],
       audit,
     }),
@@ -414,4 +480,9 @@ describe("runApprovalStack", () => {
     runCancellationAudit,
   );
   it("digestArgs is stable across key order", runDigestStability);
+  it(
+    "Q-7: gate halt propagates as stack halt; guards do not run; audit decision is 'halt'",
+    runGateHaltPropagatesAsStackHalt,
+  );
+  it("Q-7: halt path leaves the approval cache untouched", runHaltLeavesCacheUntouched);
 });

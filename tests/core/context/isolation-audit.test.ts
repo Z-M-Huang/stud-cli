@@ -21,7 +21,7 @@ function emptyAssembled(): AssembledRequest {
     toolManifest: [],
     fragments: [],
     modelParams: {},
-    tokenBreakdown: { systemPrompt: 0, history: 0, fragments: 0, toolManifest: 0, total: 0 },
+    tokenBreakdown: { system: 0, history: 0, fragments: 0, tools: 0, total: 0 },
   };
 }
 

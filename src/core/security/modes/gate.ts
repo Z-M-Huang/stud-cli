@@ -10,10 +10,14 @@
  *   - `yolo`      — unconditional approval; no checks performed.
  *   - `allowlist` — approve iff a pattern in the session allowlist matches
  *                   `approvalKey` (glob semantics per Q-8).
- *   - `ask`       — cache-hit → approve; headless → deny; otherwise raise an
- *                   `Approve` interaction request to the active interactor.
+ *   - `ask`       — cache-hit → approve; otherwise raise the approval through
+ *                   the injected `raiseApproval` callback. The callback is the
+ *                   single Interaction Protocol entry point; the host wires it
+ *                   to the multi-interactor arbiter (Q-9) with a headless
+ *                   resolver fallthrough (Q-7 emit-and-halt).
  *
- * Wiki: security/Tool-Approvals.md, security/Security-Modes.md
+ * Wiki: security/Tool-Approvals.md, security/Security-Modes.md,
+ *       runtime/Headless-and-Interactor.md (Q-7), contracts/UI.md (Q-9)
  */
 
 import { Validation } from "../../errors/validation.js";
@@ -24,27 +28,51 @@ import type { SecurityMode } from "./mode.js";
 // Public types
 // ---------------------------------------------------------------------------
 
-/** Verdict returned by `evaluateModeGate`. */
+/**
+ * Verdict returned by `evaluateModeGate`.
+ *
+ * `halt` is a terminal turn-stop outcome (Q-7 emit-and-halt). The host's
+ * `raiseApproval` callback returns halt when running headless without
+ * `--yolo`, after emitting the structured `HeadlessInteractionRequired`
+ * event. Downstream callers must end the turn cleanly without synthesising
+ * `ApprovalDenied` results or writing approval cache entries.
+ */
 export type ModeGateVerdict =
   | { readonly kind: "approve" }
   | {
       readonly kind: "deny";
-      readonly code: "NotOnAllowlist" | "AskRefused" | "HeadlessAutoDenied";
-    };
+      readonly code: "NotOnAllowlist" | "AskRefused";
+    }
+  | { readonly kind: "halt"; readonly reason: string };
 
 /**
- * A minimal approval-prompt surface used by `evaluateModeGate` in `ask` mode.
- * Only a single yes/no approval prompt is needed; the full `InteractionAPI`
- * surface is intentionally not required here.
+ * Outcome returned by the host-wired `raiseApproval` callback.
+ *
+ * The host constructs the full Interaction Protocol request shape
+ * (kind, correlationId, payload) before delegating to either the multi-
+ * interactor arbiter (when at least one interactor is loaded) or the
+ * headless resolver (when none are). This thin shape is what the gate
+ * consumes; the gate is intentionally decoupled from clocks, correlation-id
+ * sources, and the full Interaction Protocol surface.
  */
-export interface InteractorHandle {
-  /**
-   * Raise an approval prompt for the current tool call.
-   * Returns `true` if the user approves, `false` if they reject.
-   * Throws `Cancellation/TurnCancelled` if the user cancels the session.
-   */
-  approve(prompt: string): Promise<boolean>;
-}
+export type RaiseApprovalOutcome =
+  | { readonly kind: "approve" }
+  | { readonly kind: "deny" }
+  | { readonly kind: "halt"; readonly reason: string };
+
+/**
+ * Host-wired callback that the gate uses to obtain an approval verdict in
+ * `ask` mode (cache miss). The host is responsible for constructing the
+ * Interaction Protocol request, fanning out to active interactors via the
+ * arbiter, and handling the headless emit-and-halt fallthrough.
+ *
+ * Cancellation/TurnCancelled propagates through this callback — do not
+ * catch it on the gate side.
+ */
+export type RaiseApproval = (input: {
+  readonly toolId: string;
+  readonly approvalKey: string;
+}) => Promise<RaiseApprovalOutcome>;
 
 /**
  * Read/write access to the session-scoped approval cache.
@@ -71,13 +99,12 @@ export interface ModeGateInput {
    * Callers MUST NOT transform it before passing it here.
    */
   readonly approvalKey: string;
-  /** `true` when running without an interactive terminal (headless mode). */
-  readonly headless: boolean;
   /**
-   * Approval-prompt surface. Required when `mode === "ask"` and
-   * `headless === false`; ignored otherwise.
+   * Host-wired Interaction Protocol callback. Required when `mode === "ask"`
+   * and the cache misses; ignored otherwise. The host's wiring decides how
+   * to route (multi-interactor fan-out vs headless emit-and-halt).
    */
-  readonly interactor?: InteractorHandle;
+  readonly raiseApproval: RaiseApproval;
   /** Session-scoped cache of previously approved `(toolId, approvalKey)` pairs. */
   readonly cache: ApprovalCacheReadWrite;
 }
@@ -182,12 +209,14 @@ export function matchesAllowlist(pattern: string, approvalKey: string): boolean 
  * reaching this function. `evaluateModeGate` is invoked only when no State
  * Machine is attached or has already declined to render a verdict.
  *
+ * Cache writes happen on approve only — never on halt or deny (Q-7).
+ *
  * @throws `Validation/ApprovalKeyInvalid` — when `approvalKey` is malformed.
- * @throws `Cancellation/TurnCancelled`    — propagates from the interactor
- *   prompt when the user cancels the session; not caught here.
+ * @throws `Cancellation/TurnCancelled`    — propagates from the raiseApproval
+ *   callback when the user cancels the session; not caught here.
  */
 export async function evaluateModeGate(input: ModeGateInput): Promise<ModeGateVerdict> {
-  const { mode, allowlist, toolId, approvalKey, headless, interactor, cache } = input;
+  const { mode, allowlist, toolId, approvalKey, raiseApproval, cache } = input;
 
   validateApprovalKey(approvalKey);
 
@@ -208,26 +237,17 @@ export async function evaluateModeGate(input: ModeGateInput): Promise<ModeGateVe
     return { kind: "approve" };
   }
 
-  if (headless) {
-    return { kind: "deny", code: "HeadlessAutoDenied" };
-  }
+  const outcome = await raiseApproval({ toolId, approvalKey });
 
-  if (interactor === undefined) {
-    throw new Validation("interactor is required in ask mode when headless is false", undefined, {
-      code: "ApprovalKeyInvalid",
-      reason: "missing-interactor",
-    });
-  }
-
-  // Dispatch a single approval prompt. `Cancellation/TurnCancelled` propagates
-  // naturally — do not catch it at this level.
-  const approved = await interactor.approve(
-    `Allow tool "${toolId}" to run? (approval key: "${approvalKey}")`,
-  );
-
-  if (approved) {
+  if (outcome.kind === "approve") {
+    // Cache writes happen ONLY on approval. Halt and deny paths leave the
+    // cache untouched per Q-7 (no partial-state writes on a halted turn).
     cache.set(toolId, approvalKey);
     return { kind: "approve" };
+  }
+
+  if (outcome.kind === "halt") {
+    return { kind: "halt", reason: outcome.reason };
   }
 
   return { kind: "deny", code: "AskRefused" };

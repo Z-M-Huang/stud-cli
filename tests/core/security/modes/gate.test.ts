@@ -3,11 +3,15 @@
  *
  * Covers:
  *   - matchesAllowlist: exact match, glob-star match, non-match.
- *   - yolo mode: unconditional approval regardless of allowlist/headless.
+ *   - yolo mode: unconditional approval; raiseApproval is never consulted.
  *   - allowlist mode: approve on pattern match, deny on no match.
- *   - ask mode: cache hit, headless auto-deny, user approval cached,
- *     user rejection, and propagation of invalid approvalKey.
- *   - Validation/ApprovalKeyInvalid: empty key, control character, too-long key.
+ *   - ask mode: cache hit (no raiseApproval call), user approval cached,
+ *     user rejection (no cache write), halt verdict (no cache write,
+ *     terminal turn-stop), and approvalKey validation.
+ *   - Q-7 emit-and-halt: halt verdict propagates through the gate as
+ *     `{ kind: "halt", reason }`. Cache is never written on halt.
+ *   - Q-9 multi-interactor: the gate is decoupled from the interactor
+ *     surface; raiseApproval is the only Interaction Protocol entry.
  *
  * AC-64: non-SM path covers all three modes with positive and negative cases.
  * AC-66: no sandbox-implying vocabulary appears in this file.
@@ -18,7 +22,12 @@ import { describe, it } from "node:test";
 
 import { Validation } from "../../../../src/core/errors/validation.js";
 import { evaluateModeGate, matchesAllowlist } from "../../../../src/core/security/modes/gate.js";
-import { memoryCache, stubInteractor } from "../../../helpers/approval-fixtures.js";
+import {
+  memoryCache,
+  memoryCacheWithWriteLog,
+  raiseApprovalUnreachable,
+  stubRaiseApproval,
+} from "../../../helpers/approval-fixtures.js";
 
 // ---------------------------------------------------------------------------
 // matchesAllowlist
@@ -60,26 +69,14 @@ describe("matchesAllowlist", () => {
 // ---------------------------------------------------------------------------
 
 describe("evaluateModeGate — yolo mode", () => {
-  it("approves unconditionally", async () => {
+  it("approves unconditionally without consulting raiseApproval", async () => {
     const v = await evaluateModeGate({
       mode: "yolo",
       allowlist: [],
       toolId: "bash",
       approvalKey: "exec:rm -rf /",
-      headless: false,
       cache: memoryCache(),
-    });
-    assert.equal(v.kind, "approve");
-  });
-
-  it("approves even when headless is true", async () => {
-    const v = await evaluateModeGate({
-      mode: "yolo",
-      allowlist: [],
-      toolId: "bash",
-      approvalKey: "exec:ls",
-      headless: true,
-      cache: memoryCache(),
+      raiseApproval: raiseApprovalUnreachable,
     });
     assert.equal(v.kind, "approve");
   });
@@ -96,8 +93,8 @@ describe("evaluateModeGate — allowlist mode", () => {
       allowlist: ["read:*"],
       toolId: "read",
       approvalKey: "read:/a/b.md",
-      headless: false,
       cache: memoryCache(),
+      raiseApproval: raiseApprovalUnreachable,
     });
     assert.equal(v.kind, "approve");
   });
@@ -108,8 +105,8 @@ describe("evaluateModeGate — allowlist mode", () => {
       allowlist: ["read:*"],
       toolId: "bash",
       approvalKey: "exec:ls",
-      headless: false,
       cache: memoryCache(),
+      raiseApproval: raiseApprovalUnreachable,
     });
     assert.deepEqual(v, { kind: "deny", code: "NotOnAllowlist" });
   });
@@ -120,8 +117,8 @@ describe("evaluateModeGate — allowlist mode", () => {
       allowlist: [],
       toolId: "bash",
       approvalKey: "exec:ls",
-      headless: false,
       cache: memoryCache(),
+      raiseApproval: raiseApprovalUnreachable,
     });
     assert.deepEqual(v, { kind: "deny", code: "NotOnAllowlist" });
   });
@@ -132,106 +129,110 @@ describe("evaluateModeGate — allowlist mode", () => {
       allowlist: ["read:*", "exec:ls"],
       toolId: "bash",
       approvalKey: "exec:ls",
-      headless: false,
       cache: memoryCache(),
+      raiseApproval: raiseApprovalUnreachable,
     });
     assert.equal(v.kind, "approve");
   });
 });
 
 // ---------------------------------------------------------------------------
-// evaluateModeGate — ask mode (headless and basic interactor)
+// evaluateModeGate — ask mode (cache + raiseApproval)
 // ---------------------------------------------------------------------------
 
-describe("evaluateModeGate — ask mode (headless)", () => {
-  it("denies with HeadlessAutoDenied when headless is true", async () => {
-    const v = await evaluateModeGate({
-      mode: "ask",
-      allowlist: [],
-      toolId: "bash",
-      approvalKey: "exec:ls",
-      headless: true,
-      cache: memoryCache(),
-    });
-    assert.deepEqual(v, { kind: "deny", code: "HeadlessAutoDenied" });
-  });
-
-  it("cache hit takes precedence over headless flag", async () => {
+describe("evaluateModeGate — ask mode (cache hit)", () => {
+  it("cache hit approves without consulting raiseApproval", async () => {
     const cache = memoryCache();
-    const interactor = stubInteractor({ approvalAnswer: true });
+    cache.set("bash", "exec:ls");
 
-    // Warm the cache with a non-headless approval
-    await evaluateModeGate({
+    const v = await evaluateModeGate({
       mode: "ask",
       allowlist: [],
       toolId: "bash",
       approvalKey: "exec:ls",
-      headless: false,
-      interactor,
       cache,
+      raiseApproval: raiseApprovalUnreachable,
     });
-
-    // Second call is headless — cache hit should approve before the headless check
-    const second = await evaluateModeGate({
-      mode: "ask",
-      allowlist: [],
-      toolId: "bash",
-      approvalKey: "exec:ls",
-      headless: true,
-      cache,
-    });
-
-    assert.equal(second.kind, "approve");
+    assert.equal(v.kind, "approve");
   });
 });
 
-// ---------------------------------------------------------------------------
-// evaluateModeGate — ask mode (interactor)
-// ---------------------------------------------------------------------------
+describe("evaluateModeGate — ask mode (raiseApproval)", () => {
+  it("approves on raiseApproval → approve and writes the cache", async () => {
+    const { cache, writes } = memoryCacheWithWriteLog();
+    const stub = stubRaiseApproval({ outcome: { kind: "approve" } });
 
-describe("evaluateModeGate — ask mode (interactor)", () => {
-  it("consults the interactor and approves on user acceptance", async () => {
-    const interactor = stubInteractor({ approvalAnswer: true });
     const v = await evaluateModeGate({
       mode: "ask",
       allowlist: [],
       toolId: "bash",
       approvalKey: "exec:ls",
-      headless: false,
-      interactor,
-      cache: memoryCache(),
+      cache,
+      raiseApproval: stub.raiseApproval,
     });
+
     assert.equal(v.kind, "approve");
-    assert.equal(interactor.approvePromptCount, 1);
+    assert.equal(stub.callCount, 1);
+    assert.deepEqual(stub.calls[0], { toolId: "bash", approvalKey: "exec:ls" });
+    assert.deepEqual(writes, [{ toolId: "bash", approvalKey: "exec:ls" }]);
   });
 
-  it("denies with AskRefused on user rejection", async () => {
-    const interactor = stubInteractor({ approvalAnswer: false });
+  it("denies with AskRefused on raiseApproval → deny and does NOT write the cache", async () => {
+    const { cache, writes } = memoryCacheWithWriteLog();
+    const stub = stubRaiseApproval({ outcome: { kind: "deny" } });
+
     const v = await evaluateModeGate({
       mode: "ask",
       allowlist: [],
       toolId: "bash",
       approvalKey: "exec:ls",
-      headless: false,
-      interactor,
-      cache: memoryCache(),
+      cache,
+      raiseApproval: stub.raiseApproval,
     });
+
     assert.deepEqual(v, { kind: "deny", code: "AskRefused" });
-    assert.equal(interactor.approvePromptCount, 1);
+    assert.equal(stub.callCount, 1);
+    // Q-7: deny path must not write the approval cache.
+    assert.deepEqual(writes, []);
   });
 
-  it("caches approval and skips the interactor on a second identical call", async () => {
+  it("returns halt and does NOT write the cache when raiseApproval halts (Q-7)", async () => {
+    const { cache, writes } = memoryCacheWithWriteLog();
+    const stub = stubRaiseApproval({
+      outcome: { kind: "halt", reason: "headless: no interactor and no --yolo escape" },
+    });
+
+    const v = await evaluateModeGate({
+      mode: "ask",
+      allowlist: [],
+      toolId: "bash",
+      approvalKey: "exec:ls",
+      cache,
+      raiseApproval: stub.raiseApproval,
+    });
+
+    assert.equal(v.kind, "halt");
+    assert.equal(
+      v.kind === "halt" ? v.reason : null,
+      "headless: no interactor and no --yolo escape",
+    );
+    assert.equal(stub.callCount, 1);
+    // Q-7: halt path must not write the approval cache (no partial-state write
+    // on a halted turn).
+    assert.deepEqual(writes, []);
+  });
+
+  it("caches approval and skips raiseApproval on a second identical call", async () => {
     const cache = memoryCache();
-    const interactor = stubInteractor({ approvalAnswer: true });
+    const stub = stubRaiseApproval({ outcome: { kind: "approve" } });
 
     await evaluateModeGate({
       mode: "ask",
       allowlist: [],
       toolId: "bash",
       approvalKey: "exec:ls",
-      headless: false,
-      interactor,
       cache,
+      raiseApproval: stub.raiseApproval,
     });
 
     const second = await evaluateModeGate({
@@ -239,13 +240,12 @@ describe("evaluateModeGate — ask mode (interactor)", () => {
       allowlist: [],
       toolId: "bash",
       approvalKey: "exec:ls",
-      headless: false,
-      interactor,
       cache,
+      raiseApproval: stub.raiseApproval,
     });
 
     assert.equal(second.kind, "approve");
-    assert.equal(interactor.approvePromptCount, 1);
+    assert.equal(stub.callCount, 1);
   });
 });
 
@@ -256,17 +256,15 @@ describe("evaluateModeGate — ask mode (interactor)", () => {
 describe("evaluateModeGate — ask mode (cache keying)", () => {
   it("different toolId with the same approvalKey is a cache miss", async () => {
     const cache = memoryCache();
-    const interactorA = stubInteractor({ approvalAnswer: true });
-    const interactorB = stubInteractor({ approvalAnswer: true });
+    const stub = stubRaiseApproval({ outcome: { kind: "approve" } });
 
     await evaluateModeGate({
       mode: "ask",
       allowlist: [],
       toolId: "bash",
       approvalKey: "exec:ls",
-      headless: false,
-      interactor: interactorA,
       cache,
+      raiseApproval: stub.raiseApproval,
     });
 
     await evaluateModeGate({
@@ -274,28 +272,24 @@ describe("evaluateModeGate — ask mode (cache keying)", () => {
       allowlist: [],
       toolId: "read",
       approvalKey: "exec:ls",
-      headless: false,
-      interactor: interactorB,
       cache,
+      raiseApproval: stub.raiseApproval,
     });
 
-    assert.equal(interactorA.approvePromptCount, 1);
-    assert.equal(interactorB.approvePromptCount, 1);
+    assert.equal(stub.callCount, 2);
   });
 
   it("different approvalKey with the same toolId is a cache miss", async () => {
     const cache = memoryCache();
-    const interactorA = stubInteractor({ approvalAnswer: true });
-    const interactorB = stubInteractor({ approvalAnswer: true });
+    const stub = stubRaiseApproval({ outcome: { kind: "approve" } });
 
     await evaluateModeGate({
       mode: "ask",
       allowlist: [],
       toolId: "bash",
       approvalKey: "exec:ls",
-      headless: false,
-      interactor: interactorA,
       cache,
+      raiseApproval: stub.raiseApproval,
     });
 
     await evaluateModeGate({
@@ -303,13 +297,11 @@ describe("evaluateModeGate — ask mode (cache keying)", () => {
       allowlist: [],
       toolId: "bash",
       approvalKey: "exec:pwd",
-      headless: false,
-      interactor: interactorB,
       cache,
+      raiseApproval: stub.raiseApproval,
     });
 
-    assert.equal(interactorA.approvePromptCount, 1);
-    assert.equal(interactorB.approvePromptCount, 1);
+    assert.equal(stub.callCount, 2);
   });
 });
 
@@ -325,8 +317,8 @@ describe("evaluateModeGate — approvalKey validation", () => {
         allowlist: [],
         toolId: "bash",
         approvalKey: "",
-        headless: false,
         cache: memoryCache(),
+        raiseApproval: raiseApprovalUnreachable,
       }),
       (err: unknown) => {
         assert.ok(err instanceof Validation);
@@ -343,8 +335,8 @@ describe("evaluateModeGate — approvalKey validation", () => {
         allowlist: [],
         toolId: "bash",
         approvalKey: "exec:\x00ls",
-        headless: false,
         cache: memoryCache(),
+        raiseApproval: raiseApprovalUnreachable,
       }),
       (err: unknown) => {
         assert.ok(err instanceof Validation);
@@ -361,8 +353,8 @@ describe("evaluateModeGate — approvalKey validation", () => {
         allowlist: [],
         toolId: "bash",
         approvalKey: "exec:\x7fls",
-        headless: false,
         cache: memoryCache(),
+        raiseApproval: raiseApprovalUnreachable,
       }),
       (err: unknown) => {
         assert.ok(err instanceof Validation);
@@ -379,8 +371,8 @@ describe("evaluateModeGate — approvalKey validation", () => {
         allowlist: [],
         toolId: "bash",
         approvalKey: "exec:" + "a".repeat(1100),
-        headless: false,
         cache: memoryCache(),
+        raiseApproval: raiseApprovalUnreachable,
       }),
       (err: unknown) => {
         assert.ok(err instanceof Validation);
@@ -391,15 +383,14 @@ describe("evaluateModeGate — approvalKey validation", () => {
   });
 
   it("accepts an approvalKey of exactly 1024 bytes", async () => {
-    // "a" is 1 byte; pad to exactly 1024
     const key = "a".repeat(1024);
     const v = await evaluateModeGate({
       mode: "yolo",
       allowlist: [],
       toolId: "bash",
       approvalKey: key,
-      headless: false,
       cache: memoryCache(),
+      raiseApproval: raiseApprovalUnreachable,
     });
     assert.equal(v.kind, "approve");
   });
@@ -411,11 +402,6 @@ describe("evaluateModeGate — approvalKey validation", () => {
 
 describe("AC-66 — no positive in-process isolation claim", () => {
   it("this test file contains no sandbox-implying vocabulary as a positive claim", () => {
-    // The test module imports no identifier whose name implies containment or
-    // restriction beyond what the mode gate actually provides. Any use of the
-    // word 'sandbox' in this codebase must appear only in a negative assertion
-    // (e.g., 'no sandbox in v1'). This structural test satisfies AC-66 by
-    // documenting the constraint in the test suite itself.
     assert.ok(true, "no in-process containment claim found");
   });
 });

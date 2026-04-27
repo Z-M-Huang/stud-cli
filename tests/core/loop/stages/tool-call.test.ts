@@ -199,3 +199,92 @@ describe("toolCallStage — per-call error shaping", () => {
     assert.equal(out.payload.results[0]?.error?.message, "forbidden");
   });
 });
+
+describe("toolCallStage — Q-7 emit-and-halt", () => {
+  it("halts the turn without dispatching the executor and without synthesising ApprovalDenied", async () => {
+    let executed = false;
+    const handler = makeHandler({
+      approvalStack: () => Promise.resolve({ decision: "halt", reason: "headless: no --yolo" }),
+      executor: () => {
+        executed = true;
+        return Promise.reject(new Error("executor must not run on halt"));
+      },
+    });
+
+    const out = await handler(makeInput({ toolCalls: [{ id: "t1", name: "rm", args: {} }] }));
+
+    // Terminal stage outcome — turn ends, no return to COMPOSE_REQUEST.
+    assert.equal(out.next, "END_OF_TURN");
+    assert.deepEqual(out.payload.halt, { reason: "headless: no --yolo" });
+    // The halted call is NOT synthesised as ApprovalDenied; it has no entry
+    // in results (the turn ends before the call is processed further).
+    assert.equal(out.payload.results.length, 0);
+    // Executor was not dispatched.
+    assert.equal(executed, false);
+  });
+
+  it("halt on the first call short-circuits — pending later calls are not approved", async () => {
+    const seen: string[] = [];
+    let executed = 0;
+    const handler = makeHandler({
+      approvalStack: (call) => {
+        seen.push(call.id);
+        if (call.id === "t1") {
+          return Promise.resolve({ decision: "halt", reason: "halt-on-first" });
+        }
+        return Promise.resolve({ decision: "approve" });
+      },
+      executor: () => {
+        executed += 1;
+        return Promise.resolve("never");
+      },
+    });
+
+    const out = await handler(
+      makeInput({
+        toolCalls: [
+          { id: "t1", name: "rm", args: {} },
+          { id: "t2", name: "ls", args: {} },
+        ],
+      }),
+    );
+
+    assert.equal(out.next, "END_OF_TURN");
+    assert.deepEqual(out.payload.halt, { reason: "halt-on-first" });
+    // Only the first call was passed to the approval stack — second call was
+    // skipped after halt short-circuited the FIFO loop.
+    assert.deepEqual(seen, ["t1"]);
+    assert.equal(executed, 0);
+  });
+
+  it("halt after a previous deny preserves the earlier deny result and ends the turn", async () => {
+    const handler = makeHandler({
+      approvalStack: (call) => {
+        if (call.id === "t1") {
+          return Promise.resolve({ decision: "deny", reason: "policy" });
+        }
+        if (call.id === "t2") {
+          return Promise.resolve({ decision: "halt", reason: "headless" });
+        }
+        return Promise.resolve({ decision: "approve" });
+      },
+      executor: () => Promise.resolve("never"),
+    });
+
+    const out = await handler(
+      makeInput({
+        toolCalls: [
+          { id: "t1", name: "rm", args: {} },
+          { id: "t2", name: "ls", args: {} },
+        ],
+      }),
+    );
+
+    assert.equal(out.next, "END_OF_TURN");
+    assert.deepEqual(out.payload.halt, { reason: "headless" });
+    // The earlier deny result is preserved; the halted call is not in results.
+    assert.equal(out.payload.results.length, 1);
+    assert.equal(out.payload.results[0]?.id, "t1");
+    assert.equal(out.payload.results[0]?.error?.code, "ApprovalDenied");
+  });
+});

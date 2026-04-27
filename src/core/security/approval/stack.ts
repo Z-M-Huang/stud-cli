@@ -11,16 +11,23 @@ import { resolvePrecedenceStep } from "./precedence.js";
 import type { ApprovalCacheReadWrite } from "./cache.js";
 import type { ToolContract } from "../../../contracts/tools.js";
 import type { Validation } from "../../errors/validation.js";
-import type { InteractorHandle } from "../modes/gate.js";
+import type { RaiseApproval } from "../modes/gate.js";
 import type { SecurityModeRecord } from "../modes/mode.js";
 
+/**
+ * `halt` is the Q-7 emit-and-halt outcome. The host's `raiseApproval`
+ * callback returned halt (e.g., headless without `--yolo`); the stack
+ * propagates this terminal verdict so the tool-call dispatcher can end
+ * the turn cleanly without synthesising an `ApprovalDenied` result.
+ */
 export type StackDecision =
   | { kind: "approve"; source: "sm-envelope" | "sm-grant-token" | "mode-gate" }
   | {
       kind: "deny";
       source: "sm-envelope" | "sm-grant-token" | "mode-gate" | "guard";
       code: string;
-    };
+    }
+  | { kind: "halt"; source: "mode-gate"; reason: string };
 
 export interface GuardHookHandle {
   run(input: {
@@ -55,8 +62,14 @@ export interface StackInput {
   readonly proposalId: string;
   readonly mode: SecurityModeRecord;
   readonly cache: ApprovalCacheReadWrite;
-  readonly interactor?: InteractorHandle;
-  readonly headless: boolean;
+  /**
+   * Host-wired Interaction Protocol callback for `ask` mode cache misses.
+   * The host routes through the multi-interactor arbiter (Q-9) when at
+   * least one interactor is loaded, and through the headless emit-and-halt
+   * resolver (Q-7) when none are. Replaces the previous `interactor` +
+   * `headless` fields per the alignment plan.
+   */
+  readonly raiseApproval: RaiseApproval;
   readonly guardHooks: readonly GuardHookHandle[];
   readonly audit: AuditWriter;
 }
@@ -214,19 +227,21 @@ function createModeGateCache(context: StackContext) {
 
 async function resolveModeDecision(context: StackContext): Promise<StackDecision> {
   const { input, approvalKey } = context;
-  const gateInput = {
+  const gate = await evaluateModeGate({
     mode: input.mode.mode,
     allowlist: input.mode.allowlist,
     toolId: input.toolId,
     approvalKey,
-    headless: input.headless,
     cache: createModeGateCache(context),
-    ...(input.interactor === undefined ? {} : { interactor: input.interactor }),
-  };
-  const gate = await evaluateModeGate(gateInput);
-  return gate.kind === "approve"
-    ? { kind: "approve", source: "mode-gate" }
-    : { kind: "deny", source: "mode-gate", code: gate.code };
+    raiseApproval: input.raiseApproval,
+  });
+  if (gate.kind === "approve") {
+    return { kind: "approve", source: "mode-gate" };
+  }
+  if (gate.kind === "halt") {
+    return { kind: "halt", source: "mode-gate", reason: gate.reason };
+  }
+  return { kind: "deny", source: "mode-gate", code: gate.code };
 }
 
 async function resolveInitialDecision(context: StackContext): Promise<StackDecision> {

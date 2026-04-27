@@ -115,7 +115,10 @@ describe("MCP client — blob resources, no-arg prompts, transport drop", () => 
       const prompts = await client.listPrompts("srv-no-arg-prompts");
       assert.equal(prompts.length, 1);
       assert.equal(prompts[0]?.name, "simple");
-      assert.equal((prompts[0] as { arguments?: unknown[] }).arguments, undefined);
+      assert.equal(
+        (prompts[0] as unknown as { arguments?: readonly unknown[] }).arguments,
+        undefined,
+      );
     } finally {
       await client.disconnect("srv-no-arg-prompts");
     }

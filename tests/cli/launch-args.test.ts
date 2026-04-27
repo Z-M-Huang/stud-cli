@@ -73,15 +73,29 @@ describe("parseLaunchArgs", () => {
     );
   });
 
-  it("formatHelp lists every documented flag and omits --api-key", () => {
+  it("formatHelp lists every documented flag and omits --api-key + --project-root", () => {
     const help = formatHelp();
     assert.equal(help.includes("--continue"), true);
     assert.equal(help.includes("--headless"), true);
     assert.equal(help.includes("--yolo"), true);
     assert.equal(help.includes("--mode"), true);
-    assert.equal(help.includes("--project-root"), true);
     assert.equal(help.includes("--sm"), true);
     assert.equal(help.includes("--help"), true);
     assert.equal(help.includes("--api-key"), false);
+    // Wiki runtime/Launch-Arguments.md drops --project-root: project root is
+    // always <cwd>/.stud per safety invariant #5.
+    assert.equal(help.includes("--project-root"), false);
+  });
+
+  it("rejects --project-root with Validation/UnknownFlag (wiki: project root is always <cwd>/.stud)", () => {
+    assert.throws(
+      () => parseLaunchArgs(["--project-root", "/tmp/foo"], env),
+      (err: unknown) => {
+        assert.ok(err instanceof Validation);
+        assert.equal(err.class, "Validation");
+        assert.equal(err.context["code"], "UnknownFlag");
+        return true;
+      },
+    );
   });
 });

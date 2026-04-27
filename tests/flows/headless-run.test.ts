@@ -1,30 +1,26 @@
 /**
- * UAT-23 + AC-77: Headless-Run flow + --yolo escape per Q-7.
+ * UAT-23 + AC-77: Headless-Run flow + --yolo escape per Q-7 (post-wiki-alignment).
  *
  * Drives the real `resolveHeadless` (`src/core/interaction/headless.ts`) and
- * asserts the documented decision matrix:
+ * asserts the wiki's uniform emit-and-halt rule:
  *
  *   Default headless (no --yolo):
- *     - Ask, Auth.DeviceCode, Auth.Password, Approve, Confirm, Select →
- *       halt with `permission-required` message + audit
- *     - grantStageTool → auto-deny + audit (`Approval` class)
+ *     - Every Interaction Protocol kind halts the turn with the
+ *       `permission-required` message + audit decision="halt". No per-kind
+ *       carve-outs (the prior auto-deny on grantStageTool is gone).
  *
- *   --yolo softens:
- *     - Approve, Confirm → auto-accept
- *     - Select → picks first option
- *     - grantStageTool → auto-approve
- *     - Ask, Auth.* still halt (these never auto-resolve, per Q-7)
+ *   --yolo:
+ *     - Every Interaction Protocol kind auto-resolves per the wiki:
+ *       "All Interaction Protocol prompts auto-approve. No emit-and-halt;
+ *       the session runs through." Auth.* uses a null sentinel value;
+ *       Ask uses the empty string; downstream callers handle these.
  *
  * Wiki: flows/Headless-Run.md + runtime/Headless-and-Interactor.md
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import {
-  defaultHeadlessMatrix,
-  resolveHeadless,
-  type HeadlessHaltMessage,
-} from "../../src/core/interaction/headless.js";
+import { resolveHeadless, type HeadlessHaltMessage } from "../../src/core/interaction/headless.js";
 
 import type { InteractionRequest } from "../../src/core/interaction/protocol.js";
 import type { InteractionRequestKind } from "../../src/core/interaction/request-kinds.js";
@@ -49,8 +45,6 @@ function makeCapture(): AuditCapture & {
 }
 
 function req(kind: InteractionRequestKind, payload?: object): InteractionRequest {
-  // Cast: payload shape is enforced by the protocol; for headless tests we
-  // only need the `kind` to drive the matrix decisions.
   return {
     kind,
     correlationId: `c-${kind}`,
@@ -59,12 +53,15 @@ function req(kind: InteractionRequestKind, payload?: object): InteractionRequest
   };
 }
 
-describe("UAT-23: Headless default (no --yolo)", () => {
-  const matrix = defaultHeadlessMatrix(false);
-
+describe("UAT-23: Headless default (no --yolo) — every kind halts uniformly", () => {
   it("Ask halts with permission-required + audit class=Interaction + decision=halt", () => {
     const cap = makeCapture();
-    const out = resolveHeadless({ request: req("Ask"), matrix, audit: cap.audit, emit: cap.emit });
+    const out = resolveHeadless({
+      request: req("Ask"),
+      yolo: false,
+      audit: cap.audit,
+      emit: cap.emit,
+    });
     assert.equal(out.kind, "halt");
     if (out.kind === "halt") {
       assert.equal(out.message.kind, "permission-required");
@@ -78,7 +75,7 @@ describe("UAT-23: Headless default (no --yolo)", () => {
     const cap = makeCapture();
     const out = resolveHeadless({
       request: req("Auth.DeviceCode"),
-      matrix,
+      yolo: false,
       audit: cap.audit,
       emit: cap.emit,
     });
@@ -89,7 +86,7 @@ describe("UAT-23: Headless default (no --yolo)", () => {
     const cap = makeCapture();
     const out = resolveHeadless({
       request: req("Approve"),
-      matrix,
+      yolo: false,
       audit: cap.audit,
       emit: cap.emit,
     });
@@ -97,31 +94,27 @@ describe("UAT-23: Headless default (no --yolo)", () => {
     assert.equal(cap.records[0]?.["class"], "Approval");
   });
 
-  it("grantStageTool defaults to auto-deny + Approval audit", () => {
+  it("grantStageTool halts (Q-7 fix; the previous auto-deny is gone)", () => {
     const cap = makeCapture();
     const out = resolveHeadless({
       request: req("grantStageTool"),
-      matrix,
+      yolo: false,
       audit: cap.audit,
       emit: cap.emit,
     });
-    assert.equal(out.kind, "auto-response");
-    if (out.kind === "auto-response") {
-      assert.equal(out.response.kind, "rejected");
-    }
+    assert.equal(out.kind, "halt");
     assert.equal(cap.records[0]?.["class"], "Approval");
-    assert.equal(cap.records[0]?.["decision"], "deny");
+    assert.equal(cap.records[0]?.["decision"], "halt");
+    assert.equal(cap.emitted.length, 1);
   });
 });
 
-describe("UAT-23: --yolo softens Approve/Confirm/Select/grantStageTool", () => {
-  const matrix = defaultHeadlessMatrix(true);
-
+describe("UAT-23: --yolo auto-resolves every Interaction Protocol kind", () => {
   it("Approve auto-accepts under --yolo", () => {
     const cap = makeCapture();
     const out = resolveHeadless({
       request: req("Approve"),
-      matrix,
+      yolo: true,
       audit: cap.audit,
       emit: cap.emit,
     });
@@ -135,7 +128,7 @@ describe("UAT-23: --yolo softens Approve/Confirm/Select/grantStageTool", () => {
     const cap = makeCapture();
     const out = resolveHeadless({
       request: req("Confirm"),
-      matrix,
+      yolo: true,
       audit: cap.audit,
       emit: cap.emit,
     });
@@ -149,7 +142,7 @@ describe("UAT-23: --yolo softens Approve/Confirm/Select/grantStageTool", () => {
     const cap = makeCapture();
     const out = resolveHeadless({
       request: req("Select", { options: ["first", "second"] }),
-      matrix,
+      yolo: true,
       audit: cap.audit,
       emit: cap.emit,
     });
@@ -163,7 +156,7 @@ describe("UAT-23: --yolo softens Approve/Confirm/Select/grantStageTool", () => {
     const cap = makeCapture();
     const out = resolveHeadless({
       request: req("grantStageTool"),
-      matrix,
+      yolo: true,
       audit: cap.audit,
       emit: cap.emit,
     });
@@ -173,25 +166,33 @@ describe("UAT-23: --yolo softens Approve/Confirm/Select/grantStageTool", () => {
     }
   });
 
-  it("Ask STILL halts under --yolo (Q-7: never auto-resolve free-form input)", () => {
+  it("Ask auto-resolves to the empty string under --yolo (wiki: every kind auto-resolves)", () => {
     const cap = makeCapture();
     const out = resolveHeadless({
       request: req("Ask"),
-      matrix,
+      yolo: true,
       audit: cap.audit,
       emit: cap.emit,
     });
-    assert.equal(out.kind, "halt");
+    assert.equal(out.kind, "auto-response");
+    if (out.kind === "auto-response" && out.response.kind === "accepted") {
+      assert.equal(out.response.value, "");
+    }
+    assert.equal(cap.emitted.length, 0);
   });
 
-  it("Auth.Password STILL halts under --yolo (Q-7: never auto-auth)", () => {
+  it("Auth.Password auto-resolves with a null sentinel under --yolo (downstream auth fails loudly)", () => {
     const cap = makeCapture();
     const out = resolveHeadless({
       request: req("Auth.Password"),
-      matrix,
+      yolo: true,
       audit: cap.audit,
       emit: cap.emit,
     });
-    assert.equal(out.kind, "halt");
+    assert.equal(out.kind, "auto-response");
+    if (out.kind === "auto-response" && out.response.kind === "accepted") {
+      assert.equal(out.response.value, null);
+    }
+    assert.equal(cap.emitted.length, 0);
   });
 });
