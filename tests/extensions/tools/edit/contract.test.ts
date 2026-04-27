@@ -1,5 +1,5 @@
 /**
- * Contract conformance tests for the edit reference tool (AC-98).
+ * Contract conformance tests for the edit reference tool.
  *
  * Covers: shape, deriveApprovalKey parent-directory semantics (Q-8), exact-once
  * replacement success, zero-match NotFound, multi-match AmbiguousMatch,

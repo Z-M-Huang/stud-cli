@@ -67,7 +67,7 @@ export const contract: ToolContract<ReadConfig, ReadArgs, ReadResult> = {
    * Always gated: every file read runs through the approval stack.
    * The approval key is the parent directory of the target file relative to the
    * workspace root, enabling per-directory approval granularity.
-   * Wiki: reference-extensions/tools/Simple-Tools.md (AC-99, Q-8 resolution)
+   * Wiki: reference-extensions/tools/Simple-Tools.md (, Q-8 resolution)
    */
   gated: true,
 

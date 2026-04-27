@@ -1,20 +1,20 @@
 /**
  * Persistence-and-Recovery: snapshot writer, crash recovery, and cross-store
- * mismatch tests (AC-46, AC-81).
+ * mismatch tests.
  *
  * Covers:
- *   1. writeSnapshot awaits the store write then emits SessionPersisted (AC-46).
+ *   1. writeSnapshot awaits the store write then emits SessionPersisted.
  *   2. writeSnapshot surfaces Session/StoreUnavailable when the store write fails.
  *   3. writeSnapshot throws Session/ManifestDrift when writtenByStore is blank
- *      (AC-81 precondition — assertCrashSafe is called before any I/O).
+ *      ( precondition — assertCrashSafe is called before any I/O).
  *   4. SessionPersisted envelope carries correlationId, payload, and monotonicTs.
- *   5. assertStoreCompatible throws Session/ResumeMismatch on store-id mismatch (AC-81).
+ *   5. assertStoreCompatible throws Session/ResumeMismatch on store-id mismatch.
  *   6. assertStoreCompatible is a no-op when the store ids match.
  *   7. readLastSnapshot delegates to the store.
  *   8. assertCrashSafe rejects a manifest with a blank writtenByStore.
  *   9. assertCrashSafe accepts a manifest with a populated writtenByStore.
  *
- * AC-46 parallel fan-out note:
+ *  parallel fan-out note:
  *   "Parallel fan-out siblings commit a single compound-turn snapshot at the
  *   last sibling's Exit (or the join's Exit when declared)." That behaviour is
  *   orchestrated by the stage-execution layer (Unit handling Stage-Executions),
@@ -51,7 +51,7 @@ const MINIMAL: SessionManifest = {
 };
 
 // ---------------------------------------------------------------------------
-// createSnapshotWriter — turn-boundary writes (AC-46)
+// createSnapshotWriter — turn-boundary writes
 // ---------------------------------------------------------------------------
 
 describe("createSnapshotWriter — turn-boundary writes", () => {
@@ -133,10 +133,10 @@ describe("createSnapshotWriter — turn-boundary writes", () => {
 });
 
 // ---------------------------------------------------------------------------
-// createSnapshotWriter — AC-81 precondition guard (assertCrashSafe)
+// createSnapshotWriter —  precondition guard (assertCrashSafe)
 // ---------------------------------------------------------------------------
 
-describe("createSnapshotWriter — AC-81 precondition guard", () => {
+describe("createSnapshotWriter —  precondition guard", () => {
   it("throws Session/ManifestDrift when writtenByStore is blank, before any I/O", async () => {
     // assertCrashSafe runs before store.write; store must not be called.
     const bus = createEventBus({ monotonic: () => 0n });

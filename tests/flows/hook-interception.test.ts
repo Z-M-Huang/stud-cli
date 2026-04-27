@@ -1,5 +1,5 @@
 /**
- * UAT-18 + AC-47: Hook-Interception ordering at TOOL_CALL/pre.
+ *  + Hook-Interception ordering at TOOL_CALL/pre.
  *
  * Drives the real `runHooksForSlot` (`src/core/hooks/runner.ts`) with a
  * mix of guard / transform / observer hooks and asserts firing order:
@@ -53,7 +53,7 @@ async function runWithFiringOrder(
   return { firingOrder: [...fired], denied: out.denied };
 }
 
-describe("UAT-18: Hook-Interception ordering at TOOL_CALL/pre", () => {
+describe("Hook-Interception ordering at TOOL_CALL/pre", () => {
   it("approve path: guard → transform → observer", async () => {
     const fired: string[] = [];
     const hooks: HookHandle[] = [
@@ -153,7 +153,7 @@ describe("UAT-18: Hook-Interception ordering at TOOL_CALL/pre", () => {
 // Transform chaining + observer payload
 // ---------------------------------------------------------------------------
 
-describe("UAT-18: transform chain + observer post-transform payload", () => {
+describe("transform chain + observer post-transform payload", () => {
   it("transform chain: each transform sees the previous transform's payload", async () => {
     const seenPayloads: unknown[] = [];
     const hooks: HookHandle[] = [

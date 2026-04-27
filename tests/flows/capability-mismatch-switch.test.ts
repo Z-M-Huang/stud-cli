@@ -1,5 +1,5 @@
 /**
- * UAT-20 + AC-22: Capability-Mismatch-Switch surfaces the missing capability.
+ *  + Capability-Mismatch-Switch surfaces the missing capability.
  *
  * Drives the real `negotiate` from `src/core/capabilities/negotiator.ts`
  * with hard mismatches and asserts:
@@ -72,7 +72,7 @@ function captureMismatch(
   }
 }
 
-describe("UAT-20: Capability-Mismatch-Switch", () => {
+describe("Capability-Mismatch-Switch", () => {
   it("hard toolCalling against a no-toolCalling provider throws MissingCapability(toolCalling)", () => {
     const result = captureMismatch({ name: "toolCalling", level: "hard" }, noToolCalling);
     assert.equal(result?.class, "ProviderCapability");

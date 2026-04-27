@@ -1,5 +1,5 @@
 /**
- * Contract conformance tests for the context-compaction reference tool (AC-97).
+ * Contract conformance tests for the context-compaction reference tool.
  *
  * Covers: shape, approval-key stability, compaction summary return, post-
  * compaction persist, audit emission, arg-validation errors,
@@ -98,7 +98,7 @@ describe("context-compaction tool — shape", () => {
   it("declares a stateSlot shape for compaction metrics persistence", () => {
     assert.ok(
       contract.stateSlot !== null,
-      "stateSlot must not be null — execute.ts writes to it (AC-97 crash-durability)",
+      "stateSlot must not be null — execute.ts writes to it ( crash-durability)",
     );
     assert.match(contract.stateSlot.slotVersion, /^\d+\.\d+\.\d+$/);
     assert.equal(typeof contract.stateSlot.schema, "object");
@@ -119,7 +119,7 @@ describe("context-compaction tool — shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Approval key stability (AC-97, Q-8 resolution)
+// Approval key stability (, Q-8 resolution)
 // ---------------------------------------------------------------------------
 
 describe("context-compaction tool — deriveApprovalKey", () => {

@@ -11,7 +11,7 @@
  *   }
  * }
  *
- * See contracts/Conformance-and-Testing.md and CLAUDE.md §AC-120.
+ * See contracts/Conformance-and-Testing.md and CLAUDE.md §.
  */
 
 import { readFile } from "node:fs/promises";

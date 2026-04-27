@@ -33,7 +33,7 @@ import type { HostAPI } from "../core/host/host-api.js";
 export type ProviderProtocol = string;
 
 // ---------------------------------------------------------------------------
-// Capability claims (AC-22 — Capability Negotiation)
+// Capability claims ( — Capability Negotiation)
 // ---------------------------------------------------------------------------
 
 /**
@@ -202,7 +202,7 @@ export type ProviderStreamEvent =
  * Error protocol:
  *   - Retryable failure → throw `ProviderTransient` (network, 5xx, rate-limit).
  *   - Missing declared capability → throw `ProviderCapability`.
- *   - Any other failure → propagate the typed error from Unit 3.
+ *   - Any other failure → propagate the typed error from .
  *
  * Wiki: providers/Protocol-Adapters.md
  */
@@ -219,14 +219,14 @@ export interface ProviderRequestSurface {
 // ---------------------------------------------------------------------------
 
 /**
- * Per-category contract shape for Provider extensions (AC-13).
+ * Per-category contract shape for Provider extensions.
  *
  * Specialises `ExtensionContract<TConfig>` by fixing:
  *   - `kind: 'Provider'`
  *   - `loadedCardinality: 'unlimited'`
  *   - `activeCardinality: 'unlimited'`
  *   - `protocol`     — adapter key this provider implements.
- *   - `capabilities` — capability claims for Capability Negotiation (AC-22).
+ *   - `capabilities` — capability claims for Capability Negotiation.
  *   - `surface`      — the request/stream/tool-call interface `STREAM_RESPONSE` reads.
  *
  * Wiki: contracts/Providers.md
@@ -237,7 +237,7 @@ export interface ProviderContract<TConfig = unknown> extends ExtensionContract<T
   readonly activeCardinality: "unlimited";
   /** Protocol key identifying the adapter (e.g., `'anthropic'`, `'openai-compatible'`). */
   readonly protocol: ProviderProtocol;
-  /** Capability claims consumed by Capability Negotiation (AC-22). */
+  /** Capability claims consumed by Capability Negotiation. */
   readonly capabilities: ProviderCapabilityClaims;
   /** The request/stream surface `STREAM_RESPONSE` invokes. */
   readonly surface: ProviderRequestSurface;

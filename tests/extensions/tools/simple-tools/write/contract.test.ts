@@ -1,5 +1,5 @@
 /**
- * Contract conformance tests for the write reference tool (AC-99).
+ * Contract conformance tests for the write reference tool.
  *
  * Covers: shape, deriveApprovalKey parent-directory semantics (Q-8), file
  * creation, overwrite, missing-parent NotFound vs createParents success,

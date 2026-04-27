@@ -7,8 +7,8 @@
  *   - Core infrastructure when wiring up the bundled commands.
  *   - Test harnesses to inject a mock trust context.
  *
- * `TrustContext` abstracts both the project trust store (Unit 50) and the MCP
- * trust module (Unit 90 / Q-10) behind a single injectable interface, following
+ * `TrustContext` abstracts both the project trust store and the MCP
+ * trust module ( / Q-10) behind a single injectable interface, following
  * the same dependency-injection pattern as /help and /save-and-close.
  *
  * Wiki: reference-extensions/commands/trust.md
@@ -45,8 +45,8 @@ export interface McpTrustEntry {
 /**
  * Minimal trust operations surface needed by the /trust command.
  *
- * Abstracts both the project trust store (Unit 50) and the MCP trust module
- * (Unit 90). Injected after `init` via `injectTrustContext`.
+ * Abstracts both the project trust store and the MCP trust module
+ *. Injected after `init` via `injectTrustContext`.
  */
 export interface TrustContext {
   /** Returns all project trust entries. */

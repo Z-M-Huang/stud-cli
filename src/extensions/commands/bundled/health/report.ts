@@ -5,7 +5,7 @@
  * adapter over the probe surface. The type is preserved verbatim so that
  * callers can import it from the command module without a direct core import.
  *
- * Shape (AC-110):
+ * Shape:
  *   {extensions, activeStore, activeInteractor, mode, sm?, mcp, loop}
  *
  * Wiki: operations/Health-and-Diagnostics.md

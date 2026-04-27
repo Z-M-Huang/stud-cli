@@ -3,7 +3,7 @@
  *
  * Covers two concerns:
  *   1. Runtime property-enumeration of the ten-field meta-contract shape.
- *   2. AC-11 — three fixture shapes (valid, invalid, worst-plausible) validated
+ *   2.  — three fixture shapes (valid, invalid, worst-plausible) validated
  *      against the fixture's `configSchema` using Ajv, asserting that Ajv
  *      accepts valid input, rejects invalid input with a field path, and rejects
  *      hostile input without crashing.
@@ -95,7 +95,7 @@ describe("ExtensionContract<T> meta shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-11: Three fixture shapes — valid, invalid, worst-plausible.
+// Three fixture shapes — valid, invalid, worst-plausible.
 // Validates the fixture's configSchema (enabled: boolean, additionalProperties: false)
 // using Ajv so that the meta-contract's schema machinery is exercised at test time.
 //
@@ -118,7 +118,7 @@ const worstPlausibleFixture = {
   extra: "x".repeat(1_000_000),
 };
 
-describe("configSchema fixture validation (AC-11)", () => {
+describe("configSchema fixture validation", () => {
   it("accepts the valid fixture", () => {
     assert.equal(validate(validFixture), true);
     assert.equal(validate.errors, null);

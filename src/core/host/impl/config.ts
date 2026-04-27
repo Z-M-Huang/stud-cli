@@ -5,7 +5,7 @@
  * scope-merged config resolver already bound to this extension's `extId`.
  * `scope()` returns the deepest-winning scope from which the config was resolved.
  *
- * AC-56: the returned object is `Object.freeze`'d.
+ * the returned object is `Object.freeze`'d.
  *
  * Wiki: core/Host-API.md + runtime/Configuration-Scopes.md
  */

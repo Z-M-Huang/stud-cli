@@ -167,7 +167,7 @@ export interface StageDefinition {
 // ---------------------------------------------------------------------------
 
 /**
- * Per-category contract shape for State Machine extensions (AC-18).
+ * Per-category contract shape for State Machine extensions.
  *
  * Specialises `ExtensionContract<TConfig>` by fixing:
  *   - `kind: 'StateMachine'`

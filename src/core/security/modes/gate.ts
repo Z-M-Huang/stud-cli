@@ -2,9 +2,9 @@
  * Mode gate — the non-SM branch of the tool-call approval chain.
  *
  * `evaluateModeGate` resolves the approval verdict for a tool call when no
- * State Machine is attached. It implements AC-64 (non-SM path) and contains
+ * State Machine is attached. It implements  (non-SM path) and contains
  * no terminology implying that in-process extensions are contained or
- * restricted beyond what the session mode declares — invariant #7, AC-66.
+ * restricted beyond what the session mode declares — invariant #7, .
  *
  * Modes:
  *   - `yolo`      — unconditional approval; no checks performed.
@@ -76,7 +76,7 @@ export type RaiseApproval = (input: {
 
 /**
  * Read/write access to the session-scoped approval cache.
- * Unit 55 owns the storage implementation; this interface keeps `gate.ts`
+ *  owns the storage implementation; this interface keeps `gate.ts`
  * testable with in-memory fixtures without coupling to the storage layer.
  */
 export interface ApprovalCacheReadWrite {
@@ -205,7 +205,7 @@ export function matchesAllowlist(pattern: string, approvalKey: string): boolean 
 /**
  * Evaluate the mode gate for a single tool call (non-SM path).
  *
- * The caller is responsible for invoking SM precedence (Unit 56) before
+ * The caller is responsible for invoking SM precedence before
  * reaching this function. `evaluateModeGate` is invoked only when no State
  * Machine is attached or has already declined to render a verdict.
  *

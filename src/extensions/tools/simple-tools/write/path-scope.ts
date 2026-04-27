@@ -4,7 +4,7 @@
  * Mirrors the read tool's helpers — see read/path-scope.ts for the full
  * specification. Duplicated until the pattern stabilises across the
  * Simple-Tools set (read, write, list); a shared utility may be extracted
- * once Unit 131 (`list`) is in place.
+ * once  (`list`) is in place.
  *
  * Wiki: reference-extensions/tools/Simple-Tools.md (Q-8 resolution)
  */

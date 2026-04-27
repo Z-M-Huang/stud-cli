@@ -2,10 +2,10 @@
  * Tests for createHostSession — stateSlot guard and session accessors.
  *
  * Covers:
- *   AC-115 — slot-guard denial: accessing another extension's slot throws
+ *    — slot-guard denial: accessing another extension's slot throws
  *             `ExtensionHost/SlotAccessDenied` and records an audit event.
- *   AC-115 — slot-guard permit: accessing own slot succeeds.
- *   AC-56  — returned object is Object.freeze'd.
+ *    — slot-guard permit: accessing own slot succeeds.
+ *     — returned object is Object.freeze'd.
  *
  * Wiki: core/Host-API.md + contracts/Extension-State.md
  */
@@ -46,10 +46,10 @@ function makeSession(extId: string, storeData: unknown = {}, auditSink?: (e: unk
 }
 
 // ---------------------------------------------------------------------------
-// AC-115: slot-guard denial
+// slot-guard denial
 // ---------------------------------------------------------------------------
 
-describe("createHostSession — stateSlot denial (AC-115)", () => {
+describe("createHostSession — stateSlot denial", () => {
   it("throws ExtensionHost when extId does not match own id", () => {
     const { host } = makeSession("ext.me");
 
@@ -81,10 +81,10 @@ describe("createHostSession — stateSlot denial (AC-115)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-115: slot-guard permit
+// slot-guard permit
 // ---------------------------------------------------------------------------
 
-describe("createHostSession — stateSlot permit (AC-115)", () => {
+describe("createHostSession — stateSlot permit", () => {
   it("allows access when extId matches own id", () => {
     const { host } = makeSession("ext.me", { x: 1 });
 
@@ -129,10 +129,10 @@ describe("createHostSession — stateSlot permit (AC-115)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-56: frozen shape
+// frozen shape
 // ---------------------------------------------------------------------------
 
-describe("createHostSession — frozen shape (AC-56)", () => {
+describe("createHostSession — frozen shape", () => {
   it("returns a frozen object", () => {
     const { host } = makeSession("ext.me");
     assert.equal(Object.isFrozen(host), true);

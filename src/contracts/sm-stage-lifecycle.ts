@@ -1,9 +1,9 @@
 /**
  * SM Stage Lifecycle contract — seven-phase execution surface.
  *
- * Defines the ordered seven-phase sequence (AC-32), StageContext mutation rules
- * (AC-33), grantStageTool tuple binding (AC-34), fail-fast parallel fan-out
- * semantics (AC-32 / Q-4), and the SM-category attach-after-slot rule (AC-35).
+ * Defines the ordered seven-phase sequence, StageContext mutation rules
+ *, grantStageTool tuple binding, fail-fast parallel fan-out
+ * semantics ( / Q-4), and the SM-category attach-after-slot rule.
  *
  * Phase order: Setup → Init → CheckGate → Act → Assert → Exit → Next
  *
@@ -20,7 +20,7 @@
  * compound turn aborts with ExtensionHost/ParallelSiblingFailure; join only
  * runs when every sibling succeeds.
  *
- * SM-category attach (AC-35): after the standard init → activate sequence, state
+ * SM-category attach: after the standard init → activate sequence, state
  * slots are delivered before attach fires. attach sees the fully delivered slot.
  *
  * Wiki: contracts/SM-Stage-Lifecycle.md
@@ -36,7 +36,7 @@ import type { HostAPI } from "../core/host/host-api.js";
 export type { StageContext, GrantStageToolTuple, NextResult } from "./state-machines.js";
 
 // ---------------------------------------------------------------------------
-// Phase order (AC-32)
+// Phase order
 // ---------------------------------------------------------------------------
 
 /**
@@ -52,7 +52,7 @@ export type StagePhase = "Setup" | "Init" | "CheckGate" | "Act" | "Assert" | "Ex
  * Frozen, ordered array of the seven stage phases.
  *
  * Use this as the authoritative source for phase-iteration logic. The order
- * matches the execution sequence defined in AC-32.
+ * matches the execution sequence defined in .
  *
  * Wiki: contracts/SM-Stage-Lifecycle.md § The seven phases
  */
@@ -67,7 +67,7 @@ export const STAGE_PHASES: readonly StagePhase[] = Object.freeze([
 ] as const satisfies StagePhase[]);
 
 // ---------------------------------------------------------------------------
-// StageContext access rules (AC-33)
+// StageContext access rules
 // ---------------------------------------------------------------------------
 
 /**
@@ -79,7 +79,7 @@ export const STAGE_PHASES: readonly StagePhase[] = Object.freeze([
 export type CtxAccess = "read" | "write";
 
 /**
- * Per-phase access rules for StageContext (AC-33).
+ * Per-phase access rules for StageContext.
  *
  * Phases with `write` access: only `Setup`.
  * Phases with `read` access: `Init`, `CheckGate`, `Assert`, `Exit`, `Next`.
@@ -144,7 +144,7 @@ export function assertCtxAccess(
 }
 
 // ---------------------------------------------------------------------------
-// bindGrantStageToolTuple (AC-34)
+// bindGrantStageToolTuple
 // ---------------------------------------------------------------------------
 
 /**
@@ -173,7 +173,7 @@ export function bindGrantStageToolTuple(tuple: GrantStageToolTuple): string {
 }
 
 // ---------------------------------------------------------------------------
-// StageLifecycleHooks (AC-32)
+// StageLifecycleHooks
 // ---------------------------------------------------------------------------
 
 /**
@@ -235,7 +235,7 @@ export interface StageLifecycleHooks {
 }
 
 // ---------------------------------------------------------------------------
-// SMAttachLifecycle (AC-35)
+// SMAttachLifecycle
 // ---------------------------------------------------------------------------
 
 /**
@@ -262,7 +262,7 @@ export interface SMAttachLifecycle {
 }
 
 // ---------------------------------------------------------------------------
-// Parallel fan-out outcomes (AC-32 / Q-4)
+// Parallel fan-out outcomes ( / Q-4)
 // ---------------------------------------------------------------------------
 
 /**

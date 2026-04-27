@@ -75,7 +75,7 @@ describe("Anthropic contract shape", () => {
     assert.equal(contract.activeCardinality, "unlimited");
   });
 
-  it("advertises the declared capability matrix per AC-83", () => {
+  it("advertises the declared capability matrix per ", () => {
     assert.equal(contract.capabilities.streaming, "hard");
     assert.equal(contract.capabilities.toolCalling, "hard");
     assert.equal(contract.capabilities.structuredOutput, "preferred");

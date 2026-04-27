@@ -94,7 +94,7 @@ export interface ContextFragment {
 // ---------------------------------------------------------------------------
 
 /**
- * Per-category contract shape for Context Provider extensions (AC-21).
+ * Per-category contract shape for Context Provider extensions.
  *
  * Specialises `ExtensionContract<TConfig>` by fixing:
  *   - `kind: 'ContextProvider'`

@@ -1,5 +1,5 @@
 /**
- * Test fixtures for the Interaction Protocol (Unit 57).
+ * Test fixtures for the Interaction Protocol.
  *
  * Provides:
  *   - `stubInteractor` — a controllable `InteractorHandle` for FIFO-ordering

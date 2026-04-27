@@ -1,5 +1,5 @@
 /**
- * UAT-22 + AC-43: Interaction-Timeout returns a typed timeout response.
+ *  + Interaction-Timeout returns a typed timeout response.
  *
  * Drives the real `raiseWithTimeout` (`src/core/interaction/timeout.ts`)
  * with an injected fake clock and asserts:
@@ -54,7 +54,7 @@ const baseRequest: InteractionRequest = {
   payload: { kind: "Confirm", prompt: "?" },
 };
 
-describe("UAT-22: Interaction-Timeout", () => {
+describe("Interaction-Timeout", () => {
   it("delegate resolves before timer → delegate's response is returned", async () => {
     const clock = fakeClock();
     const response = await raiseWithTimeout({
@@ -132,7 +132,7 @@ describe("UAT-22: Interaction-Timeout", () => {
   });
 });
 
-describe("UAT-22: Interaction-Timeout — error paths", () => {
+describe("Interaction-Timeout — error paths", () => {
   it("timeoutMs <= 0 throws Validation/TimeoutMsInvalid", async () => {
     const clock = fakeClock();
     let threw: { class: string | undefined; code: string | undefined } | null = null;

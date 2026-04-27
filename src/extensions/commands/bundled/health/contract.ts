@@ -1,7 +1,7 @@
 /**
  * Contract declaration for the /health bundled command.
  *
- * Returns the AC-110 session health report: extensions, active store,
+ * Returns the  session health report: extensions, active store,
  * active interactor, security mode, optional SM state, MCP server health,
  * and loop counters.
  *

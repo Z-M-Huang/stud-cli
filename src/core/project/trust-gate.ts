@@ -16,23 +16,23 @@
  *
  * ---
  *
- * AC-61 scope note:
- *   AC-61 requires three independent gates to run in order on project entry:
+ *  scope note:
+ *    requires three independent gates to run in order on project entry:
  *   project-trust, extension-integrity, and MCP-trust. This unit implements
- *   the project-trust gate and satisfies AC-61's audit-record interface: each
+ *   the project-trust gate and satisfies 's audit-record interface: each
  *   evaluation emits a structured `TrustDecision` record that the orchestrator
  *   can chain in order with the other two gates. The orchestration of all three
  *   gates in sequence is deferred to the unit that wires the project-entry
  *   flow (the unit introducing the project-entry orchestrator).
  *
  * Path note:
- *   AC-61 mentions `src/core/security/trust/` as the target directory. The
+ *    mentions `src/core/security/trust/` as the target directory. The
  *   Contract Manifest for this unit (the authoritative design artefact) places
  *   the gate at `src/core/project/trust-gate.ts` because the project-trust
  *   concern belongs with the other project-root utilities (root resolution,
  *   discovery) rather than inside the security sub-tree, which is reserved for
  *   cross-cutting security policies. If the wiki is updated to reflect this
- *   canonical location, AC-61 should be updated accordingly.
+ *   canonical location,  should be updated accordingly.
  */
 
 import { basename, isAbsolute, normalize } from "node:path";
@@ -43,13 +43,13 @@ import { basename, isAbsolute, normalize } from "node:path";
 import { Session, Validation } from "../errors/index.js";
 
 // ---------------------------------------------------------------------------
-// Dependency interfaces — wired through types only until Unit 51 / Unit 57
+// Dependency interfaces — wired through types only until  /
 // ---------------------------------------------------------------------------
 
 /**
  * Minimal surface the trust gate needs to raise a yes/no prompt.
  *
- * The full Interaction Protocol (Unit 57) satisfies this interface — the
+ * The full Interaction Protocol satisfies this interface — the
  * gate does not depend on the complete shape.
  */
 export interface InteractorHandle {
@@ -65,7 +65,7 @@ export interface InteractorHandle {
 /**
  * Persistent store of project-trust decisions keyed by canonical path.
  *
- * The concrete implementation (Unit 51) reads and writes the global trust
+ * The concrete implementation reads and writes the global trust
  * file (`~/.stud/trust.json` or equivalent). This interface decouples the
  * gate from the store's I/O format.
  */
@@ -102,7 +102,7 @@ export interface TrustDecisionRecord {
 /**
  * Minimal write surface for recording trust decisions.
  *
- * The full `AuditAPI` (Unit 57) satisfies this interface. The narrowed type
+ * The full `AuditAPI` satisfies this interface. The narrowed type
  * keeps the gate decoupled from the complete host API shape.
  */
 export interface AuditWriter {
@@ -157,7 +157,7 @@ function isValidProjectRoot(path: string): boolean {
  *      immediately if non-canonical or not ending in `.stud`.
  *   2. Query the trust store — if trust is already recorded, emit a
  *      `TrustDecision{decision: "granted"}` audit record and return `"granted"`
- *      without prompting (short-circuit). AC-61 requires "each evaluation"
+ *      without prompting (short-circuit).  requires "each evaluation"
  *      to produce an audit record, including pre-existing grants.
  *   3. Raise one `confirm` prompt via the interactor.
  *   4a. Refusal — emit `TrustDecision{decision: "refused"}` audit record,

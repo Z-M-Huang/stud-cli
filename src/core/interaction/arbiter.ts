@@ -1,5 +1,5 @@
 /**
- * Race-to-answer arbiter for multi-interactor sessions (Unit 58 — Q-9).
+ * Race-to-answer arbiter for multi-interactor sessions ( — Q-9).
  *
  * When more than one interactor is attached concurrently, `createRaceArbiter`
  * fans out every `raise` call to ALL attached interactors simultaneously. The

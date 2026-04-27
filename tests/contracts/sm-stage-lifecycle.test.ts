@@ -1,11 +1,11 @@
 /**
- * SM Stage Lifecycle contract tests (AC-32, AC-33, AC-34, AC-35).
+ * SM Stage Lifecycle contract tests.
  *
  * Verifies:
- *   1. STAGE_PHASES — seven ordered phases (AC-32).
- *   2. STAGE_CONTEXT_ACCESS — access matrix assertions (AC-33).
- *   3. assertCtxAccess — Validation/ContextMutationForbidden on out-of-phase access (AC-33).
- *   4. bindGrantStageToolTuple — deterministic key binding (AC-34).
+ *   1. STAGE_PHASES — seven ordered phases.
+ *   2. STAGE_CONTEXT_ACCESS — access matrix assertions.
+ *   3. assertCtxAccess — Validation/ContextMutationForbidden on out-of-phase access.
+ *   4. bindGrantStageToolTuple — deterministic key binding.
  *
  * Wiki: contracts/SM-Stage-Lifecycle.md
  */

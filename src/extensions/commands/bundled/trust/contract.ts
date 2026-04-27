@@ -6,7 +6,7 @@
  * `--clear-mcp <server>`.
  *
  * Security notes:
- *   - `list` is read-only and requires no approval gate (AC-110).
+ *   - `list` is read-only and requires no approval gate.
  *   - `grant` and `revoke` modify the global project trust list; each mutation
  *     emits a `TrustDecision` audit record.
  *   - `--clear-mcp <server>` forgets the entry (Q-10 resolution): next use of

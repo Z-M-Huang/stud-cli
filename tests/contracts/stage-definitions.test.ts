@@ -1,5 +1,5 @@
 /**
- * Stage Definitions contract tests (AC-28).
+ * Stage Definitions contract tests.
  *
  * Verifies:
  *   1. extractCtxReferences — finds all ${ctx.*} placeholders in a body template.

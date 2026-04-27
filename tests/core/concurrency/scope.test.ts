@@ -1,8 +1,8 @@
 /**
  * Tests for the concurrency scope tree and FIFO turn serializer.
  *
- * Covers AC-51 (scope tree, cancel propagation, non-upward cancel) and
- * AC-52 (FIFO serialization of turns).
+ * Covers  (scope tree, cancel propagation, non-upward cancel) and
+ *  (FIFO serialization of turns).
  *
  * Wiki: core/Concurrency-and-Cancellation.md, core/Execution-Model.md
  */

@@ -10,9 +10,9 @@ import type { SuppressedErrorEvent } from "../../../src/core/errors/index.ts";
 import type { EventEnvelope } from "../../../src/core/events/bus.ts";
 
 // ---------------------------------------------------------------------------
-// AC-41: Registration-order delivery
+// Registration-order delivery
 // ---------------------------------------------------------------------------
-describe("createEventBus — registration-order delivery (AC-41)", () => {
+describe("createEventBus — registration-order delivery", () => {
   it("delivers named events to subscribers in registration order", () => {
     let tick = 0n;
     const bus = createEventBus({ monotonic: () => ++tick });
@@ -35,9 +35,9 @@ describe("createEventBus — registration-order delivery (AC-41)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-40: Correlation ID and monotonic timestamp plumbing
+// Correlation ID and monotonic timestamp plumbing
 // ---------------------------------------------------------------------------
-describe("createEventBus — correlation/monotonic plumbing (AC-40)", () => {
+describe("createEventBus — correlation/monotonic plumbing", () => {
   it("passes the envelope through unmodified to the subscriber", () => {
     const bus = createEventBus({ monotonic: () => 42n });
     let captured: EventEnvelope | null = null;
@@ -67,9 +67,9 @@ describe("createEventBus — correlation/monotonic plumbing (AC-40)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-40: SuppressedError safety net
+// SuppressedError safety net
 // ---------------------------------------------------------------------------
-describe("createEventBus — SuppressedError safety net (AC-40)", () => {
+describe("createEventBus — SuppressedError safety net", () => {
   it("emits SuppressedError when a named handler throws", () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const suppressed: unknown[] = [];
@@ -143,9 +143,9 @@ describe("createEventBus — SuppressedError safety net (AC-40)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-41: Unsubscribe behaviour
+// Unsubscribe behaviour
 // ---------------------------------------------------------------------------
-describe("createEventBus — unsubscribe (AC-41)", () => {
+describe("createEventBus — unsubscribe", () => {
   it("removes the named handler for future emits", () => {
     const bus = createEventBus({ monotonic: () => 0n });
     let count = 0;

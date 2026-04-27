@@ -114,7 +114,7 @@ describe("Gemini contract shape", () => {
     assert.equal(contract.activeCardinality, "unlimited");
   });
 
-  it("advertises multimodal: hard and streaming/toolCalling: hard per AC-85", () => {
+  it("advertises multimodal: hard and streaming/toolCalling: hard per ", () => {
     assert.equal(contract.capabilities.multimodal, "hard");
     assert.equal(contract.capabilities.streaming, "hard");
     assert.equal(contract.capabilities.toolCalling, "hard");

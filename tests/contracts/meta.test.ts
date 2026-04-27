@@ -1,5 +1,5 @@
 /**
- * Conformance harness smoke tests (AC-29).
+ * Conformance harness smoke tests.
  *
  * Exercises `assertContract` against:
  *   1. A fully conforming reference contract — happy path (ok: true).

@@ -5,7 +5,7 @@
  * entry with the calling extension's `extId` and a monotonic timestamp before
  * forwarding to the session-level audit writer.
  *
- * AC-56: the returned object is `Object.freeze`'d.
+ * the returned object is `Object.freeze`'d.
  * Invariant #6: callers must not pass resolved secret material in `data`.
  *               The host does NOT enforce this — the caller is responsible.
  *

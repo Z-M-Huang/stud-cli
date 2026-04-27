@@ -55,7 +55,7 @@ describe("guard-example hook — shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Guard behavior tests (block path + no-op paths) — AC-92
+// Guard behavior tests (block path + no-op paths) —
 // ---------------------------------------------------------------------------
 
 describe("guard-example hook — behavior", () => {

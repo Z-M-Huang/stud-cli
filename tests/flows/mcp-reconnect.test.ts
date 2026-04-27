@@ -1,5 +1,5 @@
 /**
- * UAT-27: MCP-Reconnect surfaces + retries + logs.
+ * MCP-Reconnect surfaces + retries + logs.
  *
  * Asserts the documented reconnect policy invariants without standing up
  * a full MCP transport (the transport itself is exercised in
@@ -17,7 +17,7 @@ import { describe, it } from "node:test";
 import { defaultReconnectPolicy, reconnect } from "../../src/core/mcp/reconnect.js";
 import { clearRegistry } from "../../src/core/mcp/server-registry.js";
 
-describe("UAT-27: MCP-Reconnect policy + invariants", () => {
+describe("MCP-Reconnect policy + invariants", () => {
   it("defaultReconnectPolicy declares bounded attempts + delays", () => {
     assert.equal(defaultReconnectPolicy.maxAttempts > 0, true);
     assert.equal(defaultReconnectPolicy.initialDelayMs > 0, true);

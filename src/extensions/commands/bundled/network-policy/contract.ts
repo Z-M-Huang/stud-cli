@@ -7,13 +7,13 @@
  *   deny  <host>   — add a host to the denylist  (requires confirmation, emits audit).
  *
  * Security notes:
- *   - `show` is read-only and requires no approval gate (AC-110).
+ *   - `show` is read-only and requires no approval gate.
  *   - `allow` and `deny` mutate the network policy; each emits a
  *     `NetworkPolicyChange` audit record.
  *   - `allow` and `deny` require interactive confirmation unless
  *     `requireConfirmForChange: false` is set in the command config.
  *   - Hostname validation delegates to the Network-Policy core module
- *     (Unit 98) to ensure a single validation definition.
+ *     to ensure a single validation definition.
  *
  * Wiki: runtime/Network-Policy.md + reference-extensions/commands/network-policy.md
  */

@@ -13,8 +13,8 @@
  *   - Q-9 multi-interactor: the gate is decoupled from the interactor
  *     surface; raiseApproval is the only Interaction Protocol entry.
  *
- * AC-64: non-SM path covers all three modes with positive and negative cases.
- * AC-66: no sandbox-implying vocabulary appears in this file.
+ * non-SM path covers all three modes with positive and negative cases.
+ * no sandbox-implying vocabulary appears in this file.
  */
 
 import assert from "node:assert/strict";
@@ -397,10 +397,10 @@ describe("evaluateModeGate — approvalKey validation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-66: no positive sandbox assertion in source (structural documentation)
+// no positive sandbox assertion in source (structural documentation)
 // ---------------------------------------------------------------------------
 
-describe("AC-66 — no positive in-process isolation claim", () => {
+describe(" — no positive in-process isolation claim", () => {
   it("this test file contains no sandbox-implying vocabulary as a positive claim", () => {
     assert.ok(true, "no in-process containment claim found");
   });

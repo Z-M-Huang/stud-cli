@@ -1,6 +1,6 @@
 /**
  * Session lifecycle state and trigger unions, plus the immutable transition
- * table that encodes AC-45's documented walk.
+ * table that encodes 's documented walk.
  *
  * Allowed transitions:
  *   Idle      --FirstTurn--> Active

@@ -1,5 +1,5 @@
 /**
- * Dependency Resolution contract tests (AC-24).
+ * Dependency Resolution contract tests.
  *
  * Verifies:
  *   1. resolveDependencies — topological init order with lexicographic tie-breaking.
@@ -8,7 +8,7 @@
  *   4. resolveDependencies — DependencyMissing failure when a declared dep is absent.
  *   5. resolveDependencies — category-kind dependency resolution.
  *   6. extensionDependencySchema fixtures — valid / invalid / worst-plausible via AJV.
- *   7. contractVersion — aligns with wiki page (AC-107 / AC-112 drift discipline).
+ *   7. contractVersion — aligns with wiki page ( /  drift discipline).
  *
  * Wiki: contracts/Dependency-Resolution.md + core/Extension-Lifecycle.md
  */
@@ -407,10 +407,10 @@ describe("extensionDependencySchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. contractVersion shape (AC-107)
+// 7. contractVersion shape
 // ---------------------------------------------------------------------------
 
-describe("contractVersion (AC-107)", () => {
+describe("contractVersion", () => {
   it("exports a semver-shaped contractVersion string", () => {
     assert.match(
       contractVersion,

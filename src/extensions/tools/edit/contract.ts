@@ -66,7 +66,7 @@ export const contract: ToolContract<EditConfig, EditArgs, EditResult> = {
    * Always gated: every file edit runs through the approval stack.
    * The approval key is the parent directory of the target file relative to the
    * workspace root, enabling per-directory approval granularity.
-   * Wiki: reference-extensions/tools/Edit.md (AC-98, Q-8 resolution)
+   * Wiki: reference-extensions/tools/Edit.md (, Q-8 resolution)
    */
   gated: true,
 

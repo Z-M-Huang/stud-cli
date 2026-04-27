@@ -5,7 +5,7 @@
  * Two distinct cap behaviours:
  *   - `sm`:           bound reached → `capHit: true, proceed: false` (no throw).
  *     The caller ends `Act` with `capHit: true`; in-flight tool calls are not
- *     cancelled (AC-39).
+ *     cancelled.
  *   - `default-chat`: bound crossed → throws `ExtensionHost / LoopBoundExceeded`.
  *     The orchestrator surfaces this as a terminal turn error.
  *

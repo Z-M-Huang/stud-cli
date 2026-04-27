@@ -1,5 +1,5 @@
 /**
- * State Machines contract tests (AC-18).
+ * State Machines contract tests.
  *
  * Verifies:
  *   1. SMContract shape — kind, cardinality, stages, entryStage, grantStageTool.

@@ -3,7 +3,7 @@
  *
  * Raises an `Ask` Interaction Protocol request through the active UI interactor.
  * Gated by the approval stack with a fixed approval key `"ask-user"` — approving
- * once per session approves all future invocations of this tool (AC-94, Q-8).
+ * once per session approves all future invocations of this tool (, Q-8).
  *
  * Wiki: reference-extensions/tools/Ask-User.md
  */
@@ -54,7 +54,7 @@ export const contract: ToolContract<AskUserConfig, AskUserArgs, AskUserResult> =
   /**
    * Every invocation of ask-user shares the same approval-cache key.
    * Approving once in `ask` mode approves for the remainder of the session.
-   * Wiki: reference-extensions/tools/Ask-User.md (AC-94, Q-8 resolution)
+   * Wiki: reference-extensions/tools/Ask-User.md (, Q-8 resolution)
    */
   gated: true,
   deriveApprovalKey: (_args: AskUserArgs): string => "ask-user",

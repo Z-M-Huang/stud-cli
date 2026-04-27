@@ -3,9 +3,9 @@
  *   createHostEvents, createHostAudit, createHostInteraction
  *
  * Covers:
- *   AC-56 — returned objects are Object.freeze'd (shape cannot grow at runtime)
- *   AC-56 — bus pass-through (emit reaches bus subscribers)
- *   AC-56 — extId plumbing (every record / request carries the extension id)
+ *    — returned objects are Object.freeze'd (shape cannot grow at runtime)
+ *    — bus pass-through (emit reaches bus subscribers)
+ *    — extId plumbing (every record / request carries the extension id)
  *
  * Wiki: core/Host-API.md
  */
@@ -22,7 +22,7 @@ import { createHostInteraction } from "../../../../src/core/host/impl/interactio
 // ---------------------------------------------------------------------------
 
 describe("createHostEvents", () => {
-  it("returns a frozen object that cannot grow new methods (AC-56)", () => {
+  it("returns a frozen object that cannot grow new methods", () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const he = createHostEvents({ bus, extId: "ext.a" });
 
@@ -43,7 +43,7 @@ describe("createHostEvents", () => {
     );
   });
 
-  it("delivers emits into the underlying bus (AC-56 pass-through)", () => {
+  it("delivers emits into the underlying bus ( pass-through)", () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const he = createHostEvents({ bus, extId: "ext.a" });
 
@@ -90,7 +90,7 @@ describe("createHostEvents", () => {
 // ---------------------------------------------------------------------------
 
 describe("createHostAudit", () => {
-  it("returns a frozen object (AC-56)", () => {
+  it("returns a frozen object", () => {
     const ha = createHostAudit({
       auditWriter: (_e) => {
         // noop — just testing freeze
@@ -100,7 +100,7 @@ describe("createHostAudit", () => {
     assert.equal(Object.isFrozen(ha), true);
   });
 
-  it("attaches extId to every audit record (AC-56 extId plumbing)", () => {
+  it("attaches extId to every audit record ( extId plumbing)", () => {
     const entries: Record<string, unknown>[] = [];
     const ha = createHostAudit({
       auditWriter: (e) => entries.push(e as unknown as Record<string, unknown>),
@@ -146,7 +146,7 @@ describe("createHostAudit", () => {
 // ---------------------------------------------------------------------------
 
 describe("createHostInteraction", () => {
-  it("returns a frozen object (AC-56)", () => {
+  it("returns a frozen object", () => {
     const hi = createHostInteraction({
       arbiter: (_k, _s, _id) => Promise.resolve({ accepted: true }),
       extId: "ext.a",
@@ -154,7 +154,7 @@ describe("createHostInteraction", () => {
     assert.equal(Object.isFrozen(hi), true);
   });
 
-  it("forwards to the arbiter with the caller extId (AC-56 extId plumbing)", async () => {
+  it("forwards to the arbiter with the caller extId ( extId plumbing)", async () => {
     let capturedId = "";
     const hi = createHostInteraction({
       arbiter: (_k, _s, id) => {

@@ -1,14 +1,14 @@
 /**
- * `assertContract` — reusable conformance harness for extension contracts (AC-29).
+ * `assertContract` — reusable conformance harness for extension contracts.
  *
  * Validates every normative dimension of an `ExtensionContract<TConfig>`:
- *   - Shape (AC-8/AC-9/AC-10/AC-12): ten required fields, `kind` in the closed
+ *   - Shape: ten required fields, `kind` in the closed
  *     nine-category union, semver patterns, `configSchema.additionalProperties`.
- *   - Cardinality (AC-23): both axes carry legal values; per-category rules for
+ *   - Cardinality: both axes carry legal values; per-category rules for
  *     SessionStore (activeCardinality: 'one').
- *   - Config fixtures (AC-11): AJV validates valid/invalid/worst-plausible.
- *   - Lifecycle order (AC-32/AC-50): init → activate → deactivate → dispose.
- *   - Dispose idempotency (AC-114): second `dispose()` must not throw.
+ *   - Config fixtures: AJV validates valid/invalid/worst-plausible.
+ *   - Lifecycle order: init → activate → deactivate → dispose.
+ *   - Dispose idempotency: second `dispose()` must not throw.
  *
  * Returns a `ContractConformanceReport` — never throws for expected rejections.
  * Unexpected AJV internal crashes (e.g., worst-plausible) DO propagate; that
@@ -50,21 +50,21 @@ export interface AssertContractOptions<TConfig> {
 export interface ContractConformanceReport {
   /** True iff every section passed with no failures. */
   readonly ok: boolean;
-  /** AC-8, AC-9, AC-10, AC-12: all ten fields present and correctly typed. */
+  /** , , , all ten fields present and correctly typed. */
   readonly shapeOk: boolean;
-  /** AC-23: both cardinality axes carry legal values. */
+  /** both cardinality axes carry legal values. */
   readonly cardinalityOk: boolean;
-  /** AC-11: valid fixture accepted by AJV. */
+  /** valid fixture accepted by AJV. */
   readonly validFixtureAccepted: boolean;
-  /** AC-11: invalid fixture rejected by AJV. */
+  /** invalid fixture rejected by AJV. */
   readonly invalidFixtureRejected: boolean;
   /** Extracted `dataPath` from the first AJV error on invalid fixture. */
   readonly invalidFixtureRejectionPath?: string;
-  /** AC-11: worst-plausible fixture rejected without AJV throwing. */
+  /** worst-plausible fixture rejected without AJV throwing. */
   readonly worstPlausibleRejectedWithoutCrash: boolean;
-  /** AC-32/AC-50: lifecycle phases observed in invocation order. */
+  /** /lifecycle phases observed in invocation order. */
   readonly lifecycleOrderObserved: readonly ("init" | "activate" | "deactivate" | "dispose")[];
-  /** AC-114: second `dispose()` invocation completed without throwing. */
+  /** second `dispose()` invocation completed without throwing. */
   readonly disposeIdempotent: boolean;
   /** Enumerated failures. Section names are stable identifiers for assertions. */
   readonly failures: readonly { section: string; detail: string }[];

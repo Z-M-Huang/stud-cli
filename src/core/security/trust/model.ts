@@ -2,7 +2,7 @@
  * Trust model types.
  *
  * Defines the shape of a trust entry and the `TrustStore` interface consumed
- * by the project-trust gate (Unit 50) and the MCP-trust surface (Unit 89).
+ * by the project-trust gate and the MCP-trust surface.
  *
  * Wiki: security/Trust-Model.md
  */

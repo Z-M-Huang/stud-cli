@@ -2,7 +2,7 @@
  * Tool contract registry delegate.
  *
  * Provides a thin, in-memory registry from `toolId` to `ToolContract`.
- * The authority stack (Unit 56) and the approval cache (Unit 55) call
+ * The authority stack and the approval cache call
  * `lookupToolContract` before invoking `deriveApprovalKey` so that the full
  * contract is available without re-traversing the extension registry.
  *

@@ -1,5 +1,5 @@
 /**
- * UAT-30: SM-Stage-Retry — retry decision faithfully surfaces from runStage.
+ * SM-Stage-Retry — retry decision faithfully surfaces from runStage.
  *
  * Drives the real `runStage` (`src/core/sm/stage-executor.ts`) with a
  * controllable smRuntime stub so the assert() callback can return any of
@@ -59,7 +59,7 @@ async function execute(verdict: AssertVerdict): Promise<{
   return { result, attempts: counter.count };
 }
 
-describe("UAT-30: runStage drives the seven phases and surfaces assertOutcome", () => {
+describe("runStage drives the seven phases and surfaces assertOutcome", () => {
   it("assertOutcome='ok' completes the stage with a populated transcript", async () => {
     const { result } = await execute("ok");
     assert.equal(result.assertOutcome, "ok");

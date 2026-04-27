@@ -1,5 +1,5 @@
 /**
- * Settings shape contract tests (AC-27).
+ * Settings shape contract tests.
  *
  * Verifies:
  *   1. settingsSchema accepts a minimal valid settings object.

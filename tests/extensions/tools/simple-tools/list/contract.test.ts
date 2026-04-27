@@ -1,5 +1,5 @@
 /**
- * Contract conformance tests for the list reference tool (AC-99).
+ * Contract conformance tests for the list reference tool.
  *
  * Covers: shape, deriveApprovalKey directory-scope semantics (Q-8),
  * immediate-children listing, recursion at maxDepth>1, dotfile hiding,

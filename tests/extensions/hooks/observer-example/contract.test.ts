@@ -83,7 +83,7 @@ describe("observer-example hook — shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Observer behavior tests — AC-92
+// Observer behavior tests —
 // ---------------------------------------------------------------------------
 
 describe("observer-example hook — behavior", () => {

@@ -131,7 +131,7 @@ describe("renderStage — Session/StoreUnavailable errors", () => {
     assert.ok(err !== undefined, "expected an error to be thrown");
     assert.equal((err as { class: string }).class, "Session");
     assert.equal((err as { context: { code: string } }).context.code, "StoreUnavailable");
-    // UI must NOT be called when the store write fails (turn abandoned, AC-46).
+    // UI must NOT be called when the store write fails (turn abandoned, ).
     assert.equal(uiCalled, false);
   });
 

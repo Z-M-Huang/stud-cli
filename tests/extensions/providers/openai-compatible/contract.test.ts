@@ -105,7 +105,7 @@ describe("OpenAI-Compatible contract shape", () => {
     assert.equal(contract.activeCardinality, "unlimited");
   });
 
-  it("advertises baseURL-routable capabilities per AC-84", () => {
+  it("advertises baseURL-routable capabilities per ", () => {
     assert.equal(contract.capabilities.streaming, "hard");
     assert.equal(contract.capabilities.toolCalling, "hard");
     assert.equal(contract.capabilities.structuredOutput, "preferred");

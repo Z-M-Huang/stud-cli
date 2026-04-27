@@ -1,5 +1,5 @@
 /**
- * Standard config fixtures for extension contract conformance tests (AC-11).
+ * Standard config fixtures for extension contract conformance tests.
  *
  * Every conformance test suite imports these three shapes:
  *   - `validConfigFixture`         — minimal conforming input; must be accepted.

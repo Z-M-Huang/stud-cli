@@ -2,7 +2,7 @@
  * Tests for `mockHost` — the frozen per-extension HostAPI stub.
  *
  * Covers:
- *   AC-115 — cross-extension state-slot access throws ExtensionHost/SlotAccessDenied
+ *    — cross-extension state-slot access throws ExtensionHost/SlotAccessDenied
  *             and emits a StateSlotAccessDenied audit record.
  *   Invariant #2 — no bulk-env surface (`list`/`all`/`entries`) on host.env.
  */
@@ -83,10 +83,10 @@ describe("mockHost — state slot (own extId)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// State slot — AC-115: cross-extension access denied
+// State slot — cross-extension access denied
 // ---------------------------------------------------------------------------
 
-describe("mockHost — state slot cross-slot rejection (AC-115)", () => {
+describe("mockHost — state slot cross-slot rejection", () => {
   it("throws ExtensionHost/SlotAccessDenied for a different extId", () => {
     const { host } = mockHost({ extId: "ext-a" });
     assert.throws(
@@ -101,7 +101,7 @@ describe("mockHost — state slot cross-slot rejection (AC-115)", () => {
     );
   });
 
-  it("emits a StateSlotAccessDenied audit record before throwing (AC-115)", () => {
+  it("emits a StateSlotAccessDenied audit record before throwing", () => {
     const { host, recorders } = mockHost({ extId: "ext-a" });
 
     try {

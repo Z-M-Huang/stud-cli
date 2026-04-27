@@ -1,7 +1,7 @@
 /**
  * Session lifecycle state machine tests.
  *
- * Covers AC-45:
+ * Covers :
  *   - Full walk Idle → Active → Persisted → Closed
  *   - Resume path Closed → Resumed → Active with SM slot delivery
  *   - Bus event emission on each transition
@@ -19,7 +19,7 @@ function noopDeliver(): Promise<void> {
   return Promise.resolve();
 }
 
-describe("SessionStateMachine — full walk (AC-45)", () => {
+describe("SessionStateMachine — full walk", () => {
   it("walks Idle -> Active -> Persisted -> Closed", async () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const m = createSessionStateMachine({ bus, deliverSmSlots: noopDeliver });
@@ -45,7 +45,7 @@ describe("SessionStateMachine — full walk (AC-45)", () => {
   });
 });
 
-describe("SessionStateMachine — resume path (AC-45)", () => {
+describe("SessionStateMachine — resume path", () => {
   it("resumes from Closed through Resumed to Active after SM slot delivery", async () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const order: string[] = [];
@@ -87,7 +87,7 @@ describe("SessionStateMachine — resume path (AC-45)", () => {
   });
 });
 
-describe("SessionStateMachine — event emission (AC-45)", () => {
+describe("SessionStateMachine — event emission", () => {
   it("emits SessionActive and SessionPersisted on matching transitions", async () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const names: string[] = [];
@@ -126,7 +126,7 @@ describe("SessionStateMachine — event emission (AC-45)", () => {
   });
 });
 
-describe("SessionStateMachine — illegal transitions (AC-45)", () => {
+describe("SessionStateMachine — illegal transitions", () => {
   it("throws Session/IllegalTransition on Resume from Active", async () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const m = createSessionStateMachine({ bus, deliverSmSlots: noopDeliver });
@@ -189,7 +189,7 @@ describe("SessionStateMachine — illegal transitions (AC-45)", () => {
   });
 });
 
-describe("SessionStateMachine — onTransition listener (AC-45)", () => {
+describe("SessionStateMachine — onTransition listener", () => {
   it("fires the listener on every valid transition", async () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const m = createSessionStateMachine({ bus, deliverSmSlots: noopDeliver });

@@ -1,5 +1,5 @@
 /**
- * UAT-1, UAT-2, UAT-3 flow tests — drive the CI gates as child processes.
+ * , ,  flow tests — drive the CI gates as child processes.
  *
  * **Recursion guard.** This file lives in the default `*.test.ts` glob, so a
  * naive `bun run test` invocation from inside it would re-discover and re-run
@@ -13,7 +13,7 @@
  *      setting the variable, so the inner suite skips itself — preventing the
  *      recursion even if a future change wires this file into a normal run.
  *
- * The negative scenario for UAT-3 plants a banned-vocab violation in a fresh
+ * The negative scenario for  plants a banned-vocab violation in a fresh
  * temp directory (never under `src/` or `tests/`), runs the scanner against
  * that directory, asserts a non-zero exit + the file path in stderr, and
  * cleans up in `after()`.
@@ -59,7 +59,7 @@ function runCommand(cmd: string, args: readonly string[]): Promise<CommandResult
 const skipReason =
   "Set STUD_RUN_CI_GATES=1 to run end-to-end CI gate tests (slow; spawn child processes).";
 
-describe("UAT-1: build/lint/typecheck/format gates exit 0 on the clean tree", () => {
+describe("build/lint/typecheck/format gates exit 0 on the clean tree", () => {
   it("typecheck exits 0", { skip: GATE_ENABLED ? false : skipReason }, async () => {
     const r = await runCommand("bun", ["run", "typecheck"]);
     assert.equal(r.code, 0, `typecheck failed: ${r.stderr}`);
@@ -76,14 +76,14 @@ describe("UAT-1: build/lint/typecheck/format gates exit 0 on the clean tree", ()
   });
 });
 
-describe("UAT-2: build is reproducible", () => {
+describe("build is reproducible", () => {
   it("build exits 0", { skip: GATE_ENABLED ? false : skipReason }, async () => {
     const r = await runCommand("bun", ["run", "build"]);
     assert.equal(r.code, 0, `build failed: ${r.stderr}`);
   });
 });
 
-describe("UAT-3: banned-vocab scan", () => {
+describe("banned-vocab scan", () => {
   let plantDir: string | null = null;
 
   after(async () => {

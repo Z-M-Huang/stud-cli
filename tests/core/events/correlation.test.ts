@@ -77,10 +77,10 @@ describe("createCorrelationFactory — prefix anchoring", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Monotonic anchoring (AC-73)
+// Monotonic anchoring
 // ---------------------------------------------------------------------------
 
-describe("createCorrelationFactory — monotonic anchoring (AC-73)", () => {
+describe("createCorrelationFactory — monotonic anchoring", () => {
   it("embeds the monotonic value in the ID", () => {
     let tick = 0n;
     const factory = createCorrelationFactory({
@@ -93,7 +93,7 @@ describe("createCorrelationFactory — monotonic anchoring (AC-73)", () => {
     assert.match(id, /^stage-\d+-/);
   });
 
-  it("deterministic seed produces byte-identical ID sequence (AC-73)", () => {
+  it("deterministic seed produces byte-identical ID sequence", () => {
     function runWithSeed(): string[] {
       let i = 0;
       let tick = 0n;

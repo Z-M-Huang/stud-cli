@@ -9,7 +9,7 @@
  * `assertStoreCompatible` enforces invariant #4: a session manifest written by
  * Store A must not be resumed with Store B. The check must run before any
  * extension state loads so that no state from the wrong store leaks into the
- * session (AC-81).
+ * session.
  *
  * Wiki: core/Persistence-and-Recovery.md + contracts/Session-Store.md
  *       flows/Session-Resume.md + flows/Session-Resume-Drift.md

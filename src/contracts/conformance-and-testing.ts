@@ -12,7 +12,7 @@ import type { ExtensionContract } from "./meta.js";
 import type { JSONSchemaObject } from "./state-slot.js";
 import type { HostAPI } from "../core/host/host-api.js";
 
-// ── ConformanceCheck — closed union (AC-29) ─────────────────────────────────
+// ── ConformanceCheck — closed union ─────────────────────────────────
 
 /** Names of all checks the conformance harness can perform. */
 export type ConformanceCheck =
@@ -50,7 +50,7 @@ export interface ConformanceExpectation {
 
 /**
  * Normative check matrix. Universal checks (appliesTo: "all") run for every
- * contract; category-specific checks run only for named kinds. AC-29, AC-114.
+ * contract; category-specific checks run only for named kinds. , .
  */
 export const CONFORMANCE_MATRIX: readonly ConformanceExpectation[] = [
   { check: "shape", required: true, appliesTo: "all" },

@@ -5,7 +5,7 @@ import { runDiscovery } from "../../src/core/discovery/run.js";
 import { createEventBus } from "../../src/core/events/bus.js";
 import { diffSequences, hashLoadOrder, replayEvents } from "../helpers/determinism.js";
 
-describe("AC-73: deterministic discovery", () => {
+describe("deterministic discovery", () => {
   it("two runs of the same extension set produce byte-identical init order", async () => {
     const first = await runDiscovery({ fixture: "reference-set" });
     const second = await runDiscovery({ fixture: "reference-set" });
@@ -21,7 +21,7 @@ describe("AC-73: deterministic discovery", () => {
   });
 });
 
-describe("AC-41: deterministic event and command delivery", () => {
+describe("deterministic event and command delivery", () => {
   it("subscribers receive events in registration order", () => {
     const bus = createEventBus({ monotonic: () => 1n });
     const seen: string[] = [];

@@ -1,5 +1,5 @@
 /**
- * Contract conformance tests for the catalog reference tool (AC-96).
+ * Contract conformance tests for the catalog reference tool.
  *
  * Covers: shape, fixed approval key, public metadata only (no internal
  * config/stateSlot fields), filterKind narrowing, filterExtId narrowing,
@@ -110,7 +110,7 @@ describe("catalog tool — shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Approval key — AC-96, Q-8 resolution
+// Approval key — , Q-8 resolution
 // ---------------------------------------------------------------------------
 
 describe("catalog tool — deriveApprovalKey", () => {

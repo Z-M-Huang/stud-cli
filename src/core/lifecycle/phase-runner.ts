@@ -3,7 +3,7 @@
  *
  * This module owns deterministic dependency ordering and phase event emission for
  * the extension lifecycle manager. State-machine attach sequencing remains gated
- * by AC-35: the session store must deliver the extension's state slot before the
+ * by the session store must deliver the extension's state slot before the
  * StateMachine extension's activate/attach work runs.
  */
 import { ExtensionHost } from "../errors/extension-host.js";

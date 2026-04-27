@@ -113,7 +113,7 @@ export type InteractorHandler = (
 // ---------------------------------------------------------------------------
 
 /**
- * Per-category contract for UI extensions (AC-16).
+ * Per-category contract for UI extensions.
  *
  * Fixes:
  *   - `kind: 'UI'`

@@ -1,5 +1,5 @@
 /**
- * UAT-6 + AC-45: Session-Resume happy path via stud --continue.
+ *  + Session-Resume happy path via stud --continue.
  *
  * Drives a two-launch resume cycle through the bundled filesystem session
  * store and the lifecycle state machine. Asserts:
@@ -38,7 +38,7 @@ after(async () => {
   await rm(projectRoot, { recursive: true, force: true });
 });
 
-describe("UAT-6: Session-Resume happy path", () => {
+describe("Session-Resume happy path", () => {
   it("manifest persisted by launch-1 round-trips intact through launch-2 read", async () => {
     const run = await runFirstTurnThenContinue({
       projectRoot,

@@ -1,5 +1,5 @@
 /**
- * Contract conformance tests for the ask-user reference tool (AC-94).
+ * Contract conformance tests for the ask-user reference tool.
  *
  * Covers: shape, approval-key stability, interactor dispatch, empty-input
  * rejection, user cancellation, execution timeout, and idempotent dispose.
@@ -102,7 +102,7 @@ describe("ask-user tool — shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Approval key stability (AC-94, Q-8 resolution)
+// Approval key stability (, Q-8 resolution)
 // ---------------------------------------------------------------------------
 
 describe("ask-user tool — deriveApprovalKey", () => {

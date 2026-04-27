@@ -64,7 +64,7 @@ export const contract: ToolContract<BashConfig, BashArgs, BashResult> = {
    * Always gated: every bash invocation runs through the approval stack.
    * The approval key is the command prefix, so `git` is approved once for all
    * subsequent `git …` calls within the session.
-   * Wiki: reference-extensions/tools/Bash.md (AC-95, Q-8 resolution)
+   * Wiki: reference-extensions/tools/Bash.md (, Q-8 resolution)
    */
   gated: true,
   deriveApprovalKey: (args: BashArgs): string => deriveCommandPrefix(args.command),

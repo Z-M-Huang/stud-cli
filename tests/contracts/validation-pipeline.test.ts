@@ -1,5 +1,5 @@
 /**
- * Validation Pipeline contract tests (AC-30).
+ * Validation Pipeline contract tests.
  *
  * Verifies:
  *   1. VALIDATION_STAGES — five stages in order.

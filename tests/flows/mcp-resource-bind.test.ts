@@ -1,5 +1,5 @@
 /**
- * UAT-25: MCP-Resource-Bind invariants.
+ * MCP-Resource-Bind invariants.
  *
  * Asserts the documented bindResource invariants:
  *   1. Negative/zero maxBytes throws Validation/BindingCapExceeded.
@@ -13,7 +13,7 @@ import { describe, it } from "node:test";
 
 import { bindResource, type MCPResourceBinding } from "../../src/core/mcp/resource-binding.js";
 
-describe("UAT-25: MCP-Resource-Bind invariants", () => {
+describe("MCP-Resource-Bind invariants", () => {
   it("invalid maxBytes throws Validation/BindingCapExceeded", async () => {
     const binding: MCPResourceBinding = {
       serverId: "github",

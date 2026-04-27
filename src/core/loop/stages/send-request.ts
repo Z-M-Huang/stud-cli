@@ -5,10 +5,10 @@
  *   1. Check the turn-scoped cancel chain before dispatching — throw
  *      Cancellation/TurnCancelled immediately if the signal is already aborted.
  *   2. Hand off to the injected ProviderDispatcher, which hides all
- *      provider-specific I/O (ai-sdk binding lands in Unit 104).
+ *      provider-specific I/O (ai-sdk binding lands in ).
  *   3. Return the StreamHandle to STREAM_RESPONSE; do not consume the stream.
  *
- * This unit owns the cancellation-span entry point (AC-51). The correlation
+ * This unit owns the cancellation-span entry point. The correlation
  * span opened here closes at RENDER or on error.
  *
  * Errors thrown / propagated:
@@ -40,7 +40,7 @@ export interface StreamHandle {
 }
 
 /**
- * Seam injected by the provider layer (Unit 104). Receives the fully composed
+ * Seam injected by the provider layer. Receives the fully composed
  * request and the turn-scoped AbortSignal; returns a streaming handle.
  */
 export type ProviderDispatcher = (
@@ -59,7 +59,7 @@ export function sendRequestStage(deps: {
   return async function sendRequest(input) {
     const { dispatcher, turnSignal } = deps;
 
-    // Cancel-chain entry point (AC-51): refuse dispatch if the turn is already
+    // Cancel-chain entry point: refuse dispatch if the turn is already
     // cancelled so we never start a request that would be immediately abandoned.
     if (turnSignal.aborted) {
       throw new Cancellation(

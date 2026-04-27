@@ -2,7 +2,7 @@
  * Tests for configuration scope resolver, merge, override-fallback, and provenance.
  *
  * Covers:
- *   - AC-71: override order (project > global > bundled), additive allowlist merge,
+ *   - override order (project > global > bundled), additive allowlist merge,
  *     unknown-key rejection, and scope-provenance tagging.
  *   - Q-3: project-scope override falls back to global when validation fails.
  */
@@ -234,7 +234,7 @@ describe("tagProvenance", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Provenance tagging on resolved values (scope-provenance on every field, AC-71)
+// Provenance tagging on resolved values (scope-provenance on every field, )
 // ---------------------------------------------------------------------------
 
 describe("createConfigResolver — scope provenance attached to every resolved field", () => {

@@ -1,7 +1,7 @@
 /**
  * Session lifecycle state machine.
  *
- * Encodes the AC-45 walk:
+ * Encodes the  walk:
  *   Idle → Active → Persisted → {Closed | Active(re-activation)}
  *   Closed → Resumed → Active  (deliverSmSlots fires on Resumed → Active edge)
  *

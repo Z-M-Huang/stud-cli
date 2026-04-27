@@ -6,7 +6,7 @@
  * to the underlying bus.  `on` is a passthrough so extensions subscribe to the
  * same bus that core and other extensions emit on.
  *
- * AC-56: the returned object is `Object.freeze`'d — the shape cannot grow new
+ * the returned object is `Object.freeze`'d — the shape cannot grow new
  *        methods at runtime.
  *
  * Wiki: core/Host-API.md + core/Event-and-Command-Ordering.md

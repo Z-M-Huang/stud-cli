@@ -1,5 +1,5 @@
 /**
- * CommandContract tests (AC-19).
+ * CommandContract tests.
  *
  * Verifies:
  *   1. Shape — kind fixed to 'Command', both cardinalities 'unlimited',

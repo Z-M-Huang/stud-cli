@@ -1,7 +1,7 @@
 /**
  * Contract conformance tests for the /health bundled command.
  *
- * Covers: shape, AC-110 report schema, SM-optional field, unhealthy MCP
+ * Covers: shape,  report schema, SM-optional field, unhealthy MCP
  * servers, no-resolved-secrets invariant, and lifecycle ordering.
  *
  * Uses node:test + node:assert/strict (project canonical test runner).
@@ -109,11 +109,11 @@ describe("/health command — shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-110: report shape
+// report shape
 // ---------------------------------------------------------------------------
 
-describe("/health command — AC-110 report shape", () => {
-  it("returns all required top-level keys from AC-110", async () => {
+describe("/health command —  report shape", () => {
+  it("returns all required top-level keys from ", async () => {
     const { host } = mockHost({ extId: "health" });
     await contract.lifecycle.init?.(host, { enabled: true });
     const result = await contract.execute(EMPTY_ARGS, host);
@@ -256,7 +256,7 @@ describe("/health command — MCP health", () => {
 });
 
 // ---------------------------------------------------------------------------
-// No resolved secrets (AC-69 / invariant #6)
+// No resolved secrets ( / invariant #6)
 // ---------------------------------------------------------------------------
 
 describe("/health command — no resolved secrets", () => {

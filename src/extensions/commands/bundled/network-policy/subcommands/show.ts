@@ -1,7 +1,7 @@
 /**
  * /network-policy show subcommand — returns the current allow and deny lists.
  *
- * Read-only. No approval gate required (AC-110).
+ * Read-only. No approval gate required.
  * No secret material is included in the output.
  *
  * Wiki: runtime/Network-Policy.md + reference-extensions/commands/network-policy.md

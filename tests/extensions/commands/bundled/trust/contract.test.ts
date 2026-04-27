@@ -127,7 +127,7 @@ describe("/trust command — shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// List subcommand — redaction tests (AC-93, invariant #6)
+// List subcommand — redaction tests (, invariant #6)
 // ---------------------------------------------------------------------------
 
 describe("/trust list — redaction", () => {

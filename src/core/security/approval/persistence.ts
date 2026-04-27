@@ -15,7 +15,7 @@
  * Pre-conditions (enforced at runtime):
  *   - When `persistProjectScope: true`, the parent directory of
  *     `projectScopedPath` (i.e. `<project-root>/.stud/`) must already exist.
- *     That directory is created only by the project-trust flow (Unit 50);
+ *     That directory is created only by the project-trust flow;
  *     its absence is treated as evidence that the project is not trusted.
  *
  * Error codes:
@@ -48,7 +48,7 @@ import type {
 /**
  * Verify that the parent directory of `approvalsPath` exists and is a
  * directory.  That parent is `<project-root>/.stud/` — it is only created by
- * the project-trust flow (Unit 50).  Its absence proves the project is not
+ * the project-trust flow.  Its absence proves the project is not
  * trusted.
  *
  * @throws `Validation/UntrustedProjectCachePath` — when the parent directory
@@ -143,7 +143,7 @@ async function loadPersistedEntries(filePath: string): Promise<ApprovalCacheEntr
  *
  * @throws `Validation/UntrustedProjectCachePath` — when `persistProjectScope`
  *   is `true` but the parent `.stud/` directory of `projectScopedPath` does
- *   not exist (project not trusted per Unit 50).
+ *   not exist (project not trusted per ).
  * @throws `Session/ApprovalCacheUnavailable` — when loading the persisted
  *   file fails for a reason other than ENOENT.
  */

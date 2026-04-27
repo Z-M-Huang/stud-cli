@@ -1,5 +1,5 @@
 /**
- * UAT companion (AC-111): LLM-vs-SM orchestration invariants.
+ * UAT companion: LLM-vs-SM orchestration invariants.
  *
  * The case study binds two negative invariants:
  *
@@ -24,7 +24,7 @@ import { stages } from "../../src/extensions/state-machines/ralph/index.js";
 
 import type { StageDefinition } from "../../src/contracts/state-machines.js";
 
-describe("AC-111: SM does not see per-token LLM deltas", () => {
+describe("SM does not see per-token LLM deltas", () => {
   it("StageDefinition has no streaming-token surface", () => {
     // The StageDefinition type structurally exposes only:
     //   id, body, allowedTools, turnCap, completionTool, completionSchema, next
@@ -47,7 +47,7 @@ describe("AC-111: SM does not see per-token LLM deltas", () => {
   });
 });
 
-describe("AC-111: LLM request does not see SM ctx", () => {
+describe("LLM request does not see SM ctx", () => {
   it("body templating uses ${ctx.X} substitution, not direct ctx pass-through", () => {
     // The body field is a string template. Substitution happens at the
     // SM-runtime layer (Setup phase) before the body becomes a system

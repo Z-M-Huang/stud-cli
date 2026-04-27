@@ -1,8 +1,8 @@
 /**
- * UAT-10 + UAT-30 composite: State-Machine-Workflow end-to-end.
+ *  +  composite: State-Machine-Workflow end-to-end.
  *
  * Asserts the documented invariants of the SM workflow surface using
- * the Ralph reference SM (Unit 133) as the case study:
+ * the Ralph reference SM as the case study:
  *
  *   1. Stage sequencing: Discovery → Decompose follows the contract.
  *   2. Parallel fan-out + join: Decompose → parallel(BuildA, BuildB)
@@ -23,7 +23,7 @@ import {
   stages,
 } from "../../src/extensions/state-machines/ralph/index.js";
 
-describe("UAT-10 + UAT-30: SM workflow primitives via Ralph case study", () => {
+describe(" + SM workflow primitives via Ralph case study", () => {
   it("stage sequencing: Discovery → Decompose (sequential)", async () => {
     const discovery = stages.find((s) => s.id === "Discovery");
     assert.ok(discovery !== undefined);

@@ -1,5 +1,5 @@
 /**
- * UAT-24: MCP-Remote-Tool-Call routes through single MCP client.
+ * MCP-Remote-Tool-Call routes through single MCP client.
  *
  * Asserts the documented contract: a hooked MCP client is the single
  * authoritative entry point for remote calls, and `getRegisteredServers`
@@ -17,7 +17,7 @@ import {
   registerServer,
 } from "../../src/core/mcp/server-registry.js";
 
-describe("UAT-24: MCP-Remote-Tool-Call routing invariants", () => {
+describe("MCP-Remote-Tool-Call routing invariants", () => {
   it("registerServer + getRegisteredServers expose the per-server config", () => {
     clearRegistry();
     registerServer({

@@ -1,5 +1,5 @@
 /**
- * UAT-17 + AC-117: Guard-Deny-Reproposal flow surfaces typed denial.
+ *  + Guard-Deny-Reproposal flow surfaces typed denial.
  *
  * Asserts the documented invariants:
  *   1. A guard denial produces a `deny/guard` decision via the real
@@ -104,7 +104,7 @@ function baseInput(overrides: Partial<StackInput>): StackInput {
   };
 }
 
-describe("UAT-17: Guard denial produces a typed deny/guard decision", () => {
+describe("Guard denial produces a typed deny/guard decision", () => {
   it("guard denial after SM-envelope approve downgrades to deny/guard", async () => {
     const sm: AttachedStateMachineView = { allowedTools: ["bash"] };
     const decision = await runApprovalStack(

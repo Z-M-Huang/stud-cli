@@ -49,7 +49,7 @@ export function createSnapshotWriter(deps: {
 
   return {
     async writeSnapshot(manifest: SessionManifest): Promise<void> {
-      // AC-81 precondition: reject manifests with a blank/absent writtenByStore
+      //  precondition: reject manifests with a blank/absent writtenByStore
       // before any I/O so that cross-store mismatch detection can fire on the
       // next resume. Throws Session/ManifestDrift if the field is unset.
       assertCrashSafe(manifest);
@@ -63,7 +63,7 @@ export function createSnapshotWriter(deps: {
         });
       }
 
-      // Emit after the store acknowledges — never before (AC-46).
+      // Emit after the store acknowledges — never before.
       bus.emit({
         name: "SessionPersisted",
         correlationId: manifest.sessionId,

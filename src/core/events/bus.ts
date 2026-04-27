@@ -6,10 +6,10 @@
  * guard hooks, or the Interaction Protocol for those paths.
  *
  * Delivery guarantees:
- *   - Subscribers fire in registration order (AC-41).
+ *   - Subscribers fire in registration order.
  *   - Handler array is snapshotted before each emit: an unsubscribe during
  *     delivery does not skip later-registered handlers for the in-flight emit.
- *   - A handler that throws produces a `SuppressedError` envelope (AC-40); it
+ *   - A handler that throws produces a `SuppressedError` envelope; it
  *     does not halt delivery to remaining handlers and does not propagate to
  *     the emitter.
  *   - `SuppressedError` handlers that throw are silently swallowed to prevent
@@ -112,7 +112,7 @@ export function createEventBus(opts: { monotonic: () => bigint }): EventBus {
   const bus: EventBus = {
     emit<TName extends string, TPayload>(envelope: EventEnvelope<TName, TPayload>): void {
       // Snapshot both arrays before delivery so that mid-emit unsubscribes do
-      // not skip later-registered handlers for this invocation (AC-41).
+      // not skip later-registered handlers for this invocation.
       const named = [...(namedHandlers.get(envelope.name) ?? [])];
       const any = [...anyHandlers];
 

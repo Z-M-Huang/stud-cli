@@ -4,9 +4,9 @@
  * `createHostInteraction` returns a frozen object whose `request` method
  * forwards to the session-level interaction arbiter with the calling
  * extension's `extId` so the arbiter can attribute and queue requests per
- * extension (Q-9 race-to-answer bookkeeping is handled in Unit 58).
+ * extension (Q-9 race-to-answer bookkeeping is handled in ).
  *
- * AC-56: the returned object is `Object.freeze`'d.
+ * the returned object is `Object.freeze`'d.
  *
  * Wiki: core/Interaction-Protocol.md + core/Host-API.md
  */

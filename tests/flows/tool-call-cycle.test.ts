@@ -1,5 +1,5 @@
 /**
- * UAT-16 + AC-64 (invariant #1): Tool-Call-Cycle authority stack.
+ *  +  (invariant #1): Tool-Call-Cycle authority stack.
  *
  * Drives the real `runApprovalStack` (`src/core/security/approval/stack.ts`)
  * through the four documented branches:
@@ -147,7 +147,7 @@ function baseInput(overrides: Partial<StackInput>): StackInput {
   };
 }
 
-describe("UAT-16: SM-envelope approve bypasses the mode gate", () => {
+describe("SM-envelope approve bypasses the mode gate", () => {
   it("decision source is sm-envelope when tool is in allowedTools", async () => {
     const sm: AttachedStateMachineView = { allowedTools: ["read"] };
     const audit = recordingAudit();
@@ -176,7 +176,7 @@ describe("UAT-16: SM-envelope approve bypasses the mode gate", () => {
   });
 });
 
-describe("UAT-16: SM-grant-token", () => {
+describe("SM-grant-token", () => {
   it("approve verdict yields decision source sm-grant-token (with stageExecutionId)", async () => {
     const sm: AttachedStateMachineView = {
       allowedTools: [], // tool NOT in envelope
@@ -214,7 +214,7 @@ describe("UAT-16: SM-grant-token", () => {
   });
 });
 
-describe("UAT-16: no SM attached → mode gate applies", () => {
+describe("no SM attached → mode gate applies", () => {
   it("yolo mode auto-approves with source mode-gate", async () => {
     const decision = await runApprovalStack(baseInput({ sm: null, mode: yoloMode }));
     assert.equal(decision.kind, "approve");
@@ -224,7 +224,7 @@ describe("UAT-16: no SM attached → mode gate applies", () => {
   });
 });
 
-describe("UAT-16: audit record matches decision", () => {
+describe("audit record matches decision", () => {
   it("approval is recorded with class=Approval and the decision shape", async () => {
     const sm: AttachedStateMachineView = { allowedTools: ["read"] };
     const audit = recordingAudit();

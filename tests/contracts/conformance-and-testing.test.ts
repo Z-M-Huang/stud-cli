@@ -1,5 +1,5 @@
 /**
- * Conformance-and-Testing contract tests (AC-29, AC-114).
+ * Conformance-and-Testing contract tests.
  *
  * Verifies:
  *   1. CONFORMANCE_CHECKS — lists all expected check names.
@@ -80,7 +80,7 @@ function validReferenceTool(): ExtensionContract<RefConfig> {
   } as unknown as ExtensionContract<RefConfig>;
 }
 
-/** A Tool contract whose dispose throws on the second invocation (AC-114 negative path). */
+/** A Tool contract whose dispose throws on the second invocation ( negative path). */
 function doubleDisposeFailsTool(): ExtensionContract<RefConfig> {
   let calls = 0;
   return {
@@ -284,7 +284,7 @@ describe("runConformanceSuite — happy path", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. runConformanceSuite — non-idempotent dispose detection (AC-114)
+// 4. runConformanceSuite — non-idempotent dispose detection
 // ---------------------------------------------------------------------------
 
 describe("runConformanceSuite — non-idempotent dispose", () => {
@@ -321,7 +321,7 @@ describe("runConformanceSuite — permissive configSchema detection", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. conformanceResultSchema — fixture assertions (AC-29 / schema shape)
+// 6. conformanceResultSchema — fixture assertions ( / schema shape)
 // ---------------------------------------------------------------------------
 
 describe("conformanceResultSchema fixtures", () => {

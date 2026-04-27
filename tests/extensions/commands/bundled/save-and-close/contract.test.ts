@@ -115,7 +115,7 @@ describe("/save-and-close command — shape", () => {
 
   it("is not approval-gated (no requiresApproval field on CommandContract)", () => {
     // CommandContract does not define requiresApproval; invoking /save-and-close
-    // requires no extra user confirmation (AC-110).
+    // requires no extra user confirmation.
     const c = contract as unknown as { requiresApproval?: unknown };
     assert.equal(c.requiresApproval, undefined);
   });

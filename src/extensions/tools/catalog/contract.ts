@@ -5,7 +5,7 @@
  * public meta-contract metadata (IDs, categories, contract versions,
  * cardinalities) without exposing per-extension config, state, or secrets.
  *
- * Approval model (AC-96, Q-8 resolution):
+ * Approval model (, Q-8 resolution):
  *   `deriveApprovalKey` returns the fixed string "catalog". Approving once
  *   per session approves all future catalog invocations.
  *
@@ -79,7 +79,7 @@ export const contract: ToolContract<CatalogConfig, CatalogArgs, CatalogResult> =
   /**
    * Fixed approval key — approving once in `ask` mode approves all future
    * catalog invocations for the session.
-   * Wiki: reference-extensions/tools/Catalog.md (AC-96, Q-8 resolution)
+   * Wiki: reference-extensions/tools/Catalog.md (, Q-8 resolution)
    */
   gated: true,
   deriveApprovalKey: (_args: CatalogArgs): string => "catalog",

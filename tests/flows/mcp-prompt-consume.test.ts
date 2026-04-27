@@ -1,5 +1,5 @@
 /**
- * UAT-26 + AC-53: MCP-Prompt-Consume flow.
+ *  + MCP-Prompt-Consume flow.
  *
  * Drives the real `createPromptRegistry` (`src/core/prompts/registry.ts`)
  * to assert:
@@ -18,7 +18,7 @@ import { describe, it } from "node:test";
 
 import { createPromptRegistry } from "../../src/core/prompts/registry.js";
 
-describe("UAT-26: MCP-Prompt-Consume registry semantics", () => {
+describe("MCP-Prompt-Consume registry semantics", () => {
   it("MCP-sourced prompts are tagged untrusted=true on resolve", () => {
     const registry = createPromptRegistry();
     registry.register({
@@ -63,7 +63,7 @@ describe("UAT-26: MCP-Prompt-Consume registry semantics", () => {
   });
 });
 
-describe("UAT-26: MCP-Prompt-Consume — error paths", () => {
+describe("MCP-Prompt-Consume — error paths", () => {
   it("resolving an unknown URI throws Validation/PromptMissing", () => {
     const registry = createPromptRegistry();
     let threw: {

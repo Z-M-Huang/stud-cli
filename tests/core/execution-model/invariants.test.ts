@@ -92,7 +92,7 @@ describe("createExecutionInvariants — assertSingleActiveTurn", () => {
 // markTurnStart — ConcurrentTurnForbidden on overlapping starts
 // ---------------------------------------------------------------------------
 
-describe("createExecutionInvariants — ConcurrentTurnForbidden (AC-52)", () => {
+describe("createExecutionInvariants — ConcurrentTurnForbidden", () => {
   it("throws ExtensionHost/ConcurrentTurnForbidden on overlapping turn starts", () => {
     const inv = createExecutionInvariants();
     inv.markTurnStart("s1", "t1");
@@ -125,7 +125,7 @@ describe("createExecutionInvariants — ConcurrentTurnForbidden (AC-52)", () => 
 // assertMonotonicAdvance — happy and error paths
 // ---------------------------------------------------------------------------
 
-describe("createExecutionInvariants — assertMonotonicAdvance (AC-73)", () => {
+describe("createExecutionInvariants — assertMonotonicAdvance", () => {
   it("does not throw when next is strictly greater than prev", () => {
     const inv = createExecutionInvariants();
     assert.doesNotThrow(() => inv.assertMonotonicAdvance(1n, 2n));
@@ -180,7 +180,7 @@ describe("createExecutionInvariants — assertMonotonicAdvance (AC-73)", () => {
 // assertSerialDelivery — happy and error paths
 // ---------------------------------------------------------------------------
 
-describe("createExecutionInvariants — assertSerialDelivery (AC-41/51)", () => {
+describe("createExecutionInvariants — assertSerialDelivery (/51)", () => {
   it("does not throw on first call for each kind", () => {
     const inv = createExecutionInvariants();
     assert.doesNotThrow(() => inv.assertSerialDelivery("event"));

@@ -1,9 +1,9 @@
 /**
  * Unit tests for `evaluateProjectTrust`.
  *
- * AC-62: Before any `.stud/` file is read or executed, the trust gate must
+ * Before any `.stud/` file is read or executed, the trust gate must
  *   run. Refusal leaves `.stud/` untouched; acceptance records the grant.
- * AC-61: Every gate run emits a `TrustDecision` audit record.
+ * Every gate run emits a `TrustDecision` audit record.
  */
 
 import assert from "node:assert/strict";
@@ -21,7 +21,7 @@ import {
 const CANONICAL = "/canonical/proj/.stud";
 
 // ---------------------------------------------------------------------------
-// Refusal path (AC-62)
+// Refusal path
 // ---------------------------------------------------------------------------
 
 describe("evaluateProjectTrust — refusal path", () => {
@@ -38,7 +38,7 @@ describe("evaluateProjectTrust — refusal path", () => {
 
     assert.equal(result.kind, "refused");
     assert.equal(result.canonicalPath, CANONICAL);
-    // Trust store was not mutated (AC-62 — no .stud/ content accessed on refusal)
+    // Trust store was not mutated ( — no .stud/ content accessed on refusal)
     assert.deepEqual([...store.listEntries()], []);
   });
 
@@ -74,7 +74,7 @@ describe("evaluateProjectTrust — refusal path", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Grant path — first entry (AC-62)
+// Grant path — first entry
 // ---------------------------------------------------------------------------
 
 describe("evaluateProjectTrust — grant path (first entry)", () => {
@@ -118,7 +118,7 @@ describe("evaluateProjectTrust — grant path (first entry)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Pre-existing grant short-circuit (AC-62)
+// Pre-existing grant short-circuit
 // ---------------------------------------------------------------------------
 
 describe("evaluateProjectTrust — pre-existing grant", () => {
@@ -140,7 +140,7 @@ describe("evaluateProjectTrust — pre-existing grant", () => {
     assert.deepEqual([...store.listEntries()], [CANONICAL]);
   });
 
-  it("pre-existing grant emits one TrustDecision audit record (AC-61 — each evaluation is audited)", async () => {
+  it("pre-existing grant emits one TrustDecision audit record ( — each evaluation is audited)", async () => {
     const audit = mockAudit();
 
     await evaluateProjectTrust({
@@ -150,7 +150,7 @@ describe("evaluateProjectTrust — pre-existing grant", () => {
       audit,
     });
 
-    // AC-61: every evaluation — including pre-existing grants — must produce an audit record
+    // every evaluation — including pre-existing grants — must produce an audit record
     assert.equal(audit.records.length, 1);
     assert.equal(audit.records[0]?.decision, "granted");
     assert.equal(audit.records[0]?.canonicalPath, CANONICAL);
@@ -283,7 +283,7 @@ describe("evaluateProjectTrust — trust-store error paths", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Cancellation propagation — Cancellation/TurnCancelled (AC-62)
+// Cancellation propagation — Cancellation/TurnCancelled
 // ---------------------------------------------------------------------------
 
 describe("evaluateProjectTrust — cancellation propagation", () => {

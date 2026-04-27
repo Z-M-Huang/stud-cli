@@ -2,7 +2,7 @@
  * Extension lifecycle manager.
  *
  * This module is the sole authority for extension phase transitions
- * `init → activate → deactivate → dispose`. Per AC-35, state-machine attach
+ * `init → activate → deactivate → dispose`. Per , state-machine attach
  * work must happen only after the session store has delivered the extension's
  * state slot; that sequencing is preserved by requiring activation to run
  * against the extension-scoped host after load/state setup is complete.

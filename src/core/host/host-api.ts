@@ -53,7 +53,7 @@ export type { ToolsAPI } from "./api/tools.js";
  * All properties are `readonly`. The host freezes the instance before handing
  * it to `init`, so extensions cannot add or replace surface methods.
  *
- * AC-56: shape exposes exactly the twelve sanctioned surfaces below.
+ * shape exposes exactly the twelve sanctioned surfaces below.
  */
 export interface HostAPI {
   /** Session id, security mode, project root, and per-extension state slots. */

@@ -78,7 +78,7 @@ async function resolveReadableSource(source: InstallSource): Promise<string> {
   if (source.kind === "local-package") {
     throw new ExtensionHost("tarball extension install is not implemented", undefined, {
       code: "NotImplemented",
-      note: "tarball install: see Unit 77 follow-up",
+      note: "tarball install: see  follow-up",
       tarball: resolve(source.tarball),
     });
   }

@@ -1,13 +1,13 @@
 /**
  * Session resume orchestrator tests.
  *
- * Covers AC-45's revised semantics (Q-2 "always-core-works"):
+ * Covers 's revised semantics (Q-2 "always-core-works"):
  *   - Happy path: SM attach succeeds → smRestored true, no skip entries.
  *   - Silent SM skip: core resume succeeds even when the SM extension is absent.
  *   - SM attach throws: treated as a silent skip (Q-2 policy).
  *   - Absent smState: attachSm is never called; no skip entries; smRestored false.
  *   - Session/ResumeMismatch: thrown when the active store differs from the
- *     one that wrote the manifest (invariant #4 / AC-81).
+ *     one that wrote the manifest (invariant #4 / ).
  *   - Session/NoSnapshot: thrown when there is nothing to resume.
  *
  * Note on deliverSmSlots: slot delivery on the Resumed → Active edge is
@@ -99,10 +99,10 @@ function noopAssertCompat(_m: string, _a: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: SM attach success (happy path) — AC-45
+// Tests: SM attach success (happy path) —
 // ---------------------------------------------------------------------------
 
-describe("resumeSession — SM attach: success (AC-45)", () => {
+describe("resumeSession — SM attach: success", () => {
   it("sets smRestored true and records no skip entries when attachSm returns 'attached'", async () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const machine = createSessionStateMachine({ bus, deliverSmSlots: noopDeliver });
@@ -170,7 +170,7 @@ describe("resumeSession — SM attach: success (AC-45)", () => {
 // Tests: SM skip cases
 // ---------------------------------------------------------------------------
 
-describe("resumeSession — SM skip: absent extension (AC-45 Q-2)", () => {
+describe("resumeSession — SM skip: absent extension ( Q-2)", () => {
   it("restores messages and mode even when the SM extension is absent", async () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const machine = createSessionStateMachine({ bus, deliverSmSlots: noopDeliver });
@@ -226,7 +226,7 @@ describe("resumeSession — SM skip: absent extension (AC-45 Q-2)", () => {
   });
 });
 
-describe("resumeSession — SM skip: no smState in manifest (AC-45 Q-2)", () => {
+describe("resumeSession — SM skip: no smState in manifest ( Q-2)", () => {
   it("does not add a skippedExtensions entry when smState is absent", async () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const machine = createSessionStateMachine({ bus, deliverSmSlots: noopDeliver });
@@ -275,7 +275,7 @@ describe("resumeSession — SM skip: no smState in manifest (AC-45 Q-2)", () => 
 // Tests: Session/ResumeMismatch
 // ---------------------------------------------------------------------------
 
-describe("resumeSession — Session/ResumeMismatch (AC-81)", () => {
+describe("resumeSession — Session/ResumeMismatch", () => {
   it("throws ResumeMismatch when the active store differs from the manifest store", async () => {
     const bus = createEventBus({ monotonic: () => 0n });
     const machine = createSessionStateMachine({ bus, deliverSmSlots: noopDeliver });

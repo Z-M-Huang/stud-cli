@@ -4,7 +4,7 @@
  * Verifies that `HostAPI` properties are declared `readonly` on the interface.
  * The TypeScript `readonly` modifier is the compile-time contract; `Object.freeze`
  * on the per-extension host instance is the runtime enforcement, which lands in
- * Unit 5's mock host. This test documents the freeze expectation by using a
+ * 's mock host. This test documents the freeze expectation by using a
  * frozen sentinel as a stand-in.
  *
  * Wiki: core/Host-API.md
@@ -17,7 +17,7 @@ import type { HostAPI } from "../../../src/core/host/host-api.js";
 describe("HostAPI surfaces are readonly", () => {
   it("a frozen object satisfies the HostAPI shape (runtime analogue of readonly)", () => {
     // The interface uses `readonly` on every property. The runtime analogue —
-    // Object.freeze on the per-extension host — lands in Unit 5's mockHost.
+    // Object.freeze on the per-extension host — lands in 's mockHost.
     // Here we confirm that `Object.freeze` works on an object used as HostAPI.
     const sentinel = Object.freeze({}) as unknown as HostAPI;
     assert.equal(Object.isFrozen(sentinel), true);

@@ -1,5 +1,5 @@
 /**
- * UAT-4 + AC-38: Default-chat flow end-to-end.
+ *  + Default-chat flow end-to-end.
  *
  * Drives a single turn through the message-loop orchestrator via the
  * `runDefaultChatTurn` harness and asserts:
@@ -47,7 +47,7 @@ after(async () => {
   await rm(projectRoot, { recursive: true, force: true });
 });
 
-describe("UAT-4: default-chat flow end-to-end", () => {
+describe("default-chat flow end-to-end", () => {
   it("wraps the turn in SessionTurnStart / SessionTurnEnd", async () => {
     const { events } = await runDefaultChatTurn({ projectRoot, prompt: "hello" });
     assert.equal(events[0]?.name, "SessionTurnStart");
@@ -122,7 +122,7 @@ describe("UAT-4: default-chat flow end-to-end", () => {
   });
 });
 
-describe("AC-38: six-stage fixed order", () => {
+describe("six-stage fixed order", () => {
   it("StagePreFired and StagePostFired alternate exactly (every Pre is followed by a Post)", async () => {
     const { events } = await runDefaultChatTurn({ projectRoot, prompt: "alternation" });
     const stageEvents = events

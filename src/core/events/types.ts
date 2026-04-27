@@ -12,7 +12,7 @@ import type { EventEnvelope } from "./bus.js";
 export type { EventEnvelope };
 
 // ---------------------------------------------------------------------------
-// Closed event-name union (AC-73 bootstrap set)
+// Closed event-name union ( bootstrap set)
 // ---------------------------------------------------------------------------
 
 export type EventName =
@@ -39,7 +39,7 @@ export interface EventTypeDescriptor<TName extends EventName, _TPayload> {
 }
 
 // ---------------------------------------------------------------------------
-// Registry — frozen at module initialisation (AC-73: immutable)
+// Registry — frozen at module initialisation (: immutable)
 // ---------------------------------------------------------------------------
 
 type EventTypeRegistry = Readonly<Record<EventName, EventTypeDescriptor<EventName, unknown>>>;

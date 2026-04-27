@@ -7,7 +7,7 @@
  * targets the directory.
  *
  * Duplicated until the pattern stabilises across the Simple-Tools set; a
- * shared utility may be extracted once Unit 131 (`list`) is in place.
+ * shared utility may be extracted once  (`list`) is in place.
  *
  * Wiki: reference-extensions/tools/Simple-Tools.md (Q-8 resolution)
  */

@@ -2,8 +2,8 @@
  * SessionAPI surface tests.
  *
  * Verifies:
- *   - `SessionAPI` declares exactly the four required properties (AC-56).
- *   - `mode` is a closed union of the three security modes (AC-63).
+ *   - `SessionAPI` declares exactly the four required properties.
+ *   - `mode` is a closed union of the three security modes.
  *   - `StateSlotHandle` declares `read` and `write`.
  *
  * Wiki: core/Host-API.md + security/Security-Modes.md + contracts/Extension-State.md
@@ -20,7 +20,7 @@ describe("SessionAPI surface", () => {
     assert.equal(required.length, 4);
   });
 
-  it("mode is a closed union of the three security modes (AC-63)", () => {
+  it("mode is a closed union of the three security modes", () => {
     // Type-level: assigning each of the three literals to SessionAPI['mode']
     // must compile. Assigning anything else would be a compile error.
     const m1: SessionAPI["mode"] = "ask";

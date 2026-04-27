@@ -1,5 +1,5 @@
 /**
- * Contract conformance tests for the Ralph reference SM (AC-101).
+ * Contract conformance tests for the Ralph reference SM.
  *
  * Covers: contract shape, six-stage graph (Discovery → Decompose →
  * parallel BuildA/BuildB → JoinReview → Complete), per-stage allowedTools
@@ -11,7 +11,7 @@
  * Note on Q-4 fail-fast and end-to-end UAT: the SM only declares the stage
  * graph; enforcement of `ExtensionHost/ParallelSiblingFailure` and the
  * "join skipped on sibling failure" semantic lives in the Stage Executions
- * orchestrator (Unit 81), not in this extension. Those behaviors are
+ * orchestrator, not in this extension. Those behaviors are
  * verified in tests/core/sm/. A live end-to-end UAT requires the full
  * session orchestrator and is out of scope for the contract tests here.
  *

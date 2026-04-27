@@ -6,10 +6,10 @@
  * work is queued and starts only after the preceding turn's promise settles
  * (fulfilled or rejected).
  *
- * This is the enforcement mechanism for AC-52: "concurrent turns per session
+ * This is the enforcement mechanism for "concurrent turns per session
  * are forbidden." The serializer does not throw — it queues. The
  * `ExtensionHost/ConcurrentTurnForbidden` error is reserved for the
- * execution-model invariants (Unit 29) that perform bookkeeping-level checks.
+ * execution-model invariants that perform bookkeeping-level checks.
  *
  * The session scope's AbortSignal is NOT consulted here intentionally: if the
  * session is cancelled the in-progress turn's own signal (a child of the

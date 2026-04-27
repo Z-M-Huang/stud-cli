@@ -7,7 +7,7 @@
  *
  * Security: never approval-gated. /save-and-close is a core session lifecycle
  * action that requires no additional user confirmation beyond the explicit
- * invocation (AC-110).
+ * invocation.
  *
  * Wiki: reference-extensions/commands/save-and-close.md
  */

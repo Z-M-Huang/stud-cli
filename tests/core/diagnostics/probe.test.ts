@@ -45,7 +45,7 @@ function registerFixtureServer(id: string, scope: "bundled" | "global" | "projec
 }
 
 describe("health probe", () => {
-  it("returns the AC-110 shape with every required key", async () => {
+  it("returns the  shape with every required key", async () => {
     registerFixtureServer("srv-1", "bundled");
 
     const report = await probe();

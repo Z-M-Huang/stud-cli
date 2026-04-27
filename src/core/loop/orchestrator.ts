@@ -1,13 +1,13 @@
 /**
  * Message loop orchestrator — six-stage, fixed-order turn runner.
  *
- * Implements the authoritative turn lifecycle (AC-38):
+ * Implements the authoritative turn lifecycle:
  *
  *   RECEIVE_INPUT → COMPOSE_REQUEST → SEND_REQUEST
  *     → STREAM_RESPONSE → [TOOL_CALL →] RENDER
  *
  * with the continuation path TOOL_CALL → COMPOSE_REQUEST and a configurable
- * loop bound checked at the top of each continuation iteration (AC-39).
+ * loop bound checked at the top of each continuation iteration.
  *
  * Routing rules (StageOutput.next is authoritative only for branch points):
  *   - RECEIVE_INPUT, COMPOSE_REQUEST, SEND_REQUEST: always advance to the next
@@ -203,7 +203,7 @@ export function createMessageLoop(opts: {
       payload = riOut.payload;
 
       // Phase 2: Continuation loop — COMPOSE_REQUEST through [TOOL_CALL].
-      // Bound is checked at the top of each iteration AFTER the first (AC-39).
+      // Bound is checked at the top of each iteration AFTER the first.
       let iterationCount = 0;
       let continueLoop = true;
 
@@ -246,7 +246,7 @@ export function createMessageLoop(opts: {
         );
       }
     } finally {
-      // SessionTurnEnd always fires, even on error (AC-38).
+      // SessionTurnEnd always fires, even on error.
       bus.emit({
         name: "SessionTurnEnd",
         correlationId: turnId,

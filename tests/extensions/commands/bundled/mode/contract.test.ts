@@ -80,7 +80,7 @@ describe("/mode command — shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Execution tests (AC-93 /mode scope + AC-110 approval-free read)
+// Execution tests ( /mode scope +  approval-free read)
 // ---------------------------------------------------------------------------
 
 describe("/mode command — execution", () => {

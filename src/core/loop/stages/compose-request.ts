@@ -8,7 +8,7 @@
  *
  * Full context assembly (system prompt + history + tool defs + provider
  * contributions + compaction) is intentionally out of scope here; that work
- * belongs to Units 65-68 (context/ directory). This unit exposes the seam —
+ * belongs to  (context/ directory). This unit exposes the seam —
  * the `ComposeRequestAssembler` injection point — so the message loop is
  * complete and testable before those units land.
  *
@@ -52,7 +52,7 @@ export interface ComposedRequest {
 }
 
 /**
- * Injected by the Context Assembly orchestrator (Unit 65). Accepts the current
+ * Injected by the Context Assembly orchestrator. Accepts the current
  * turn's prior payload and returns a fully composed request ready for the
  * provider wire-call.
  */

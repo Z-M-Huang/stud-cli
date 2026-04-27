@@ -1,5 +1,5 @@
 /**
- * UI contract tests (AC-16).
+ * UI contract tests.
  *
  * Verifies:
  *   1. Shape — kind, both cardinalities unlimited, roles array.

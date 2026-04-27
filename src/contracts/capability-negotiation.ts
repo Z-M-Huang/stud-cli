@@ -15,7 +15,7 @@ import type { ProviderCapabilityClaims } from "./providers.js";
 import type { JSONSchemaObject } from "./state-slot.js";
 
 // ---------------------------------------------------------------------------
-// Capability name union (seven names — AC-22)
+// Capability name union (seven names — )
 // ---------------------------------------------------------------------------
 
 /**
@@ -33,7 +33,7 @@ export type CapabilityName =
   | "promptCaching";
 
 // ---------------------------------------------------------------------------
-// Requirement level union (three levels — AC-22)
+// Requirement level union (three levels — )
 // ---------------------------------------------------------------------------
 
 /**

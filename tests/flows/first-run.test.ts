@@ -1,5 +1,5 @@
 /**
- * UAT-5 + AC-62: First-run trust prompt gates `.stud/` loading.
+ *  + First-run trust prompt gates `.stud/` loading.
  *
  * Drives the project-trust gate (`src/core/project/trust-gate.ts`) with a
  * refusing interactor stub and asserts the safety invariants:
@@ -50,7 +50,7 @@ after(async () => {
   await rm(join(projectRoot, ".."), { recursive: true, force: true });
 });
 
-describe("UAT-5: First-run trust prompt — refusal path", () => {
+describe("First-run trust prompt — refusal path", () => {
   it("prompts the interactor exactly once on first entry", async () => {
     const run = await runFirstRunWithRefusal({ projectRoot });
     assert.equal(run.confirmCalls, 1);
@@ -83,7 +83,7 @@ describe("UAT-5: First-run trust prompt — refusal path", () => {
   });
 });
 
-describe("UAT-5 (control): grant path persists and audits", () => {
+describe(" (control): grant path persists and audits", () => {
   it("acceptance persists the entry and emits decision=granted", async () => {
     const run = await runFirstRunWithAcceptance({ projectRoot });
     assert.equal(run.outcome.kind, "granted");

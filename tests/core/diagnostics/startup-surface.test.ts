@@ -35,7 +35,7 @@ describe("startup surface", () => {
     assert.equal(surface.disabledCount, 1);
   });
 
-  it("disabled entries carry stage and fieldPath per AC-30", () => {
+  it("disabled entries carry stage and fieldPath per ", () => {
     primeOutcomes([
       {
         id: "x",
@@ -103,7 +103,7 @@ describe("startup surface", () => {
     assert.equal(JSON.stringify(buildStartupSurface()), JSON.stringify(buildStartupSurface()));
   });
 
-  it("refuses when Unit 75 has not populated outcomes", () => {
+  it("refuses when  has not populated outcomes", () => {
     resetOutcomes();
 
     assert.throws(

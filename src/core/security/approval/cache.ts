@@ -12,7 +12,7 @@
  *   - `ApprovalCacheEntry` preserves full provenance (when, by whom, in which
  *     scope) so the audit trail is complete without reaching into session state.
  *   - `ApprovalCacheReadWrite` is the narrow interface used by the authority
- *     stack (Unit 56); `openApprovalCache` in `persistence.ts` produces it.
+ *     stack; `openApprovalCache` in `persistence.ts` produces it.
  *   - No I/O, no side effects. All functions in this module are pure.
  *
  * Wiki: security/Tool-Approvals.md (Q-8 resolution)
@@ -53,7 +53,7 @@ export interface ApprovalCacheEntry {
 /**
  * Narrow read/write surface for the per-(tool, key) approval cache.
  *
- * The authority stack (Unit 56) consumes this interface; the concrete
+ * The authority stack consumes this interface; the concrete
  * implementation is produced by `openApprovalCache` in `persistence.ts`.
  */
 export interface ApprovalCacheReadWrite {
@@ -93,7 +93,7 @@ export interface ApprovalCacheReadWrite {
  */
 export interface OpenApprovalCacheInput {
   /**
-   * Unique identifier for the current session (from Unit 41, session manifest).
+   * Unique identifier for the current session (from , session manifest).
    * Used only for audit / logging; does not affect the cache key.
    */
   readonly sessionId: string;
@@ -106,7 +106,7 @@ export interface OpenApprovalCacheInput {
   /**
    * When `true`, project-scope entries are written to `projectScopedPath`.
    * Defaults to `false` at the session layer — opt-in only.
-   * The project must be trusted (Unit 50) before this flag is set to `true`.
+   * The project must be trusted before this flag is set to `true`.
    */
   readonly persistProjectScope: boolean;
 }

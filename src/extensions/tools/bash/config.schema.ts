@@ -4,7 +4,7 @@
  * `enabled`          — whether the tool is active (optional; defaults to enabled).
  * `defaultTimeoutMs` — subprocess timeout in milliseconds (default: 30 000).
  * `maxOutputBytes`   — per-stream output cap before truncation (default: 1 MiB).
- * `blockedPrefixes`  — command prefixes rejected by the bash policy (Unit 99 / U-4.3).
+ * `blockedPrefixes`  — command prefixes rejected by the bash policy ( / U-4.3).
  *                      Checked before the approval stack is consulted.
  *
  * Wiki: reference-extensions/tools/Bash.md

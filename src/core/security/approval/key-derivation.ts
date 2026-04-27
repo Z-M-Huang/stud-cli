@@ -2,9 +2,9 @@
  * Approval-key derivation framework.
  *
  * `deriveApprovalKey` is the canonical entry point called by the authority
- * stack before consulting the approval cache (Unit 55) or the mode gate
- * (Unit 56). It delegates to the tool's own `deriveApprovalKey(args)` method
- * declared on the `ToolContract` (Unit 8 / AC-14, Q-8 resolution).
+ * stack before consulting the approval cache or the mode gate
+ *. It delegates to the tool's own `deriveApprovalKey(args)` method
+ * declared on the `ToolContract` ( / , Q-8 resolution).
  *
  * Design:
  *   - The framework neither hashes, truncates, nor rewrites the tool's output.

@@ -8,7 +8,7 @@
  *   - `Validation/ApprovalKeyInvalid` for empty, oversize, and control-char keys.
  *   - Well-formed keys pass without error.
  *
- * AC-14: ToolContract shape — approval key derivation via `deriveApprovalKey`.
+ * ToolContract shape — approval key derivation via `deriveApprovalKey`.
  * Wiki: security/Tool-Approvals.md, contracts/Tools.md
  */
 
@@ -34,7 +34,7 @@ import type { ToolContract } from "../../../../src/contracts/tools.js";
  * introducing real side effects.
  *
  * The return type annotation causes TypeScript to check all fields against
- * `ToolContract` — no `as unknown as ToolContract` escape hatch. If Unit 8
+ * `ToolContract` — no `as unknown as ToolContract` escape hatch. If
  * changes the contract shape, the typecheck will fail here first.
  */
 function stubTool(fn: (args: unknown) => string): ToolContract {

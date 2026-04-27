@@ -1,5 +1,5 @@
 /**
- * Contract conformance tests for the read reference tool (AC-99).
+ * Contract conformance tests for the read reference tool.
  *
  * Covers: shape, deriveApprovalKey parent-directory semantics (Q-8), file read
  * success, size-cap truncation, outside-root Forbidden, missing-file NotFound,

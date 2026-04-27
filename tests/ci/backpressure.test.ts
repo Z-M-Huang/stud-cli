@@ -1,5 +1,5 @@
 /**
- * Unit 166 / AC-117: backpressure orchestrator CI job.
+ *  / backpressure orchestrator CI job.
  *
  * Asserts the CI workflow ships a `backpressure` job that depends on the
  * full set of upstream gates and uses --frozen-lockfile installs (so the
@@ -25,7 +25,7 @@ const REQUIRED_NEEDS = [
   "examples-check",
 ] as const;
 
-describe("AC-117 backpressure orchestrator job", () => {
+describe(" backpressure orchestrator job", () => {
   it("ci.yml declares a `backpressure` job", async () => {
     const yaml = await readFile(".github/workflows/ci.yml", "utf8");
     assert.equal(yaml.includes("backpressure"), true);

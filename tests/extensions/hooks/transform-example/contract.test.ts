@@ -65,7 +65,7 @@ describe("transform-example hook — shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Transform behavior tests — AC-92
+// Transform behavior tests —
 // ---------------------------------------------------------------------------
 
 describe("transform-example hook — behavior", () => {

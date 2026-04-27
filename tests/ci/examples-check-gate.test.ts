@@ -1,5 +1,5 @@
 /**
- * Unit 163 / AC-118: examples-check CI gate.
+ *  / examples-check CI gate.
  *
  * Asserts:
  *  1. The workflow file invokes scripts/examples-check.ts.
@@ -14,7 +14,7 @@ import { describe, it } from "node:test";
 
 import { runExamplesCheck } from "../../scripts/examples-check.js";
 
-describe("AC-118 examples-check CI gate", () => {
+describe(" examples-check CI gate", () => {
   it("ci.yml invokes the examples checker as a required step", async () => {
     const yaml = await readFile(".github/workflows/ci.yml", "utf8");
     assert.equal(yaml.includes("examples-check"), true);

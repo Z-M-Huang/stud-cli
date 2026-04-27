@@ -2,9 +2,9 @@
  * Tests for createHostConfig — scope-aware config reader wrapper.
  *
  * Covers:
- *   AC-56  — returned object is Object.freeze'd.
- *   AC-56  — readOwn<T>() forwards to configResolver with correct extId.
- *   AC-56  — scope() returns the correct scope value.
+ *     — returned object is Object.freeze'd.
+ *     — readOwn<T>() forwards to configResolver with correct extId.
+ *     — scope() returns the correct scope value.
  *
  * Wiki: core/Host-API.md + runtime/Configuration-Scopes.md
  */
@@ -14,10 +14,10 @@ import { describe, it } from "node:test";
 import { createHostConfig } from "../../../../src/core/host/impl/config.js";
 
 // ---------------------------------------------------------------------------
-// AC-56: frozen shape
+// frozen shape
 // ---------------------------------------------------------------------------
 
-describe("createHostConfig — frozen shape (AC-56)", () => {
+describe("createHostConfig — frozen shape", () => {
   it("returns a frozen object", () => {
     const host = createHostConfig({
       extId: "ext.a",

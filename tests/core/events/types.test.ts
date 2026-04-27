@@ -59,10 +59,10 @@ describe("EVENT_TYPES — declared names", () => {
 });
 
 // ---------------------------------------------------------------------------
-// EVENT_TYPES immutability (AC-73)
+// EVENT_TYPES immutability
 // ---------------------------------------------------------------------------
 
-describe("EVENT_TYPES — frozen (AC-73)", () => {
+describe("EVENT_TYPES — frozen", () => {
   it("is frozen at the top level", () => {
     assert.ok(Object.isFrozen(EVENT_TYPES));
   });

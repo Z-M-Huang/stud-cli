@@ -1,5 +1,5 @@
 /**
- * Tests for the Interaction Protocol core (Unit 57).
+ * Tests for the Interaction Protocol core.
  *
  * Covers:
  *   - FIFO ordering: second prompt is not invoked until first settles.
@@ -9,7 +9,7 @@
  *   - Serializer round-trip: serializeRequest + deserializeRequest are byte-identical.
  *   - Event emissions: InteractionRaised and InteractionAnswered emitted per raise.
  *
- * AC-43: seven kinds, FIFO, typed response shapes.
+ * seven kinds, FIFO, typed response shapes.
  */
 
 import assert from "node:assert/strict";
@@ -34,10 +34,10 @@ function makeAskRequest(correlationId: string): InteractionRequest {
 }
 
 // ---------------------------------------------------------------------------
-// FIFO ordering (AC-43)
+// FIFO ordering
 // ---------------------------------------------------------------------------
 
-describe("createInteractionProtocol — FIFO ordering (AC-43)", () => {
+describe("createInteractionProtocol — FIFO ordering", () => {
   it("second prompt is not invoked until first resolves", async () => {
     const { interactor, resolve } = stubInteractor();
     const proto = createInteractionProtocol({
@@ -91,10 +91,10 @@ describe("createInteractionProtocol — FIFO ordering (AC-43)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// All seven request kinds (AC-43)
+// All seven request kinds
 // ---------------------------------------------------------------------------
 
-describe("createInteractionProtocol — seven request kinds (AC-43)", () => {
+describe("createInteractionProtocol — seven request kinds", () => {
   const kinds = [
     "Ask",
     "Approve",
@@ -258,7 +258,7 @@ describe("serializeRequest / deserializeRequest — round-trip", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Dismissal → Cancellation/TurnCancelled (AC-43 post-condition)
+// Dismissal → Cancellation/TurnCancelled ( post-condition)
 // ---------------------------------------------------------------------------
 
 describe("createInteractionProtocol — dismissal cancellation", () => {

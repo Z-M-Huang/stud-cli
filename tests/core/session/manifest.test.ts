@@ -1,5 +1,5 @@
 /**
- * SessionManifest round-trip, version-check, and slim-shape tests (AC-44).
+ * SessionManifest round-trip, version-check, and slim-shape tests.
  *
  * Covers:
  *   1. Round-trip: parseManifest(serializeManifest(m)) deep-equals m.
@@ -7,7 +7,7 @@
  *   3. Slim shape: SESSION_MANIFEST_SCHEMA has no 'extensions', 'capabilityProbes',
  *      or 'configHashes' keys (Q-2).
  *   4. Structural roundtrip still succeeds when smState.slot contains an apiKeyRef
- *      reference object (secrets-hygiene guard tested separately in Unit 48).
+ *      reference object (secrets-hygiene guard tested separately in ).
  *
  * Wiki: core/Session-Manifest.md, security/Secrets-Hygiene.md
  */
@@ -257,7 +257,7 @@ describe("SESSION_MANIFEST_SCHEMA — slim shape assertion (Q-2)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Structural roundtrip with apiKeyRef reference in smState.slot (AC-44)
+// 4. Structural roundtrip with apiKeyRef reference in smState.slot
 // ---------------------------------------------------------------------------
 
 describe("parseManifest — invariant #6 structural check", () => {

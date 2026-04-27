@@ -53,7 +53,7 @@ type CompactFn = (args: CompactionArgs, host: HostAPI) => Promise<CompactionSumm
  *
  * Returns a stub summary because v1 `HostAPI` does not expose the session
  * message history. The framework replaces this by injecting the real compact
- * function (AC-58) when wiring the extension at session start.
+ * function when wiring the extension at session start.
  */
 const defaultCompactFn: CompactFn = (
   _args: CompactionArgs,
@@ -220,7 +220,7 @@ export async function executeContextCompaction(
     });
   }
 
-  // Emit one Compaction audit record (AC-109).
+  // Emit one Compaction audit record.
   // Never include message content — invariant #6.
   await host.audit.write({
     severity: "info",

@@ -2,8 +2,8 @@
  * Tests for the message-loop orchestrator.
  *
  * Covers:
- *   AC-38 — Six-stage fixed order with pre/post events and session brackets.
- *   AC-39 — Loop bound: default-chat terminal error + SM capHit.
+ *    — Six-stage fixed order with pre/post events and session brackets.
+ *    — Loop bound: default-chat terminal error + SM capHit.
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
@@ -55,10 +55,10 @@ const DEFAULT_BOUND: LoopBound = { kind: "default-chat", maxIterations: 10 };
 const INITIAL: StageInput = { stage: "RECEIVE_INPUT", correlationId: "c", payload: {} };
 
 // ---------------------------------------------------------------------------
-// AC-38: Fixed six-stage order
+// Fixed six-stage order
 // ---------------------------------------------------------------------------
 
-describe("createMessageLoop — AC-38: fixed stage order", () => {
+describe("createMessageLoop — fixed stage order", () => {
   it("runs RECEIVE_INPUT as the first stage", async () => {
     const { loop } = makeEnv();
     const seen: string[] = [];
@@ -115,10 +115,10 @@ describe("createMessageLoop — AC-38: fixed stage order", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-38: StagePreFired / StagePostFired + SessionTurnStart / SessionTurnEnd
+// StagePreFired / StagePostFired + SessionTurnStart / SessionTurnEnd
 // ---------------------------------------------------------------------------
 
-describe("createMessageLoop — AC-38: event brackets", () => {
+describe("createMessageLoop — event brackets", () => {
   it("emits SessionTurnStart and SessionTurnEnd around the turn", async () => {
     const { bus, loop } = makeEnv();
     const names: string[] = [];
@@ -208,10 +208,10 @@ describe("createMessageLoop — AC-38: event brackets", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-38: StageNotRegistered guard
+// StageNotRegistered guard
 // ---------------------------------------------------------------------------
 
-describe("createMessageLoop — AC-38: StageNotRegistered", () => {
+describe("createMessageLoop — StageNotRegistered", () => {
   it("throws ExtensionHost/StageNotRegistered when a stage handler is missing", async () => {
     const { loop } = makeEnv();
     // Register only five of the six stages (omit RENDER).
@@ -251,10 +251,10 @@ describe("createMessageLoop — AC-38: StageNotRegistered", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-39: Loop bound — SM capHit
+// Loop bound — SM capHit
 // ---------------------------------------------------------------------------
 
-describe("createMessageLoop — AC-39: SM cap", () => {
+describe("createMessageLoop — SM cap", () => {
   it("returns capHit:true when SM maxIterations is reached", async () => {
     const { loop } = makeEnv();
 
@@ -320,10 +320,10 @@ describe("createMessageLoop — AC-39: SM cap", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-39: Loop bound — default-chat terminal error
+// Loop bound — default-chat terminal error
 // ---------------------------------------------------------------------------
 
-describe("createMessageLoop — AC-39: default-chat LoopBoundExceeded", () => {
+describe("createMessageLoop — default-chat LoopBoundExceeded", () => {
   it("throws ExtensionHost/LoopBoundExceeded when default-chat bound is exceeded", async () => {
     const { loop } = makeEnv();
 

@@ -6,7 +6,7 @@
  * • `host.session.stateSlot(extId)` returns a live in-memory handle for the
  *   caller's own `extId`.
  * • `host.session.stateSlot(otherExtId)` throws `ExtensionHost/SlotAccessDenied`
- *   and writes a `StateSlotAccessDenied` record to `recorders.audit` (AC-115).
+ *   and writes a `StateSlotAccessDenied` record to `recorders.audit`.
  * • `host.env.get(name)` resolves from `opts.env`; throws `Validation/EnvNameNotSet`
  *   for unknown names.  No `list`/`all`/`entries` surface (invariant #2).
  * • `host.events.emit(event, payload)` appends to `recorders.events`.
@@ -128,7 +128,7 @@ function buildSession(
     projectRoot: opts.projectRoot ?? "/fake/project/.stud",
     stateSlot(requestedExtId: string): StateSlotHandle {
       if (requestedExtId !== callerExtId) {
-        // AC-115: write audit record BEFORE throwing so it is always recorded
+        // write audit record BEFORE throwing so it is always recorded
         auditRec.push({
           class: "StateSlotAccessDenied",
           extId: callerExtId,

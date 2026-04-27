@@ -1,5 +1,5 @@
 /**
- * Contract conformance tests for the web-fetch reference tool (AC-100).
+ * Contract conformance tests for the web-fetch reference tool.
  *
  * Covers: shape, deriveApprovalKey domain semantics (Q-8), allowed-host
  * happy path with `untrusted: true`, denied-host NetworkDenied (no HTTP

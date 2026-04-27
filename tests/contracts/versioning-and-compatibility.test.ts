@@ -1,5 +1,5 @@
 /**
- * Versioning-and-Compatibility contract tests (AC-107, AC-112).
+ * Versioning-and-Compatibility contract tests.
  *
  * Verifies:
  *   1. assertSemVerBump — valid/invalid bump classifications per breaking-change class.

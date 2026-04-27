@@ -1,5 +1,5 @@
 /**
- * Tests for the race-to-answer arbiter (Unit 58 — Q-9).
+ * Tests for the race-to-answer arbiter ( — Q-9).
  *
  * Covers:
  *   - First responder wins; every other interactor receives a dismiss signal.

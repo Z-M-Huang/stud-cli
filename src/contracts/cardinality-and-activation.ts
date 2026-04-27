@@ -16,7 +16,7 @@
  *
  * Wiki: contracts/Cardinality-and-Activation.md + contracts/Contract-Pattern.md
  */
-// From Unit 6 (meta-contract); see src/contracts/cardinality.ts, src/contracts/kinds.ts, src/contracts/state-slot.ts
+// From  (meta-contract); see src/contracts/cardinality.ts, src/contracts/kinds.ts, src/contracts/state-slot.ts
 // These sibling files are stable once their units land. If ActiveCardinality or CategoryKind gains a new
 // variant (e.g., a 10th category), CATEGORY_CARDINALITY and its tests must be updated in sync.
 import type { ActiveCardinality } from "./cardinality.js";
@@ -36,7 +36,7 @@ export type { CategoryKind } from "./kinds.js";
  *
  * Exported so `scripts/wiki-drift.ts` can compare the value in the wiki page's
  * `> contractVersion:` header against the value here without parsing source AST.
- * When the wiki page bumps, this constant bumps in the same PR per AC-107/AC-112.
+ * When the wiki page bumps, this constant bumps in the same PR per /.
  *
  * Wiki: contracts/Cardinality-and-Activation.md
  */
@@ -125,10 +125,10 @@ export const CATEGORY_CARDINALITY: Readonly<Record<CategoryKind, CardinalityDecl
  * site that throws. The discriminant name is used so callers can forward the
  * envelope into the typed error pipeline without losing class information.
  *
- * AC-107 note: `cardinality-and-activation.ts` is meta-infrastructure shared
+ *  note: `cardinality-and-activation.ts` is meta-infrastructure shared
  * by all per-category contracts. The wiki-drift CI script (`scripts/wiki-drift.ts`)
  * validates all `.ts` files in `src/contracts/`, including this file, so
- * AC-107's contractVersion discipline applies here as it does to per-category
+ * 's contractVersion discipline applies here as it does to per-category
  * contracts.
  *
  * Returns `{ ok: true }` when both axes match exactly.

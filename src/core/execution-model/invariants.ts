@@ -6,12 +6,12 @@
  * side effect escapes.
  *
  * Three invariants are enforced:
- *  1. Single active turn per session — AC-52.
- *  2. Monotonic clock advance — AC-73.
- *  3. Serial delivery (no reentrant dispatch) — AC-41/51.
+ *  1. Single active turn per session — .
+ *  2. Monotonic clock advance — .
+ *  3. Serial delivery (no reentrant dispatch) — /51.
  *
  * No external I/O, no logging. Consumers route observability through the
- * event bus (Unit 27).
+ * event bus.
  *
  * Wiki: core/Execution-Model.md, runtime/Determinism-and-Ordering.md
  */

@@ -4,7 +4,7 @@
  * `assertCrashSafe` verifies that a manifest has `writtenByStore` set before
  * any cross-store compatibility check can fire. A manifest without
  * `writtenByStore` cannot be safely validated by `assertStoreCompatible` and
- * must be rejected as corrupt or from a pre-AC-81 code path.
+ * must be rejected as corrupt or from a pre- code path.
  *
  * Wiki: core/Persistence-and-Recovery.md + core/Session-Manifest.md
  */
@@ -17,7 +17,7 @@ import type { SessionManifest } from "../session/manifest/types.js";
  * Assert that the manifest carries a non-empty `writtenByStore` field.
  *
  * Throws `Session/ManifestDrift` if the field is absent or blank, since such
- * a manifest cannot satisfy the cross-store mismatch check (AC-81).
+ * a manifest cannot satisfy the cross-store mismatch check.
  *
  * @param manifest - The manifest to inspect.
  */

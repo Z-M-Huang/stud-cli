@@ -3,8 +3,8 @@
  * and reference type guard.
  *
  * Covers:
- *   AC-44 — manifest carries only references; Session/SecretLeak thrown on leak.
- *   AC-69 — audit redactor replaces plaintext with [REDACTED]; references intact.
+ *    — manifest carries only references; Session/SecretLeak thrown on leak.
+ *    — audit redactor replaces plaintext with [REDACTED]; references intact.
  *
  * Wiki: security/Secrets-Hygiene.md, core/Session-Manifest.md
  */
@@ -40,7 +40,7 @@ const BASE: SessionManifest = {
 // ---------------------------------------------------------------------------
 
 describe("assertManifestClean — clean detection", () => {
-  it("accepts a manifest that carries only references (AC-44)", () => {
+  it("accepts a manifest that carries only references", () => {
     const manifest: SessionManifest = {
       ...BASE,
       smState: {
@@ -53,7 +53,7 @@ describe("assertManifestClean — clean detection", () => {
     assertManifestClean(manifest, ["plaintext-secret-value"]);
   });
 
-  it("throws Session/SecretLeak when a known secret appears in a message (AC-44)", () => {
+  it("throws Session/SecretLeak when a known secret appears in a message", () => {
     const manifest: SessionManifest = {
       ...BASE,
       messages: [
@@ -178,11 +178,11 @@ describe("assertManifestClean — reference kinds and edge cases", () => {
 });
 
 // ---------------------------------------------------------------------------
-// auditRedact (AC-69)
+// auditRedact
 // ---------------------------------------------------------------------------
 
 describe("auditRedact", () => {
-  it("replaces known secret values with [REDACTED] and leaves references intact (AC-69)", () => {
+  it("replaces known secret values with [REDACTED] and leaves references intact", () => {
     const payload = {
       extId: "ext.x",
       name: "MY_KEY",

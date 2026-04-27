@@ -7,7 +7,7 @@
  *   3. All four phases may coexist without conflict.
  *
  * The functions are not called in these tests (no real HostAPI is available
- * until Unit 4). Assertions operate on `typeof` values only.
+ * until ). Assertions operate on `typeof` values only.
  *
  * Wiki: contracts/Contract-Pattern.md
  */

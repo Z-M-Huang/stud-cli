@@ -1,5 +1,5 @@
 /**
- * Extension State contract tests (AC-26).
+ * Extension State contract tests.
  *
  * Verifies:
  *   1. verifyStateSlot — version match, unversioned slot, drift reject, drift warn,

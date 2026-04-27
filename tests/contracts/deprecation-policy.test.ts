@@ -1,5 +1,5 @@
 /**
- * Deprecation Policy contract tests (AC-25).
+ * Deprecation Policy contract tests.
  *
  * Verifies:
  *   1. classifyDeprecation — soft window warning, hard removal error, invalid window rejection.

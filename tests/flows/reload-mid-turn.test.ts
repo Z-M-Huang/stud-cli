@@ -1,5 +1,5 @@
 /**
- * UAT-29: Reload-Mid-Turn respects reloadBehavior.
+ * Reload-Mid-Turn respects reloadBehavior.
  *
  * Drives the real `requestReload` (`src/core/lifecycle/reloader.ts`) with
  * the three reloadBehavior values and asserts:
@@ -27,7 +27,7 @@ afterEach(() => {
   __resetReloadRuntimeForTest();
 });
 
-describe("UAT-29: Reload-Mid-Turn respects reloadBehavior", () => {
+describe("Reload-Mid-Turn respects reloadBehavior", () => {
   it("'in-turn' queues at stage boundary; flushing runs deactivate→dispose→init→activate", async () => {
     const calls: string[] = [];
     __registerActiveExtensionForTest({

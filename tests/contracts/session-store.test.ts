@@ -1,5 +1,5 @@
 /**
- * Session Store contract tests (AC-20).
+ * Session Store contract tests.
  *
  * Verifies:
  *   1. Shape — kind, cardinality, storeId, read/write/list presence.

@@ -1,5 +1,5 @@
 /**
- * UAT-5 companion + AC-62 (acceptance branch): Project-First-Run-Trust
+ *  companion +  (acceptance branch): Project-First-Run-Trust
  * acceptance flow.
  *
  * Drives the project-trust gate twice against a shared in-memory trust
@@ -39,7 +39,7 @@ after(async () => {
   await rm(join(projectRoot, ".."), { recursive: true, force: true });
 });
 
-describe("UAT-5 companion: Project-First-Run-Trust acceptance path", () => {
+describe(" companion: Project-First-Run-Trust acceptance path", () => {
   it("first launch persists the canonical project path in the trust list", async () => {
     const run = await runAcceptanceThenResume({ projectRoot });
     assert.equal(run.firstLaunch.outcome.kind, "granted");

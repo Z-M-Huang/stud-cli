@@ -1,5 +1,5 @@
 /**
- * UAT-21 + AC-58: Compaction-Warning flow.
+ *  + Compaction-Warning flow.
  *
  * Drives the real `compactHistory` (`src/core/context/compactor.ts`) and
  * captures bus events + audit records to assert:
@@ -48,7 +48,7 @@ function bigHistory(): ChatMessage[] {
   ];
 }
 
-describe("UAT-21: Compaction-Warning + CompactionPerformed events", () => {
+describe("Compaction-Warning + CompactionPerformed events", () => {
   it("CompactionInvoked event fires before any compaction work", async () => {
     const bus = makeBus();
     const audit = recordingAudit();

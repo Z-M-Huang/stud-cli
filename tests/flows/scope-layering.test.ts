@@ -1,5 +1,5 @@
 /**
- * UAT-31: Scope-Layering project > global > bundled.
+ * Scope-Layering project > global > bundled.
  *
  * Drives the real `createConfigResolver` (`src/core/config/scope-resolver.ts`)
  * and asserts:
@@ -16,7 +16,7 @@ import { describe, it } from "node:test";
 
 import { createConfigResolver } from "../../src/core/config/scope-resolver.js";
 
-describe("UAT-31: Scope-Layering invariants", () => {
+describe("Scope-Layering invariants", () => {
   it("project value overrides global which overrides bundled", () => {
     const resolver = createConfigResolver({
       layers: {

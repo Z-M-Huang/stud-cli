@@ -1,11 +1,11 @@
 /**
- * Cardinality and Activation contract tests (AC-23, AC-107, AC-112).
+ * Cardinality and Activation contract tests.
  *
  * Verifies:
  *   1. CATEGORY_CARDINALITY — per-category pin tests (SessionStore, StateMachine, UI, rest).
  *   2. assertCategoryCardinality — ok path and CardinalityMismatch path.
  *   3. cardinalityDeclarationSchema fixtures — valid / invalid / worst-plausible via AJV.
- *   4. contractVersion — aligns with wiki page (AC-107 / AC-112 drift discipline).
+ *   4. contractVersion — aligns with wiki page ( /  drift discipline).
  *
  * Q-9 resolution:
  *   - UI.active = 'unlimited' (interactor/subscriber distinction in the roles array).
@@ -250,15 +250,15 @@ describe("cardinalityDeclarationSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. contractVersion drift discipline (AC-107 / AC-112)
+// 4. contractVersion drift discipline
 //
-// AC-107: every edit to a *Contract type in src/contracts/ must bump contractVersion
+// every edit to a *Contract type in src/contracts/ must bump contractVersion
 //   on the wiki page and append a changelog entry in the same PR. The code-side
 //   shape of contractVersion (SemVer string) is asserted here; spec parity is a
 //   manual discipline (no longer enforced by a wiki-coupled CI gate).
 // ---------------------------------------------------------------------------
 
-describe("contractVersion (AC-107)", () => {
+describe("contractVersion", () => {
   it("exports a semver-shaped contractVersion string", () => {
     assert.match(
       contractVersion,

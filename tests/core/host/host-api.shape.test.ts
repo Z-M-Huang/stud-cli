@@ -2,12 +2,12 @@
  * Shape-surface tests for `HostAPI`.
  *
  * Covers:
- *   AC-56 — `HostAPI` exposes exactly the twelve sanctioned sub-surfaces.
- *   AC-31 — `contractVersion` is a SemVer triple; `requiredCoreVersion` is a
+ *    — `HostAPI` exposes exactly the twelve sanctioned sub-surfaces.
+ *    — `contractVersion` is a SemVer triple; `requiredCoreVersion` is a
  *            SemVer range string (type-level static part; runtime mismatch
  *            throwing `Validation/ContractVersionMismatch` is deferred to the
  *            contract-loader unit).
- *   AC-50 — Lifecycle interface (`LifecycleFns`) declares all four phases
+ *    — Lifecycle interface (`LifecycleFns`) declares all four phases
  *            (`init → activate → deactivate → dispose`), each optional and
  *            `dispose` documented as idempotent (type-level static part;
  *            the lifecycle manager that enforces ordering and idempotency at
@@ -36,7 +36,7 @@ import type { HostAPI } from "../../../src/core/host/host-api.js";
 type Equals<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
 // ---------------------------------------------------------------------------
-// AC-56: exactly twelve sanctioned surfaces
+// exactly twelve sanctioned surfaces
 // ---------------------------------------------------------------------------
 
 /** The canonical set of twelve sanctioned HostAPI surface names. */
@@ -55,7 +55,7 @@ type SanctionedHostAPISurfaces =
   | "commands";
 
 /**
- * Compile-time exhaustiveness assertion (AC-56).
+ * Compile-time exhaustiveness assertion.
  *
  * If `HostAPI` gains a 13th surface, `keyof HostAPI` is no longer assignable
  * to `SanctionedHostAPISurfaces` and `Equals` resolves to `false`, making the
@@ -66,7 +66,7 @@ type SanctionedHostAPISurfaces =
  */
 const _assertExactSurfaces: Equals<keyof HostAPI, SanctionedHostAPISurfaces> = true;
 
-describe("HostAPI shape (AC-56)", () => {
+describe("HostAPI shape", () => {
   it("declares exactly the twelve sanctioned surfaces (exhaustive compile-time check)", () => {
     // The compile-time assertion `_assertExactSurfaces` above is the primary
     // guard.  This runtime check documents the expected count so a reader
@@ -113,7 +113,7 @@ describe("HostAPI shape (AC-56)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-31: contractVersion is SemVer; requiredCoreVersion is a SemVer range
+// contractVersion is SemVer; requiredCoreVersion is a SemVer range
 //
 // Static part (type-level): enforced by the `SemVer` template-literal type
 // (`${number}.${number}.${number}`) on `ExtensionContract.contractVersion`.
@@ -122,7 +122,7 @@ describe("HostAPI shape (AC-56)", () => {
 // contract-loader unit; see test.skip stubs below.
 // ---------------------------------------------------------------------------
 
-describe("AC-31: contractVersion / requiredCoreVersion typing", () => {
+describe("contractVersion / requiredCoreVersion typing", () => {
   it("SemVer template-literal type enforces MAJOR.MINOR.PATCH at compile time", () => {
     // Valid assignments compile; anything like '1.2' or '1.2.3-beta' is a
     // type error at the call site.
@@ -173,7 +173,7 @@ describe("AC-31: contractVersion / requiredCoreVersion typing", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-50: lifecycle interface shape — init → activate → deactivate → dispose,
+// lifecycle interface shape — init → activate → deactivate → dispose,
 //        idempotent dispose.
 //
 // Static part (type-level): `LifecycleFns` declares all four optional phases.
@@ -182,7 +182,7 @@ describe("AC-31: contractVersion / requiredCoreVersion typing", () => {
 // lifecycle-manager unit; see test.skip stubs below.
 // ---------------------------------------------------------------------------
 
-describe("AC-50: LifecycleFns interface shape", () => {
+describe("LifecycleFns interface shape", () => {
   it("LifecycleFns declares init as an optional async function", () => {
     type HasInit = "init" extends keyof LifecycleFns<unknown> ? true : false;
     const hasInit: HasInit = true;

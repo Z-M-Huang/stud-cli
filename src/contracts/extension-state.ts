@@ -5,7 +5,7 @@
  * Every state slot carries a `slotVersion` so core can detect schema drift on
  * resume and apply the extension's declared drift policy.
  *
- * Drift policies (per Q-2 / AC-26):
+ * Drift policies (per Q-2 / ):
  *   "migrate" — call `shape.migrate(payload, storedVersion)` and deliver the
  *               result. A throwing migrator surfaces `Session/SlotMigrationFailed`.
  *   "warn"    — deliver the stored payload unchanged. Core emits a `Deprecation`-

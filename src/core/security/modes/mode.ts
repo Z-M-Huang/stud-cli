@@ -5,7 +5,7 @@
  * first `RECEIVE_INPUT` stage. The returned `SecurityModeRecord` is frozen;
  * there is no `setMode()` or other mutator — invariant #3.
  *
- * Allowlist union rule (AC-63, AC-73):
+ * Allowlist union rule:
  *   allowlist = deduplicated, lexicographically sorted set union of
  *               bundled ∪ global ∪ project allowlist entries.
  *
@@ -23,7 +23,7 @@ export type SecurityMode = "ask" | "yolo" | "allowlist";
 
 /**
  * An immutable snapshot of the security mode resolved at session start.
- * Stored on the session manifest by Unit 41; never mutated after creation.
+ * Stored on the session manifest by ; never mutated after creation.
  */
 export interface SecurityModeRecord {
   /** The resolved mode. */
@@ -44,7 +44,7 @@ export interface SecurityModeRecord {
  * When provided it takes precedence over all scope settings.
  *
  * `settingsByScope` carries the per-scope fragments as loaded by the config
- * subsystem (AC-71 merge order: bundled → global → project). This module
+ * subsystem ( merge order: bundled → global → project). This module
  * receives all three fragments so it can compute the additive allowlist union.
  */
 export interface ModeResolverInput {

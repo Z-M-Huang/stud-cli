@@ -1,14 +1,14 @@
 /**
- * Hooks contract tests (AC-15, AC-36, AC-37, AC-47, AC-48).
+ * Hooks contract tests.
  *
  * Verifies:
- *   1. HOOK_SLOTS — exactly twelve canonical slots (AC-47).
- *   2. HOOK_TAXONOMY — sub-kind applicability matrix assertions (AC-48).
- *   3. validateHookRegistration — HookInvalidAttachment + HookSlotUnknown (AC-36).
- *   4. HookContract shape — kind, cardinalities, registration, handler (AC-15).
- *   5. hookConfigSchema fixtures — valid / invalid / worst-plausible (AC-15).
- *   6. orderingManifestSchema — Q-5 shape + three fixture tiers (AC-37).
- *   7. Conformance harness — assertContract passes on a conforming hook (AC-15).
+ *   1. HOOK_SLOTS — exactly twelve canonical slots.
+ *   2. HOOK_TAXONOMY — sub-kind applicability matrix assertions.
+ *   3. validateHookRegistration — HookInvalidAttachment + HookSlotUnknown.
+ *   4. HookContract shape — kind, cardinalities, registration, handler.
+ *   5. hookConfigSchema fixtures — valid / invalid / worst-plausible.
+ *   6. orderingManifestSchema — Q-5 shape + three fixture tiers.
+ *   7. Conformance harness — assertContract passes on a conforming hook.
  *
  * Wiki: contracts/Hooks.md + core/Hook-Taxonomy.md
  */
@@ -83,7 +83,7 @@ const hookFixtures = {
 };
 
 // ---------------------------------------------------------------------------
-// 1. HOOK_SLOTS — exactly twelve canonical slots (AC-47)
+// 1. HOOK_SLOTS — exactly twelve canonical slots
 // ---------------------------------------------------------------------------
 
 describe("Hook taxonomy — HOOK_SLOTS", () => {
@@ -115,7 +115,7 @@ describe("Hook taxonomy — HOOK_SLOTS", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. HOOK_TAXONOMY — matrix assertions (AC-48)
+// 2. HOOK_TAXONOMY — matrix assertions
 // ---------------------------------------------------------------------------
 
 describe("Hook taxonomy — HOOK_TAXONOMY matrix", () => {
@@ -125,11 +125,11 @@ describe("Hook taxonomy — HOOK_TAXONOMY matrix", () => {
     }
   });
 
-  it("marks transforms at SEND_REQUEST/pre as rare (AC-48)", () => {
+  it("marks transforms at SEND_REQUEST/pre as rare", () => {
     assert.equal(HOOK_TAXONOMY["SEND_REQUEST/pre"].transform, "rare");
   });
 
-  it("marks transforms at STREAM_RESPONSE/pre as rare (AC-48)", () => {
+  it("marks transforms at STREAM_RESPONSE/pre as rare", () => {
     assert.equal(HOOK_TAXONOMY["STREAM_RESPONSE/pre"].transform, "rare");
   });
 
@@ -185,7 +185,7 @@ describe("Hook taxonomy — HOOK_TAXONOMY matrix", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. validateHookRegistration — error paths (AC-36)
+// 3. validateHookRegistration — error paths
 // ---------------------------------------------------------------------------
 
 describe("validateHookRegistration", () => {
@@ -205,7 +205,7 @@ describe("validateHookRegistration", () => {
     });
   });
 
-  it("throws Validation/HookSlotUnknown for an unrecognized slot string (AC-47)", () => {
+  it("throws Validation/HookSlotUnknown for an unrecognized slot string", () => {
     let thrown: unknown;
     try {
       validateHookRegistration({
@@ -222,7 +222,7 @@ describe("validateHookRegistration", () => {
     assert.equal((thrown.context as Record<string, unknown>)["slot"], "BOGUS/pre");
   });
 
-  it("throws Validation/HookInvalidAttachment for guard at RENDER/post (AC-36)", () => {
+  it("throws Validation/HookInvalidAttachment for guard at RENDER/post", () => {
     let thrown: unknown;
     try {
       validateHookRegistration({ slot: "RENDER/post", subKind: "guard", firingMode: "per-stage" });
@@ -284,7 +284,7 @@ describe("validateHookRegistration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. HookContract shape (AC-15)
+// 4. HookContract shape
 // ---------------------------------------------------------------------------
 
 describe("HookContract shape", () => {
@@ -323,7 +323,7 @@ describe("HookContract shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. hookConfigSchema fixtures (AC-15)
+// 5. hookConfigSchema fixtures
 // ---------------------------------------------------------------------------
 
 describe("hookConfigSchema", () => {
@@ -364,7 +364,7 @@ describe("hookConfigSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. orderingManifestSchema — Q-5 shape (AC-37)
+// 6. orderingManifestSchema — Q-5 shape
 // ---------------------------------------------------------------------------
 
 describe("orderingManifestSchema", () => {
@@ -436,7 +436,7 @@ describe("orderingManifestSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. Conformance harness (AC-15)
+// 7. Conformance harness
 // ---------------------------------------------------------------------------
 
 describe("HookContract conformance harness", () => {

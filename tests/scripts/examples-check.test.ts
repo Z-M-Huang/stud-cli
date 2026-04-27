@@ -41,7 +41,7 @@ async function seedConformantTree(root: string): Promise<void> {
   }
 }
 
-describe("runExamplesCheck (UAT-38, AC-118)", () => {
+describe("runExamplesCheck (, )", () => {
   it("passes when every category has ≥1 example dir with conformant config.json", async () => {
     const root = await mkdtemp(join(tmpdir(), "ex-check-"));
     try {

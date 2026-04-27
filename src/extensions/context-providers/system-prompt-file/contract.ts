@@ -4,7 +4,7 @@ import { activate, deactivate, dispose, init, provide } from "./lifecycle.js";
 import type { ContextProviderContract } from "../../../contracts/context-providers.js";
 
 /**
- * Contract for the system-prompt-file context provider (AC-91).
+ * Contract for the system-prompt-file context provider.
  *
  * Reads a user-configured file and emits its content as a `system-message`
  * fragment with a declared token budget. Enforces the project-trust gate:

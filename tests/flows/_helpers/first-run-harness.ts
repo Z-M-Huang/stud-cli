@@ -160,7 +160,7 @@ export interface AcceptanceThenResumeOutcome {
  *
  * The shared `TrustStore` mimics the global trust file (which is the only
  * persistence layer the gate relies on) — so this asserts the
- * cross-session resume path UAT-5 calls for.
+ * cross-session resume path  calls for.
  */
 export async function runAcceptanceThenResume(
   input: FirstRunRefusalInput,

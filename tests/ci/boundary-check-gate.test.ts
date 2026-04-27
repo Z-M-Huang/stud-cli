@@ -1,5 +1,5 @@
 /**
- * Unit 162 / AC-114: boundary-check CI gate.
+ *  / boundary-check CI gate.
  *
  * Asserts:
  *  1. The workflow file invokes scripts/boundary-check.ts as a required step.
@@ -12,7 +12,7 @@ import { describe, it } from "node:test";
 
 import { runBoundaryCheck } from "../../scripts/boundary-check.js";
 
-describe("AC-114 boundary-check CI gate", () => {
+describe(" boundary-check CI gate", () => {
   it("ci.yml invokes the boundary checker as a required step", async () => {
     const yaml = await readFile(".github/workflows/ci.yml", "utf8");
     assert.equal(yaml.includes("boundary-check"), true);

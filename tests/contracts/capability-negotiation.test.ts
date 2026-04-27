@@ -1,5 +1,5 @@
 /**
- * Capability Negotiation contract tests (AC-22).
+ * Capability Negotiation contract tests.
  *
  * Verifies:
  *   1. CAPABILITY_NAMES enumerates exactly seven capabilities.

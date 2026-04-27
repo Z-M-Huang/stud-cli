@@ -1,5 +1,5 @@
 /**
- * UAT-23 + AC-77: Headless-Run flow + --yolo escape per Q-7 (post-wiki-alignment).
+ *  + Headless-Run flow + --yolo escape per Q-7 (post-wiki-alignment).
  *
  * Drives the real `resolveHeadless` (`src/core/interaction/headless.ts`) and
  * asserts the wiki's uniform emit-and-halt rule:
@@ -53,7 +53,7 @@ function req(kind: InteractionRequestKind, payload?: object): InteractionRequest
   };
 }
 
-describe("UAT-23: Headless default (no --yolo) — every kind halts uniformly", () => {
+describe("Headless default (no --yolo) — every kind halts uniformly", () => {
   it("Ask halts with permission-required + audit class=Interaction + decision=halt", () => {
     const cap = makeCapture();
     const out = resolveHeadless({
@@ -109,7 +109,7 @@ describe("UAT-23: Headless default (no --yolo) — every kind halts uniformly", 
   });
 });
 
-describe("UAT-23: --yolo auto-resolves every Interaction Protocol kind", () => {
+describe("--yolo auto-resolves every Interaction Protocol kind", () => {
   it("Approve auto-accepts under --yolo", () => {
     const cap = makeCapture();
     const out = resolveHeadless({

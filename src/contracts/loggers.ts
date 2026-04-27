@@ -1,5 +1,5 @@
 /**
- * Loggers contract — fan-out sink extension category (AC-17).
+ * Loggers contract — fan-out sink extension category.
  *
  * A Logger extension is a pure consumer of the observability event stream.
  * Core fans every observability event out to every active logger's `sink`
@@ -80,7 +80,7 @@ export type LoggerSink = (event: ObservabilityEvent, host: HostAPI) => Promise<v
 // ---------------------------------------------------------------------------
 
 /**
- * Per-category contract shape for Logger extensions (AC-17).
+ * Per-category contract shape for Logger extensions.
  *
  * Specialises `ExtensionContract<TConfig>` by fixing:
  *   - `kind: 'Logger'`

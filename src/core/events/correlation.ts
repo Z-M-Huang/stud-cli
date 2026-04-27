@@ -9,7 +9,7 @@
  *
  * The injected `rng` and `monotonic` sources are seedable in tests, which
  * means a fixed seed produces a byte-identical ID sequence across runs
- * (AC-73: determinism).
+ * (: determinism).
  *
  * Wiki: runtime/Determinism-and-Ordering.md
  */
@@ -33,11 +33,11 @@ export interface CorrelationFactory {
  * @param opts.rng        - Returns an opaque, collision-resistant token.
  *                          Must be injected at session start. In test mode,
  *                          pass a deterministic source to get byte-identical
- *                          sequences (AC-73).
+ *                          sequences.
  * @param opts.monotonic  - Returns a strictly increasing bigint. A
  *                          non-monotonic source is a contract violation;
  *                          detection is deferred to the invariant checks in
- *                          Unit 29.
+ *                          .
  */
 export function createCorrelationFactory(opts: {
   rng: () => string;

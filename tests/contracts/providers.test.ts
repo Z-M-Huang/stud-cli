@@ -1,5 +1,5 @@
 /**
- * Provider contract tests (AC-13).
+ * Provider contract tests.
  *
  * Verifies:
  *   1. Shape — kind, cardinality, protocol, capabilities.

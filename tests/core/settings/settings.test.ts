@@ -1,7 +1,7 @@
 /**
  * Tests for Settings shape validation and scope merge.
  *
- * Covers AC-27:
+ * Covers :
  *   - validateSettings accepts the fourteen allowed top-level keys.
  *   - validateSettings rejects unknown top-level keys with a path in context.
  *   - mergeSettings unions securityMode.allowlist across all three scopes.

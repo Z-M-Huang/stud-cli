@@ -170,7 +170,7 @@ export interface OpenCallRecorder {
  * Since `evaluateProjectTrust` never performs direct filesystem I/O, this
  * recorder's `files` array will always be empty. The call exists to document
  * the invariant: the trust gate must never open any file under `.stud/`
- * before the trust decision is recorded (AC-62).
+ * before the trust decision is recorded.
  */
 export function recordingOpenCalls(): OpenCallRecorder {
   return { files: [] };

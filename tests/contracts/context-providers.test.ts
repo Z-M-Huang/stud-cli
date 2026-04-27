@@ -1,5 +1,5 @@
 /**
- * Context Providers contract tests (AC-21).
+ * Context Providers contract tests.
  *
  * Verifies:
  *   1. Shape — kind fixed to 'ContextProvider', both cardinalities 'unlimited',

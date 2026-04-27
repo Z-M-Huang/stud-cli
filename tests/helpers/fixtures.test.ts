@@ -1,5 +1,5 @@
 /**
- * Tests for the standard config fixtures (AC-11).
+ * Tests for the standard config fixtures.
  *
  * Verifies:
  *   - `validConfigFixture` has the expected minimal shape.
@@ -16,7 +16,7 @@ import {
   worstPlausibleConfigFixture,
 } from "./fixtures.js";
 
-describe("validConfigFixture (AC-11)", () => {
+describe("validConfigFixture", () => {
   it("is a non-null object", () => {
     assert.equal(typeof validConfigFixture, "object");
     assert.notEqual(validConfigFixture, null);
@@ -31,7 +31,7 @@ describe("validConfigFixture (AC-11)", () => {
   });
 });
 
-describe("invalidConfigFixture (AC-11)", () => {
+describe("invalidConfigFixture", () => {
   it("is a non-null object", () => {
     assert.equal(typeof invalidConfigFixture, "object");
     assert.notEqual(invalidConfigFixture, null);
@@ -47,7 +47,7 @@ describe("invalidConfigFixture (AC-11)", () => {
   });
 });
 
-describe("worstPlausibleConfigFixture (AC-11)", () => {
+describe("worstPlausibleConfigFixture", () => {
   it("is a non-null object", () => {
     assert.equal(typeof worstPlausibleConfigFixture, "object");
     assert.notEqual(worstPlausibleConfigFixture, null);

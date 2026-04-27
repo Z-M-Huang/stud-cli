@@ -1,5 +1,5 @@
 /**
- * LoggerContract tests (AC-17).
+ * LoggerContract tests.
  *
  * Verifies:
  *   1. Shape — kind fixed to 'Logger', both cardinalities 'unlimited'.

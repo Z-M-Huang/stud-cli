@@ -1,5 +1,5 @@
 /**
- * Commands contract — UI-agnostic slash-command extension category (AC-19).
+ * Commands contract — UI-agnostic slash-command extension category.
  *
  * A Command extension exposes a `/name` string, a `description`, and an
  * `execute(args, host)` function that acts on the main session.
@@ -93,7 +93,7 @@ export type CommandExecutor = (args: CommandArgs, host: HostAPI) => Promise<Comm
 // ---------------------------------------------------------------------------
 
 /**
- * Per-category contract shape for Command extensions (AC-19).
+ * Per-category contract shape for Command extensions.
  *
  * Specialises `ExtensionContract<TConfig>` by fixing:
  *   - `kind: 'Command'`

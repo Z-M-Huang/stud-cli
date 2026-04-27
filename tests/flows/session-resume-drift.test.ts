@@ -1,5 +1,5 @@
 /**
- * UAT-32 + AC-81: Session-Resume-Drift — core resume never fails on
+ *  + Session-Resume-Drift — core resume never fails on
  * extension drift; cross-store resume IS a critical mismatch.
  *
  * Per Q-2 the session manifest stores ONLY:
@@ -71,7 +71,7 @@ async function readBack(sessionId: string, root: string) {
   return result;
 }
 
-describe("UAT-32: Session-Resume-Drift", () => {
+describe("Session-Resume-Drift", () => {
   it("removed optional logger between launches: resume succeeds (manifest is logger-agnostic)", async () => {
     const sessionId = "drift-no-logger";
     const manifest: SessionManifest = {

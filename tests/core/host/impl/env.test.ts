@@ -2,9 +2,9 @@
  * Tests for createHostEnv — per-extension environment variable wrapper.
  *
  * Covers:
- *   AC-56       — returned object is Object.freeze'd.
- *   AC-56       — get(name) forwards to envProvider.get(extId, name).
- *   AC-56       — declare(name) forwards to envProvider.declare(extId, name).
+ *          — returned object is Object.freeze'd.
+ *          — get(name) forwards to envProvider.get(extId, name).
+ *          — declare(name) forwards to envProvider.declare(extId, name).
  *   Invariant 2 — no bulk-read method (list/all/keys) exists on the returned object.
  *
  * Wiki: core/Env-Provider.md + security/LLM-Context-Isolation.md
@@ -31,10 +31,10 @@ function makeProvider(overrides?: Partial<EnvProvider>): EnvProvider {
 }
 
 // ---------------------------------------------------------------------------
-// AC-56: frozen shape
+// frozen shape
 // ---------------------------------------------------------------------------
 
-describe("createHostEnv — frozen shape (AC-56)", () => {
+describe("createHostEnv — frozen shape", () => {
   it("returns a frozen object", () => {
     const env = createHostEnv({ extId: "ext.a", envProvider: makeProvider() });
     assert.equal(Object.isFrozen(env), true);

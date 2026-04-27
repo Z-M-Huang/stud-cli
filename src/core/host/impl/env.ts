@@ -9,7 +9,7 @@
  *   Invariant #2 (LLM context isolation): no bulk-read method is present.
  *   Invariant #6: `get` resolves the value at point-of-use; no value is stored.
  *
- * AC-56: the returned object is `Object.freeze`'d.
+ * the returned object is `Object.freeze`'d.
  *
  * Error delegation:
  *   `Validation/EnvNameUndeclared` — forwarded from the EnvProvider when `get`
@@ -48,7 +48,7 @@ export interface HostEnvImpl {
  * Construct a per-extension env wrapper.
  *
  * @param deps.extId       - The owning extension's canonical ID.
- * @param deps.envProvider - The session-level env provider (Unit 45).
+ * @param deps.envProvider - The session-level env provider.
  */
 export function createHostEnv(deps: { extId: string; envProvider: EnvProvider }): HostEnvImpl {
   const { extId, envProvider } = deps;

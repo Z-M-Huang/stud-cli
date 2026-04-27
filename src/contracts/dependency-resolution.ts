@@ -6,7 +6,7 @@
  * the `resolveDependencies` pure function, and the `extensionDependencySchema`
  * AJV-compilable JSON-Schema.
  *
- * Resolution rules (AC-24):
+ * Resolution rules:
  *   - Topological sort (Kahn's algorithm) with **lexicographic** tie-breaking on
  *     `extId` — the same input always produces the same order.
  *   - `initOrder` is the topological order; `disposeOrder` is its exact reverse.
@@ -34,7 +34,7 @@ export type { CategoryKind } from "./kinds.js";
  *
  * Exported so `scripts/wiki-drift.ts` can compare the value in the wiki page's
  * `> contractVersion:` header against the value here without parsing source AST.
- * When the wiki page bumps, this constant bumps in the same PR per AC-107/AC-112.
+ * When the wiki page bumps, this constant bumps in the same PR per /.
  */
 export const contractVersion = "1.0.0" as const;
 

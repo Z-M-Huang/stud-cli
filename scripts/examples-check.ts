@@ -1,5 +1,5 @@
 /**
- * Examples parity check (UAT-38, AC-118).
+ * Examples parity check (, ).
  *
  * Three responsibilities:
  *

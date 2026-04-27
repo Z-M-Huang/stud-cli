@@ -1,5 +1,5 @@
 /**
- * Unit 165 / AC-116: coverage-gate CI gate.
+ *  / coverage-gate CI gate.
  *
  * Asserts:
  *  1. The workflow's coverage step invokes scripts/coverage-gate.ts (via the
@@ -19,7 +19,7 @@ import { runCoverageGate } from "../../scripts/coverage-gate.js";
 
 const T = { lines: 90, branches: 90 };
 
-describe("AC-116 coverage-gate CI gate", () => {
+describe(" coverage-gate CI gate", () => {
   it("package.json test:coverage chains scripts/coverage-gate.ts after the run", async () => {
     const pkg = await readFile("package.json", "utf8");
     assert.equal(pkg.includes("scripts/coverage-gate.ts"), true);

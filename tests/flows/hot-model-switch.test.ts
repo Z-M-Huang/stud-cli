@@ -1,5 +1,5 @@
 /**
- * UAT-19 + AC-22: Hot-Model-Switch flow.
+ *  + Hot-Model-Switch flow.
  *
  * Drives the real `negotiate` from `src/core/capabilities/negotiator.ts`
  * across a model swap to assert:
@@ -65,7 +65,7 @@ function recordingAudit(): { records: AuditRecord[]; emit: (r: AuditRecord) => v
   return { records, emit: (r) => records.push(r) };
 }
 
-describe("UAT-19: Hot-Model-Switch", () => {
+describe("Hot-Model-Switch", () => {
   it("successful switch re-runs negotiation against the new model's vector", () => {
     const requirements: CapabilityRequirement[] = [{ name: "streaming", level: "hard" }];
 
@@ -133,7 +133,7 @@ describe("UAT-19: Hot-Model-Switch", () => {
     assert.equal(threw, true, "switching to a smaller-context model must throw");
   });
 
-  it("probed capability never blocks (test docs the AC-22 contract)", () => {
+  it("probed capability never blocks (test docs the  contract)", () => {
     const requirements: CapabilityRequirement[] = [{ name: "promptCaching", level: "probed" }];
     const result = negotiate(requirements, modelA); // no promptCaching
     assert.equal(result.ok, true);

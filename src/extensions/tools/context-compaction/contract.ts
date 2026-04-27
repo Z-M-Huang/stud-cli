@@ -4,7 +4,7 @@
  * Triggers the compaction subsystem at the model's request, returning a
  * summary of compacted history segments and the new context-window
  * utilization. Approval-gated with a fixed key `"context-compaction"` — one
- * approval per session covers all invocations (AC-97, Q-8).
+ * approval per session covers all invocations (, Q-8).
  *
  * Side effects:
  *   - Mutates the session's message history (that is the point).
@@ -93,7 +93,7 @@ export const contract: ToolContract<CompactionConfig, CompactionArgs, Compaction
 
   /**
    * Fixed approval key — one approval per session covers all compaction
-   * invocations (AC-97, Q-8 resolution).
+   * invocations (, Q-8 resolution).
    *
    * Wiki: reference-extensions/tools/Context-Compaction.md
    */

@@ -204,7 +204,7 @@ function registerLifecycleAndSurfaceTests(): void {
     assert.deepEqual(host.ui.startupDetails, ["bad-ext: config"]);
   });
 
-  it("refuses cross-extension stateSlot access (AC-115)", async () => {
+  it("refuses cross-extension stateSlot access", async () => {
     const host = createTestHost({ extId: "default-tui" });
     await contract.lifecycle.init?.(host, {});
     assert.throws(() => host.session.stateSlot("other-ext"), /ExtensionHost/);

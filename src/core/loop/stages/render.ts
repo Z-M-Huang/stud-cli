@@ -8,10 +8,10 @@
  *
  * Errors thrown:
  *   Session / StoreUnavailable — appendHistory fails at the store layer.
- *     The UI handoff does NOT occur when the write fails (turn abandoned, AC-46).
+ *     The UI handoff does NOT occur when the write fails (turn abandoned, ).
  *
  * Side effects: one write to session history; one call to handOffToUI.
- * The surrounding orchestrator (Unit 30) emits SessionTurnEnd.
+ * The surrounding orchestrator emits SessionTurnEnd.
  *
  * Wiki: core/Message-Loop.md §RENDER
  */
@@ -55,7 +55,7 @@ export function renderStage(deps: {
     const { correlationId, payload } = input;
     const { assistantText } = payload;
 
-    // Persist before handoff — if the store write fails, abandon the turn (AC-46).
+    // Persist before handoff — if the store write fails, abandon the turn.
     try {
       await appendHistory({ role: "assistant", content: assistantText });
     } catch (err) {

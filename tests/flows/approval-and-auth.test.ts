@@ -1,5 +1,5 @@
 /**
- * UAT-33 + AC-44 (invariant #6): Approval-and-Auth flow — Auth.DeviceCode
+ *  +  (invariant #6): Approval-and-Auth flow — Auth.DeviceCode
  * never lets a resolved token escape into the session manifest bytes.
  *
  * Pragmatic scope. The full Interaction Protocol + a real device-code
@@ -147,7 +147,7 @@ async function runDeviceCodeThenSecondTurn(): Promise<AuthRunResult> {
   };
 }
 
-describe("UAT-33: Approval-and-Auth device-code flow", () => {
+describe("Approval-and-Auth device-code flow", () => {
   it("first turn presents the Auth.DeviceCode prompt", async () => {
     const run = await runDeviceCodeThenSecondTurn();
     assert.equal(run.devicePrompted, true);

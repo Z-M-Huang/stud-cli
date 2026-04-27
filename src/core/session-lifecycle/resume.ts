@@ -58,7 +58,7 @@ export interface ResumeOutcome {
  *      in `skippedExtensions` — the SM was never expected.
  *   4. Drive the lifecycle machine: Closed → Resumed → Active.
  *
- * @param deps.recovery          - Crash-recovery helper (Unit 43).
+ * @param deps.recovery          - Crash-recovery helper.
  * @param deps.activeStoreId     - Extension ID of the currently active store.
  * @param deps.lifecycleMachine  - Session state machine, pre-set to `Closed`.
  * @param deps.attachSm          - Callback to attach a specific SM extension.

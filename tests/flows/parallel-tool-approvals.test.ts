@@ -1,5 +1,5 @@
 /**
- * UAT-28 + Q-9: Parallel-Tool-Approvals race-to-answer dismissal.
+ *  + Q-9: Parallel-Tool-Approvals race-to-answer dismissal.
  *
  * Drives the real `createRaceArbiter` (`src/core/interaction/arbiter.ts`)
  * with multiple interactors and asserts:
@@ -59,7 +59,7 @@ function slowInteractor(): InteractorHandle {
   };
 }
 
-describe("UAT-28: Parallel-Tool-Approvals race", () => {
+describe("Parallel-Tool-Approvals race", () => {
   it("single interactor degenerates: response from sole interactor wins, no dismiss", async () => {
     const bus = makeBus();
     const arbiter = createRaceArbiter({

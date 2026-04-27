@@ -1,7 +1,7 @@
 /**
  * Executor for the /health bundled command.
  *
- * Invokes the core diagnostics probe and returns the AC-110-pinned report
+ * Invokes the core diagnostics probe and returns the -pinned report
  * shape. The command is always permitted (no approval gate) and read-only —
  * it never mutates session state.
  *

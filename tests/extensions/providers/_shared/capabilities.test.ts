@@ -130,7 +130,7 @@ describe("listDeclaredModels", () => {
   });
 });
 
-describe("AC-86: promptCaching default is probed (detect-on-use)", () => {
+describe("promptCaching default is probed (detect-on-use)", () => {
   it("every declaration that uses defaults gets promptCaching as probed", () => {
     declareModelCapabilities([
       {

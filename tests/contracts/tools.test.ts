@@ -1,5 +1,5 @@
 /**
- * Tools contract tests (AC-14).
+ * Tools contract tests.
  *
  * Verifies:
  *   1. Shape — kind, cardinality, gated, deriveApprovalKey.

@@ -2,13 +2,13 @@
  * HostSessionImpl — per-extension session wrapper.
  *
  * `createHostSession` returns a frozen object exposing session id, security
- * mode, and the `stateSlot` accessor.  The `stateSlot` guard enforces AC-115:
+ * mode, and the `stateSlot` accessor.  The `stateSlot` guard enforces :
  * an extension may only access its own state slot.  Any attempt to pass a
  * foreign `extId` throws `ExtensionHost/SlotAccessDenied` and emits an audit
  * record.
  *
- * AC-56:  the returned object is `Object.freeze`'d.
- * AC-115: cross-extension stateSlot access is denied at runtime.
+ * the returned object is `Object.freeze`'d.
+ * cross-extension stateSlot access is denied at runtime.
  * Invariant #3: mode is session-fixed; the returned value never changes.
  * Invariant #6: session manifest never stores resolved secrets — stateSlot
  *               values must not contain secret material (caller's responsibility).
@@ -34,7 +34,7 @@ export interface StateSlotHandle {
  * The concrete session wrapper given to one extension.
  *
  * `stateSlot(extId)` may only be called with the own `extId` — any other value
- * throws `ExtensionHost/SlotAccessDenied` (AC-115).
+ * throws `ExtensionHost/SlotAccessDenied`.
  */
 export interface HostSessionImpl {
   readonly stateSlot: (extId: string) => StateSlotHandle;
@@ -69,7 +69,7 @@ export function createHostSession(deps: {
 
   function stateSlot(requestedExtId: string): StateSlotHandle {
     if (requestedExtId !== ownExtId) {
-      // AC-115: record the violation before throwing.
+      // record the violation before throwing.
       audit.record({
         class: "ExtensionHost",
         code: "SlotAccessDenied",

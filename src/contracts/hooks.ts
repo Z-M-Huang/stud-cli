@@ -110,7 +110,7 @@ export type HookHandler<TPayload> =
 // ---------------------------------------------------------------------------
 
 /**
- * Per-category contract shape for Hook extensions (AC-15).
+ * Per-category contract shape for Hook extensions.
  *
  * Specialises `ExtensionContract<TConfig>` by fixing:
  *   - `kind: 'Hook'`
@@ -166,7 +166,7 @@ export interface OrderingManifest {
 }
 
 // ---------------------------------------------------------------------------
-// Canonical hook slots (twelve total)  AC-47
+// Canonical hook slots (twelve total)
 // ---------------------------------------------------------------------------
 
 /**
@@ -192,7 +192,7 @@ export const HOOK_SLOTS: readonly HookSlot[] = Object.freeze([
 ] as const satisfies HookSlot[]);
 
 // ---------------------------------------------------------------------------
-// Hook taxonomy matrix  AC-48
+// Hook taxonomy matrix
 // ---------------------------------------------------------------------------
 
 interface TaxonomyEntry {
@@ -202,7 +202,7 @@ interface TaxonomyEntry {
 }
 
 /**
- * Per-slot sub-kind applicability matrix (AC-47/AC-48).
+ * Per-slot sub-kind applicability matrix.
  *
  * Values:
  *   "allowed"   — valid declaration; hook will fire.
@@ -211,7 +211,7 @@ interface TaxonomyEntry {
  *
  * Observer is always "allowed" at every slot — it is the universal hook kind.
  *
- * Notable matrix lines (AC-48):
+ * Notable matrix lines:
  *   SEND_REQUEST/pre and STREAM_RESPONSE/pre transforms → "rare" (prefer COMPOSE_REQUEST/post).
  *   STREAM_RESPONSE/pre transforms → "rare" (per-token; proposed surface).
  *   TOOL_CALL/pre transforms → args-only; TOOL_CALL/post transforms → result.

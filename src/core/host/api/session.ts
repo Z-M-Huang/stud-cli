@@ -7,7 +7,7 @@
  *   - `projectRoot` is exactly `<cwd>/.stud` — no walk-up resolution (invariant #5).
  *   - `stateSlot(extId)` is scoped to the extension's own `extId`.
  *     Cross-extension access throws `ExtensionHost/SlotAccessDenied` at runtime
- *     (AC-115; enforced by the mock host in Unit 5 and the real host in a later unit).
+ *     (; enforced by the mock host in  and the real host in a later unit).
  *
  * Wiki: core/Host-API.md + security/Security-Modes.md + contracts/Extension-State.md
  */
@@ -51,7 +51,7 @@ export interface SessionAPI {
    *
    * At runtime, the host checks that `extId` matches the calling extension's
    * registered identity. A mismatch throws `ExtensionHost/SlotAccessDenied`
-   * (AC-115). Extensions must never pass another extension's id here.
+   *. Extensions must never pass another extension's id here.
    */
   stateSlot(extId: string): StateSlotHandle;
 }

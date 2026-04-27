@@ -86,7 +86,7 @@ export type ToolExecutor<TIn, TOut> = (
 // ---------------------------------------------------------------------------
 
 /**
- * Per-category contract shape for Tool extensions (AC-14).
+ * Per-category contract shape for Tool extensions.
  *
  * Specialises `ExtensionContract<TConfig>` by fixing:
  *   - `kind: 'Tool'`

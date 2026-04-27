@@ -1,5 +1,5 @@
 /**
- * Contract conformance tests for the bash reference tool (AC-95).
+ * Contract conformance tests for the bash reference tool.
  *
  * Covers: shape, prefix extraction (deriveApprovalKey), non-zero-exit partial
  * result, policy-block before approval, timeout killing the subprocess,
@@ -58,7 +58,7 @@ describe("bash tool — shape", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Command prefix extraction — deriveApprovalKey (AC-95, Q-8 resolution)
+// Command prefix extraction — deriveApprovalKey (, Q-8 resolution)
 // ---------------------------------------------------------------------------
 
 describe("bash tool — deriveApprovalKey (prefix extraction)", () => {
@@ -105,7 +105,7 @@ describe("bash tool — execute success", () => {
     await contract.lifecycle.dispose!(host);
   });
 
-  it("non-zero exit is a partial result — not a terminal error (AC-95)", async () => {
+  it("non-zero exit is a partial result — not a terminal error", async () => {
     const { host } = mockHost({ extId: "bash" });
     await contract.lifecycle.init!(host, {});
     const signal = new AbortController().signal;
@@ -241,7 +241,7 @@ describe("bash tool — execute error paths", () => {
     await contract.lifecycle.dispose!(host);
   });
 
-  it("output bytes capped with truncation sentinel (AC-95)", async () => {
+  it("output bytes capped with truncation sentinel", async () => {
     const { host } = mockHost({ extId: "bash" });
     await contract.lifecycle.init!(host, { maxOutputBytes: 1024 });
     const signal = new AbortController().signal;

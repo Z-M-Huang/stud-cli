@@ -12,9 +12,9 @@
  * prevents concurrent approval prompts from confusing the user and removes any
  * race between parallel tool calls that both need approval.
  *
- * ## This unit (Unit 57) — single-interactor path
+ * ## This unit — single-interactor path
  *
- * Exactly one interactor is assumed. Unit 58 extends this to the multi-interactor
+ * Exactly one interactor is assumed.  extends this to the multi-interactor
  * race-to-answer arbiter; the `InteractorHandle[]` array is already present in the
  * deps interface so the upgrade is additive.
  *
@@ -77,16 +77,16 @@ export interface InteractionProtocolCore {
 }
 
 export interface InteractionProtocolDeps {
-  /** Active interactors. Unit 57: exactly one. Unit 58+ allows the arbiter. */
+  /** Active interactors. exactly one. + allows the arbiter. */
   readonly interactors: readonly InteractorHandle[];
   readonly eventBus: EventBus;
   readonly clock: { now(): string };
   /**
-   * Reserved for Unit 58's multi-interactor race-to-answer arbiter, which will
+   * Reserved for 's multi-interactor race-to-answer arbiter, which will
    * generate fresh correlation IDs when fanning out to multiple interactors.
-   * Unit 57 (single-interactor path) does not call this; callers must still
+   *  (single-interactor path) does not call this; callers must still
    * supply it so that the interface is forward-compatible without a breaking
-   * change when Unit 58 lands.
+   * change when  lands.
    */
   readonly newCorrelationId: () => string;
 }

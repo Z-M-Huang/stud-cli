@@ -1,5 +1,5 @@
 /**
- * Tests for the Interaction-Timeout wrapper (Unit 59).
+ * Tests for the Interaction-Timeout wrapper.
  *
  * Covers:
  *   - delegate resolves first → delegate response returned; timer cancelled.
@@ -36,7 +36,7 @@ function makeAskRequest(correlationId: string): InteractionRequest {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("raiseWithTimeout — delegate wins (Unit 59)", () => {
+describe("raiseWithTimeout — delegate wins", () => {
   it("returns the delegate response when delegate resolves first", async () => {
     const clock = fakeClock();
     const req = makeAskRequest("c1");
@@ -55,7 +55,7 @@ describe("raiseWithTimeout — delegate wins (Unit 59)", () => {
   });
 });
 
-describe("raiseWithTimeout — timer wins (Unit 59)", () => {
+describe("raiseWithTimeout — timer wins", () => {
   it("returns timeout shape when timer fires before delegate resolves", async () => {
     const clock = fakeClock();
     const req = makeAskRequest("c1");
@@ -98,7 +98,7 @@ describe("raiseWithTimeout — timer wins (Unit 59)", () => {
   });
 });
 
-describe("raiseWithTimeout — validation (Unit 59)", () => {
+describe("raiseWithTimeout — validation", () => {
   it("rejects with Validation/TimeoutMsInvalid when timeoutMs is 0", async () => {
     await assert.rejects(
       () =>
@@ -133,7 +133,7 @@ describe("raiseWithTimeout — validation (Unit 59)", () => {
   });
 });
 
-describe("raiseWithTimeout — late delegate resolution is ignored (Unit 59)", () => {
+describe("raiseWithTimeout — late delegate resolution is ignored", () => {
   it("caller only observes the timeout response; late arrival is discarded", async () => {
     const clock = fakeClock();
     let resolveDelegate!: (r: { kind: "accepted"; correlationId: string; value: unknown }) => void;
@@ -163,7 +163,7 @@ describe("raiseWithTimeout — late delegate resolution is ignored (Unit 59)", (
   });
 });
 
-describe("raiseWithTimeout — no pending timer after happy path (Unit 59)", () => {
+describe("raiseWithTimeout — no pending timer after happy path", () => {
   it("timer is cancelled (pendingCount === 0) after delegate resolves", async () => {
     const clock = fakeClock();
 
@@ -178,7 +178,7 @@ describe("raiseWithTimeout — no pending timer after happy path (Unit 59)", () 
   });
 });
 
-describe("defaultTimeoutClock — real Node setTimeout backing (Unit 59)", () => {
+describe("defaultTimeoutClock — real Node setTimeout backing", () => {
   it("returned handle exposes a cancel() that clears the timer without firing", async () => {
     const clock = defaultTimeoutClock();
     let fired = false;

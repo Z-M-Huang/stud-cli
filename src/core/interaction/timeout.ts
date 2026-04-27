@@ -1,8 +1,8 @@
 /**
- * Interaction-Timeout wrapper (Unit 59).
+ * Interaction-Timeout wrapper.
  *
  * `raiseWithTimeout` composes on top of any delegate raise function (the arbiter
- * or single-interactor `raise` from Units 57/58) and enforces a wall-clock
+ * or single-interactor `raise` from /58) and enforces a wall-clock
  * deadline. If the delegate resolves before the timer fires the timer is
  * cancelled and the delegate's response is returned. If the timer fires first
  * a canonical `{ kind: "timeout", correlationId }` response is returned and the

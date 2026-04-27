@@ -8,7 +8,7 @@
  *     `capHit: true` without cancelling in-flight tool calls.
  *
  * `shouldTerminate` is called at the top of each continuation iteration, before
- * COMPOSE_REQUEST re-enters, so the first full turn pass is never gated (AC-39).
+ * COMPOSE_REQUEST re-enters, so the first full turn pass is never gated.
  *
  * Wiki: core/Message-Loop.md + core/Stage-Executions.md
  */

@@ -1,7 +1,7 @@
 /**
  * Settings shape — TypeScript type and frozen JSON Schema for `settings.json`.
  *
- * Allowed top-level keys (AC-27):
+ * Allowed top-level keys:
  *   env, securityMode, providers, tools, hooks, ui, loggers, stateMachines,
  *   commands, sessionStores, contextProviders, logging, active.
  *
