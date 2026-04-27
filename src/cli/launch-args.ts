@@ -12,6 +12,7 @@ export interface LaunchArgs {
   readonly projectRoot: string;
   readonly sm: string | null;
   readonly help: boolean;
+  readonly version: boolean;
   readonly rawArgv: readonly string[];
 }
 
@@ -29,6 +30,7 @@ export function formatHelp(): string {
     "                            Set the session security mode at session start.",
     "  --sm <id>                 Attach the named state machine at session start.",
     "  --help                    Print this help and exit.",
+    "  --version                 Print the current version and exit.",
     "",
     "Configure provider credentials through settings.json apiKeyRef or environment variables.",
   ].join("\n");
@@ -48,6 +50,7 @@ export function parseLaunchArgs(
   const projectRoot = join(env.cwd(), ".stud");
   let sm: string | null = null;
   let help = false;
+  let version = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -67,6 +70,9 @@ export function parseLaunchArgs(
         break;
       case "--help":
         help = true;
+        break;
+      case "--version":
+        version = true;
         break;
       case "--mode": {
         const value = requireValue(argv, index, "--mode");
@@ -121,6 +127,7 @@ export function parseLaunchArgs(
     projectRoot,
     sm,
     help,
+    version,
     rawArgv: Object.freeze([...argv]),
   });
 }

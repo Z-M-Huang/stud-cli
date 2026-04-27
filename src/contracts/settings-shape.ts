@@ -116,8 +116,10 @@ export interface LoggingSettings {
  * Wiki: contracts/Settings-Shape.md § active, contracts/Cardinality-and-Activation.md
  */
 export interface ActiveSelectors {
+  readonly provider?: string; // extId — current Provider for composition
   readonly interactor?: string; // extId — Q-9: multiple may be active; this is a hint
-  readonly sessionStore: string; // extId — required; resume invariant §4
+  readonly sessionStore?: string; // extId — used for resume when configured
+  readonly attachedSM?: string; // extId — the currently attached State Machine
 }
 
 // ---------------------------------------------------------------------------
@@ -127,8 +129,8 @@ export interface ActiveSelectors {
 /**
  * The full normative shape of `settings.json`.
  *
- * Every field is optional except `securityMode` and `active`, which have
- * required sub-fields. Unknown top-level keys are rejected by `settingsSchema`.
+ * Every field is optional. Unknown top-level keys are rejected by
+ * `settingsSchema`.
  *
  * Wiki: contracts/Settings-Shape.md
  */
@@ -136,7 +138,7 @@ export interface Settings {
   /** Env-name → value mapping for extensions that declare env names. */
   readonly env?: EnvMap;
   /** Security mode and allowlist for this session. Session-fixed after start. */
-  readonly securityMode: SecuritySettings;
+  readonly securityMode?: SecuritySettings;
   /** Per-extension config for Provider extensions, keyed by extension id. */
   readonly providers?: PerCategoryMap;
   /** Per-extension config for Tool extensions. */
@@ -158,7 +160,7 @@ export interface Settings {
   /** Cross-logger defaults and sink list. */
   readonly logging?: LoggingSettings;
   /** Active-selector fields for the single-active categories. */
-  readonly active: ActiveSelectors;
+  readonly active?: ActiveSelectors;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +175,7 @@ export interface Settings {
  * - `additionalProperties: false` at root → unknown top-level keys are rejected.
  * - `securityMode.mode` is a closed enum of three values.
  * - `securityMode.allowlist` is an array of strings when present.
- * - `active.sessionStore` is a non-empty string (required).
+ * - `active.*` selectors are optional and later-layer wins when merged.
  * - All per-category maps accept any object-valued keys (shapes delegated to
  *   each extension's own `configSchema`).
  *
@@ -186,7 +188,6 @@ export const settingsSchema: JSONSchemaObject = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
   type: "object",
   additionalProperties: false,
-  required: ["securityMode", "active"],
   properties: {
     env: {
       type: "object",
@@ -250,10 +251,11 @@ export const settingsSchema: JSONSchemaObject = {
     active: {
       type: "object",
       additionalProperties: false,
-      required: ["sessionStore"],
       properties: {
+        provider: { type: "string", minLength: 1 },
         interactor: { type: "string" },
         sessionStore: { type: "string", minLength: 1 },
+        attachedSM: { type: "string", minLength: 1 },
       },
     },
   },

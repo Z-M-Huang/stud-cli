@@ -23,6 +23,23 @@ export interface TrustEntry {
   readonly kind: "project";
 }
 
+export interface TrustDecisionEntry {
+  /** Absolute, normalized path — no `..` segments, no unresolved symlinks. */
+  readonly canonicalPath: string;
+  /** The most recent decision recorded for this path. */
+  readonly decision: "trusted" | "declined";
+  /** ISO-8601 timestamp recorded at the moment of the decision. */
+  readonly grantedAt: string;
+  /** On-disk schema version for future invalidation. */
+  readonly schemaVersion: 1;
+  /** Optional free-text note. */
+  readonly note?: string;
+}
+
+export interface TrustListDocument {
+  readonly entries: readonly TrustDecisionEntry[];
+}
+
 /**
  * Persistent store of trust grants backed by the global-scope `trust.json`.
  *
@@ -46,6 +63,13 @@ export interface TrustStore {
    * Throws `Session/TrustStoreUnavailable` on I/O failure.
    */
   grant(entry: TrustEntry): Promise<void>;
+  /**
+   * Persist a declined trust decision without granting the project.
+   *
+   * Used by the first-run bootstrap so the trust history is auditable even
+   * when the current launch declines to load project scope.
+   */
+  recordDecline(canonicalPath: string, declinedAt: string, note?: string): Promise<void>;
   /**
    * Remove the entry for `canonicalPath` if present; no-op if absent.
    *

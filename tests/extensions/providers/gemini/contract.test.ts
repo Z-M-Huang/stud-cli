@@ -197,6 +197,10 @@ describe("normalizeGeminiParts (content-parts handling)", () => {
 });
 
 async function assertSurfaceThrowsProviderTransient(host: HostAPI): Promise<void> {
+  await contract.lifecycle.init?.(host, {
+    apiKeyRef: { kind: "env", name: "X" },
+    model: "gemini-2.0-flash",
+  });
   await assert.rejects(
     async () => {
       for await (const _event of contract.surface.request(

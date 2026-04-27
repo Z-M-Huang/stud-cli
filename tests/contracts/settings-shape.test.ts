@@ -34,10 +34,7 @@ const validate = ajv.compile(compilableSchema);
 // Helper: minimal valid settings
 // ---------------------------------------------------------------------------
 
-const minimalValid = {
-  securityMode: { mode: "ask" },
-  active: { sessionStore: "core-session-store" },
-};
+const minimalValid = {};
 
 // ---------------------------------------------------------------------------
 // Valid-input cases
@@ -56,7 +53,6 @@ describe("settingsSchema — valid inputs", () => {
   it("accepts an allowlist as an array of strings", () => {
     const result = validate({
       securityMode: { mode: "allowlist", allowlist: ["fs.read:*", "shell:safe-*"] },
-      active: { sessionStore: "core-session-store" },
     });
     assert.equal(
       result,
@@ -91,7 +87,6 @@ describe("settingsSchema — invalid inputs", () => {
   it("rejects an unknown security mode with a path", () => {
     const result = validate({
       securityMode: { mode: "wild" },
-      active: { sessionStore: "core-session-store" },
     });
     assert.equal(result, false, "Expected unknown security mode to be rejected");
     const firstError = validate.errors?.[0];
@@ -109,7 +104,6 @@ describe("settingsSchema — invalid inputs", () => {
   it("rejects an allowlist that is not an array of strings with a path", () => {
     const result = validate({
       securityMode: { mode: "allowlist", allowlist: "not-an-array" },
-      active: { sessionStore: "core-session-store" },
     });
     assert.equal(result, false, "Expected non-array allowlist to be rejected");
     const firstError = validate.errors?.[0];
@@ -136,5 +130,15 @@ describe("settingsSchema — invalid inputs", () => {
       assert.fail(`AJV threw on worst-plausible input: ${String(err)}`);
     }
     assert.equal(result!, false, "Expected worst-plausible input to be rejected");
+  });
+
+  it("accepts active.provider and active.attachedSM when present", () => {
+    const result = validate({
+      active: {
+        provider: "openai-compatible",
+        attachedSM: "ralph",
+      },
+    });
+    assert.equal(result, true);
   });
 });

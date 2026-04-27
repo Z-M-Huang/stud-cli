@@ -35,8 +35,10 @@ export interface Settings {
   readonly contextProviders?: Readonly<Record<string, unknown>>;
   readonly logging?: Readonly<Record<string, unknown>>;
   readonly active?: {
+    readonly provider?: string;
     readonly interactor?: string;
     readonly sessionStore?: string;
+    readonly attachedSM?: string;
   };
 }
 
@@ -108,8 +110,10 @@ export const SETTINGS_SCHEMA: Readonly<Record<string, unknown>> = Object.freeze(
       type: "object",
       additionalProperties: false,
       properties: {
+        provider: { type: "string" },
         interactor: { type: "string" },
         sessionStore: { type: "string" },
+        attachedSM: { type: "string" },
       },
     },
   },

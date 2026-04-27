@@ -33,12 +33,19 @@ describe("validateSettings — accept valid shapes", () => {
       sessionStores: {},
       contextProviders: {},
       logging: {},
-      active: { interactor: "ui.tui", sessionStore: "fs.reference" },
+      active: {
+        provider: "openai-compatible",
+        interactor: "ui.tui",
+        sessionStore: "fs.reference",
+        attachedSM: "ralph",
+      },
     });
 
     assert.equal(s.env?.["MY_KEY"], "x");
+    assert.equal(s.active?.provider, "openai-compatible");
     assert.equal(s.active?.interactor, "ui.tui");
     assert.equal(s.active?.sessionStore, "fs.reference");
+    assert.equal(s.active?.attachedSM, "ralph");
     assert.equal(s.securityMode?.mode, "ask");
     assert.deepEqual(s.securityMode?.allowlist, ["fs.read"]);
   });

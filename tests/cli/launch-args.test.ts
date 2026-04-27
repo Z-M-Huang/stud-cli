@@ -25,6 +25,10 @@ describe("parseLaunchArgs", () => {
     assert.equal(parseLaunchArgs(["--mode", "allowlist"], env).mode, "allowlist");
   });
 
+  it("accepts --version", () => {
+    assert.equal(parseLaunchArgs(["--version"], env).version, true);
+  });
+
   it("rejects --api-key with Validation/UnsupportedFlag per Q-7", () => {
     assert.throws(
       () => parseLaunchArgs(["--api-key", "sk-xxx"], env),
@@ -81,6 +85,7 @@ describe("parseLaunchArgs", () => {
     assert.equal(help.includes("--mode"), true);
     assert.equal(help.includes("--sm"), true);
     assert.equal(help.includes("--help"), true);
+    assert.equal(help.includes("--version"), true);
     assert.equal(help.includes("--api-key"), false);
     // Wiki runtime/Launch-Arguments.md drops --project-root: project root is
     // always <cwd>/.stud per safety invariant #5.

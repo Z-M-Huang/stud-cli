@@ -2,7 +2,11 @@ import { ProviderTransient } from "../../../core/errors/provider-transient.js";
 import { mapStream, type WireEvent } from "../_adapter/stream-mapper.js";
 
 import type { OpenAICompatibleConfig } from "./config.schema.js";
-import type { ProviderContentPart } from "../../../contracts/providers.js";
+import type {
+  ProviderContentPart,
+  ProviderMessage,
+  ProviderToolDefinition,
+} from "../../../contracts/providers.js";
 import type { HostAPI } from "../../../core/host/host-api.js";
 import type { ProtocolAdapter, ProtocolRequestArgs, StreamEvent } from "../_adapter/protocol.js";
 
@@ -69,6 +73,102 @@ function textFromContent(content: string | readonly ProviderContentPart[]): stri
     .join("\n");
 }
 
+function toolCallsFromContent(
+  content: string | readonly ProviderContentPart[],
+): readonly Extract<ProviderContentPart, { type: "tool-call" }>[] {
+  if (typeof content === "string") {
+    return [];
+  }
+
+  return content.filter(
+    (part): part is Extract<ProviderContentPart, { type: "tool-call" }> =>
+      part.type === "tool-call",
+  );
+}
+
+function toolResultFromContent(
+  content: string | readonly ProviderContentPart[],
+): Extract<ProviderContentPart, { type: "tool-result" }> | undefined {
+  if (typeof content === "string") {
+    return undefined;
+  }
+
+  return content.find(
+    (part): part is Extract<ProviderContentPart, { type: "tool-result" }> =>
+      part.type === "tool-result",
+  );
+}
+
+function stringifyToolArgs(args: Readonly<Record<string, unknown>>): string {
+  return JSON.stringify(args);
+}
+
+function toOpenAIToolDefinition(
+  tool: ProviderToolDefinition,
+  apiShape: OpenAICompatibleConfig["apiShape"],
+): Readonly<Record<string, unknown>> {
+  if (apiShape === "responses") {
+    return {
+      type: "function",
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+    };
+  }
+
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+    },
+  };
+}
+
+function toOpenAIMessage(message: ProviderMessage): Readonly<Record<string, unknown>> {
+  if (typeof message.content === "string") {
+    return {
+      role: message.role,
+      content: message.content,
+    };
+  }
+
+  if (message.role === "assistant") {
+    const toolCalls = toolCallsFromContent(message.content);
+    if (toolCalls.length > 0) {
+      return {
+        role: "assistant",
+        content: textFromContent(message.content) || null,
+        tool_calls: toolCalls.map((toolCall) => ({
+          id: toolCall.toolCallId,
+          type: "function",
+          function: {
+            name: toolCall.toolName,
+            arguments: stringifyToolArgs(toolCall.args),
+          },
+        })),
+      };
+    }
+  }
+
+  if (message.role === "tool") {
+    const toolResult = toolResultFromContent(message.content);
+    if (toolResult !== undefined) {
+      return {
+        role: "tool",
+        tool_call_id: toolResult.toolCallId,
+        content: toolResult.content,
+      };
+    }
+  }
+
+  return {
+    role: message.role,
+    content: textFromContent(message.content),
+  };
+}
+
 function errorStatus(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) {
     return undefined;
@@ -86,7 +186,15 @@ function errorStatus(error: unknown): number | undefined {
 
 function errorEventForStatus(status: number): WireEvent {
   const message =
-    status === 401 ? "network unauthorized" : status === 429 ? "rate limit" : SAFE_ERROR_MESSAGE;
+    status === 401
+      ? "network unauthorized"
+      : status === 404
+        ? "endpoint not found"
+        : status === 429
+          ? "rate limit"
+          : status >= 500
+            ? "upstream server error"
+            : `http ${status}`;
   return { kind: "error", httpStatus: status, message };
 }
 
@@ -109,7 +217,80 @@ function safeParseJson(input: string): unknown {
   }
 }
 
-function choiceDeltaEvents(delta: Readonly<Record<string, unknown>>): WireEvent[] {
+interface OpenAIToolCallParseState {
+  readonly callIdsByIndex: Map<number, string>;
+  nextGeneratedId: number;
+}
+
+function resolveToolCallId(
+  toolCall: Readonly<Record<string, unknown>>,
+  state: OpenAIToolCallParseState,
+): string {
+  const explicitId = getString(toolCall, "id");
+  const index = typeof toolCall["index"] === "number" ? toolCall["index"] : undefined;
+
+  if (explicitId !== undefined) {
+    if (index !== undefined) {
+      state.callIdsByIndex.set(index, explicitId);
+    }
+    return explicitId;
+  }
+
+  if (index !== undefined) {
+    const existing = state.callIdsByIndex.get(index);
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const generated = `openai-tool-${index}`;
+    state.callIdsByIndex.set(index, generated);
+    return generated;
+  }
+
+  const generated = `openai-tool-${state.nextGeneratedId}`;
+  state.nextGeneratedId += 1;
+  return generated;
+}
+
+function toolCallDeltaEvents(
+  delta: Readonly<Record<string, unknown>>,
+  state: OpenAIToolCallParseState,
+): WireEvent[] {
+  const toolCalls = delta["tool_calls"];
+  if (!Array.isArray(toolCalls)) {
+    return [];
+  }
+
+  return toolCalls.flatMap((entry) => {
+    const toolCall = getObject(entry);
+    if (toolCall === undefined) {
+      return [];
+    }
+
+    const functionRecord = getObject(toolCall["function"]);
+    const callId = resolveToolCallId(toolCall, state);
+    const name = getString(functionRecord ?? {}, "name");
+    const argsJson = getString(functionRecord ?? {}, "arguments");
+
+    if (name === undefined && argsJson === undefined) {
+      return [];
+    }
+
+    return [
+      {
+        kind: "tool-call-delta",
+        callId,
+        ...(name === undefined ? {} : { nameDelta: name }),
+        ...(argsJson === undefined ? {} : { argsJsonDelta: argsJson }),
+      } satisfies WireEvent,
+    ];
+  });
+}
+
+function choiceDeltaEvents(
+  delta: Readonly<Record<string, unknown>>,
+  state: OpenAIToolCallParseState,
+): WireEvent[] {
   const events: WireEvent[] = [];
   const content = getString(delta, "content");
   if (content !== undefined) {
@@ -119,7 +300,7 @@ function choiceDeltaEvents(delta: Readonly<Record<string, unknown>>): WireEvent[
   if (reasoning !== undefined) {
     events.push({ kind: "reasoning", text: reasoning });
   }
-  return events;
+  return [...events, ...toolCallDeltaEvents(delta, state)];
 }
 
 function responseShapeEvents(record: Readonly<Record<string, unknown>>, type: string): WireEvent[] {
@@ -137,7 +318,7 @@ function responseShapeEvents(record: Readonly<Record<string, unknown>>, type: st
   return [];
 }
 
-function eventsFromPayload(payload: unknown): WireEvent[] {
+function eventsFromPayload(payload: unknown, state: OpenAIToolCallParseState): WireEvent[] {
   const record = getObject(payload);
   if (record === undefined) {
     return [];
@@ -160,7 +341,7 @@ function eventsFromPayload(payload: unknown): WireEvent[] {
     const choiceRecord = getObject(choice);
     const finishReason = getString(choiceRecord ?? {}, "finish_reason");
     const delta = getObject(choiceRecord?.["delta"]);
-    const events = delta === undefined ? [] : choiceDeltaEvents(delta);
+    const events = delta === undefined ? [] : choiceDeltaEvents(delta, state);
     return finishReason === undefined
       ? events
       : [...events, { kind: "finish", rawReason: finishReason }];
@@ -172,6 +353,10 @@ async function* parseSse(body: ReadableStream<Uint8Array> | null): AsyncGenerato
     return;
   }
 
+  const state: OpenAIToolCallParseState = {
+    callIdsByIndex: new Map<number, string>(),
+    nextGeneratedId: 0,
+  };
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -181,18 +366,19 @@ async function* parseSse(body: ReadableStream<Uint8Array> | null): AsyncGenerato
       break;
     }
     buffer += decoder.decode(read.value, { stream: true });
-    yield* drainSseBuffer(buffer, (next) => {
+    yield* drainSseBuffer(buffer, state, (next) => {
       buffer = next;
     });
   }
   buffer += decoder.decode();
   if (buffer.trim().length > 0) {
-    yield* eventsFromSseBlock(buffer);
+    yield* eventsFromSseBlock(buffer, state);
   }
 }
 
 function* drainSseBuffer(
   buffer: string,
+  state: OpenAIToolCallParseState,
   setBuffer: (remaining: string) => void,
 ): Generator<WireEvent> {
   let remaining = buffer;
@@ -205,11 +391,11 @@ function* drainSseBuffer(
     const separatorLength = remaining[boundary] === "\r" ? 4 : 2;
     const rawEvent = remaining.slice(0, boundary);
     remaining = remaining.slice(boundary + separatorLength);
-    yield* eventsFromSseBlock(rawEvent);
+    yield* eventsFromSseBlock(rawEvent, state);
   }
 }
 
-function* eventsFromSseBlock(block: string): Generator<WireEvent> {
+function* eventsFromSseBlock(block: string, state: OpenAIToolCallParseState): Generator<WireEvent> {
   const data = block
     .split(/\r?\n/u)
     .filter((line) => line.startsWith("data:"))
@@ -222,7 +408,7 @@ function* eventsFromSseBlock(block: string): Generator<WireEvent> {
     yield { kind: "finish", rawReason: "stop" };
     return;
   }
-  yield* eventsFromPayload(safeParseJson(data));
+  yield* eventsFromPayload(safeParseJson(data), state);
 }
 
 function requestBody(args: ProtocolRequestArgs, config: OpenAICompatibleConfig): string {
@@ -231,13 +417,11 @@ function requestBody(args: ProtocolRequestArgs, config: OpenAICompatibleConfig):
     model: config.model,
     stream: true,
     shape: config.apiShape ?? "chat-completions",
-    messages: args.messages.map((message) => ({
-      role: message.role === "tool" ? "user" : message.role,
-      content: textFromContent(message.content),
-    })),
+    messages: args.messages.map((message) => toOpenAIMessage(message)),
     max_tokens: args.params["maxTokens"],
     temperature: args.params["temperature"],
-    tools: args.tools,
+    tools: args.tools.map((tool) => toOpenAIToolDefinition(tool, config.apiShape)),
+    tool_choice: args.tools.length > 0 ? "auto" : undefined,
   });
 }
 

@@ -1,4 +1,6 @@
 import { ExtensionHost } from "../../../core/errors/extension-host.js";
+import { ProviderCapability } from "../../../core/errors/provider-capability.js";
+import { ProviderTransient } from "../../../core/errors/provider-transient.js";
 
 import { createOpenAIAdapter } from "./adapter.js";
 import {
@@ -72,6 +74,11 @@ export const contract: ProviderContract<OpenAICompatibleConfig> = {
             args: (event.args ?? {}) as Readonly<Record<string, unknown>>,
           };
           continue;
+        }
+
+        if (event.kind === "error") {
+          const Cls = event.class === "ProviderCapability" ? ProviderCapability : ProviderTransient;
+          throw new Cls(event.message, undefined, { code: event.code });
         }
 
         if (event.kind === "finish") {

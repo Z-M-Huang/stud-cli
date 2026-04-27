@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import Ajv from "ajv";
 
+import { ProviderTransient } from "../../../../src/core/errors/provider-transient.js";
 import { openaiCompatibleConfigSchema } from "../../../../src/extensions/providers/openai-compatible/config.schema.js";
 import {
   contract,
@@ -96,6 +97,137 @@ async function drainFakeOpenAIStream(
     events.push(event);
   }
   return events;
+}
+
+function installToolCallingFetchMock(): {
+  readonly calls: CapturedRequest[];
+  readonly restore: () => void;
+} {
+  const originalFetch = globalThis.fetch;
+  const calls: CapturedRequest[] = [];
+
+  globalThis.fetch = ((input, init) => {
+    const headers = new Headers(init?.headers);
+    const body = typeof init?.body === "string" ? init.body : "{}";
+    calls.push({
+      url: input instanceof Request ? input.url : input.toString(),
+      authorization: headers.get("authorization"),
+      body: JSON.parse(body) as Readonly<Record<string, unknown>>,
+    });
+    return Promise.resolve(
+      new Response(
+        sseResponse([
+          JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "call_1",
+                      function: { name: "read", arguments: '{"path":"README.md"}' },
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          JSON.stringify({ choices: [{ finish_reason: "tool_calls" }] }),
+        ]),
+        { status: 200, headers: { "content-type": "text/event-stream" } },
+      ),
+    );
+  }) as typeof fetch;
+
+  return {
+    calls,
+    restore() {
+      globalThis.fetch = originalFetch;
+    },
+  };
+}
+
+function toolCallingRequestArgs() {
+  return {
+    messages: [
+      {
+        role: "assistant" as const,
+        content: [
+          {
+            type: "tool-call" as const,
+            toolCallId: "call_prev",
+            toolName: "read",
+            args: { path: "README.md" },
+          },
+        ],
+      },
+      {
+        role: "tool" as const,
+        content: [
+          {
+            type: "tool-result" as const,
+            toolCallId: "call_prev",
+            toolName: "read",
+            content: '{"ok":true}',
+          },
+        ],
+      },
+    ],
+    tools: [
+      {
+        name: "read",
+        description: "Read a file",
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          required: ["path"],
+          properties: { path: { type: "string" } },
+        },
+      },
+    ],
+    params: {},
+    signal: new AbortController().signal,
+  };
+}
+
+async function collectToolCallingEvents(
+  adapter: ReturnType<typeof createOpenAIAdapter>,
+  host: HostAPI,
+): Promise<readonly StreamEvent[]> {
+  const events: StreamEvent[] = [];
+  for await (const event of adapter.request(toolCallingRequestArgs(), host)) {
+    events.push(event);
+  }
+  return events;
+}
+
+async function assertSurfaceThrowsProviderTransient(host: HostAPI): Promise<void> {
+  await contract.lifecycle.init?.(host, {
+    apiKeyRef: { kind: "env", name: "X" },
+    baseURL: "https://x",
+    model: "y",
+  });
+
+  await assert.rejects(
+    async () => {
+      for await (const _event of contract.surface.request(
+        {
+          messages: [{ role: "user", content: "Hi" }],
+          tools: [],
+          modelId: "y",
+          maxTokens: 1,
+        },
+        host,
+        new AbortController().signal,
+      )) {
+        // Drain the provider surface to force request execution.
+      }
+    },
+    (error: unknown) =>
+      error instanceof ProviderTransient &&
+      error.code === "EndpointNotFound" &&
+      error.message.includes("super-secret") === false,
+  );
 }
 
 describe("OpenAI-Compatible contract shape", () => {
@@ -268,6 +400,53 @@ describe("adapter routes to both chat-completions and responses APIs", () => {
     }
   });
 });
+describe("tool-calling wire shape", () => {
+  it("serializes tools/messages and assembles streamed tool calls", async () => {
+    const fetchMock = installToolCallingFetchMock();
+    try {
+      const { host } = mockHost({ extId: "openai-compatible" });
+      const secretHost = withSecrets(host, () => "k");
+      const adapter = createOpenAIAdapter(
+        {
+          apiKeyRef: { kind: "env", name: "X" },
+          baseURL: "https://api.openai.com/v1",
+          model: "gpt-4o",
+          apiShape: "chat-completions",
+        },
+        secretHost,
+      );
+      const events = await collectToolCallingEvents(adapter, secretHost);
+      const toolCall = events.find((event) => event.kind === "tool-call");
+      assert.deepEqual(toolCall, {
+        kind: "tool-call",
+        callId: "call_1",
+        name: "read",
+        args: { path: "README.md" },
+      });
+
+      const request = fetchMock.calls[0]?.body;
+      assert.ok(request !== undefined);
+      const tools = request["tools"] as readonly Record<string, unknown>[];
+      assert.equal(tools[0]?.["type"], "function");
+      assert.equal(((tools[0]?.["function"] ?? {}) as Record<string, unknown>)["name"], "read");
+
+      const messages = request["messages"] as readonly Record<string, unknown>[];
+      assert.equal(messages[0]?.["role"], "assistant");
+      assert.equal(
+        (
+          (((messages[0]?.["tool_calls"] as readonly Record<string, unknown>[] | undefined) ??
+            [])[0]?.["function"] ?? {}) as Record<string, unknown>
+        )["name"],
+        "read",
+      );
+      assert.equal(messages[1]?.["role"], "tool");
+      assert.equal(messages[1]?.["tool_call_id"], "call_prev");
+      assert.equal(messages[1]?.["content"], '{"ok":true}');
+    } finally {
+      fetchMock.restore();
+    }
+  });
+});
 
 describe("Secrets hygiene (invariant #6)", () => {
   it("never resolves apiKeyRef at construction time", () => {
@@ -304,6 +483,16 @@ describe("Secrets hygiene (invariant #6)", () => {
       assert.equal(err.class, "ProviderTransient");
       assert.equal(err.code, "Unauthorized");
       assert.equal(JSON.stringify(err).includes("super-secret"), false);
+    } finally {
+      fetchMock.restore();
+    }
+  });
+
+  it("throws ProviderTransient from surface.request on adapter error events", async () => {
+    const fetchMock = installFetchMock(404);
+    try {
+      const { host } = mockHost({ extId: "openai-compatible" });
+      await assertSurfaceThrowsProviderTransient(withSecrets(host, () => "super-secret"));
     } finally {
       fetchMock.restore();
     }

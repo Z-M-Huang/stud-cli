@@ -1,6 +1,10 @@
+import { ExtensionHost } from "../../../core/errors/extension-host.js";
+import { ProviderCapability } from "../../../core/errors/provider-capability.js";
+import { ProviderTransient } from "../../../core/errors/provider-transient.js";
+
 import { createAnthropicAdapter } from "./adapter.js";
 import { anthropicConfigSchema, type AnthropicConfig } from "./config.schema.js";
-import { activate, deactivate, dispose, init } from "./lifecycle.js";
+import { activate, configForHost, deactivate, dispose, init } from "./lifecycle.js";
 
 import type { ProviderContract, ProviderStreamEvent } from "../../../contracts/providers.js";
 
@@ -32,9 +36,17 @@ export const contract: ProviderContract<AnthropicConfig> = {
   },
   surface: {
     async *request(args, host, signal): AsyncGenerator<ProviderStreamEvent> {
+      const loadedConfig = configForHost(host);
+      if (loadedConfig === undefined) {
+        throw new ExtensionHost("Anthropic provider has not been initialized.", undefined, {
+          code: "LifecycleFailure",
+        });
+      }
+
       const adapter = createAnthropicAdapter(
         {
           ...defaultConfig,
+          ...loadedConfig,
           model: args.modelId,
         },
         host,
@@ -65,6 +77,11 @@ export const contract: ProviderContract<AnthropicConfig> = {
             args: (event.args ?? {}) as Readonly<Record<string, unknown>>,
           };
           continue;
+        }
+
+        if (event.kind === "error") {
+          const Cls = event.class === "ProviderCapability" ? ProviderCapability : ProviderTransient;
+          throw new Cls(event.message, undefined, { code: event.code });
         }
 
         if (event.kind === "finish") {

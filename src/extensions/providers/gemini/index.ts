@@ -1,9 +1,10 @@
+import { ExtensionHost } from "../../../core/errors/extension-host.js";
 import { ProviderCapability } from "../../../core/errors/provider-capability.js";
 import { ProviderTransient } from "../../../core/errors/provider-transient.js";
 
 import { createGeminiAdapter } from "./adapter.js";
 import { geminiConfigSchema, type GeminiConfig } from "./config.schema.js";
-import { activate, deactivate, dispose, init } from "./lifecycle.js";
+import { activate, configForHost, deactivate, dispose, init } from "./lifecycle.js";
 
 import type { ProviderContract, ProviderStreamEvent } from "../../../contracts/providers.js";
 
@@ -35,9 +36,17 @@ export const contract: ProviderContract<GeminiConfig> = {
   },
   surface: {
     async *request(args, host, signal): AsyncGenerator<ProviderStreamEvent> {
+      const loadedConfig = configForHost(host);
+      if (loadedConfig === undefined) {
+        throw new ExtensionHost("Gemini provider has not been initialized.", undefined, {
+          code: "LifecycleFailure",
+        });
+      }
+
       const adapter = createGeminiAdapter(
         {
           ...defaultConfig,
+          ...loadedConfig,
           model: args.modelId,
         },
         host,

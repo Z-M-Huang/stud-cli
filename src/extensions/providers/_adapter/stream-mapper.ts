@@ -71,6 +71,15 @@ function toErrorEvent(event: Extract<WireEvent, { readonly kind: "error" }>): St
     };
   }
 
+  if (event.httpStatus === 404 || normalized.includes("not found")) {
+    return {
+      kind: "error",
+      class: "ProviderTransient",
+      code: "EndpointNotFound",
+      message,
+    };
+  }
+
   if (
     event.httpStatus === 429 ||
     normalized.includes("rate limit") ||

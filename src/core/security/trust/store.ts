@@ -13,12 +13,12 @@
  */
 
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
-import { dirname, isAbsolute, sep } from "node:path";
+import { dirname, isAbsolute, resolve, sep } from "node:path";
 
 import { Session } from "../../errors/session.js";
 import { Validation } from "../../errors/validation.js";
 
-import type { TrustEntry, TrustStore } from "./model.js";
+import type { TrustDecisionEntry, TrustEntry, TrustListDocument, TrustStore } from "./model.js";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -32,6 +32,14 @@ function isUnderStudDir(filePath: string): boolean {
   const normalised = filePath.split(sep).join("/");
   // Any path segment equal to ".stud" → project scope.
   return normalised.split("/").includes(".stud");
+}
+
+function canonicalHomeTrustPath(userHome: string | undefined): string {
+  if (userHome === undefined) {
+    return "";
+  }
+
+  return resolve(userHome, ".stud", "trust.json");
 }
 
 /**
@@ -55,6 +63,33 @@ function validateEntry(entry: TrustEntry): void {
   }
 }
 
+function validateDecisionEntry(entry: TrustDecisionEntry): void {
+  if (!entry.canonicalPath || !isAbsolute(entry.canonicalPath)) {
+    throw new Validation("trust entry canonicalPath must be a non-empty absolute path", undefined, {
+      code: "TrustEntryInvalid",
+      canonicalPath: entry.canonicalPath,
+    });
+  }
+
+  if (entry.decision !== "trusted" && entry.decision !== "declined") {
+    throw new Validation(
+      `trust entry decision '${String(entry.decision)}' is not allowed`,
+      undefined,
+      {
+        code: "TrustEntryInvalid",
+        decision: entry.decision,
+      },
+    );
+  }
+
+  if (entry.schemaVersion !== 1) {
+    throw new Validation("trust entry schemaVersion must be 1", undefined, {
+      code: "TrustEntryInvalid",
+      schemaVersion: entry.schemaVersion,
+    });
+  }
+}
+
 /**
  * Atomically write `data` to `filePath` using a temp-file + rename strategy.
  * A `fsync` is called on the temp file before rename to durably commit the
@@ -75,19 +110,46 @@ async function atomicWrite(filePath: string, data: string): Promise<void> {
 }
 
 /**
- * Load the JSON array from `filePath`.
+ * Load the trust document from `filePath`.
  *
- * Returns an empty array when the file does not exist yet.
+ * Returns an empty document when the file does not exist yet.
  * Throws `Session/TrustStoreUnavailable` on any other I/O error or if the
  * file contains malformed JSON.
  */
-async function loadEntries(filePath: string): Promise<TrustEntry[]> {
+function normalizeDocument(raw: unknown): TrustListDocument {
+  if (Array.isArray(raw)) {
+    const entries = raw as TrustEntry[];
+    return {
+      entries: entries.map((entry) => ({
+        canonicalPath: entry.canonicalPath,
+        decision: "trusted",
+        grantedAt: entry.grantedAt,
+        schemaVersion: 1,
+      })),
+    };
+  }
+
+  if (
+    typeof raw === "object" &&
+    raw !== null &&
+    "entries" in raw &&
+    Array.isArray((raw as { entries?: unknown }).entries)
+  ) {
+    return raw as TrustListDocument;
+  }
+
+  throw new Session("trust store contains malformed JSON", undefined, {
+    code: "TrustStoreUnavailable",
+  });
+}
+
+async function loadEntries(filePath: string): Promise<TrustListDocument> {
   let raw: string;
   try {
     raw = await readFile(filePath, "utf-8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      return [];
+      return { entries: [] };
     }
     throw new Session("failed to read trust store", err, {
       code: "TrustStoreUnavailable",
@@ -95,8 +157,15 @@ async function loadEntries(filePath: string): Promise<TrustEntry[]> {
     });
   }
   try {
-    return JSON.parse(raw) as TrustEntry[];
+    return normalizeDocument(JSON.parse(raw) as unknown);
   } catch (err) {
+    if (err instanceof Session) {
+      throw new Session("trust store contains malformed JSON", err, {
+        code: "TrustStoreUnavailable",
+        path: filePath,
+      });
+    }
+
     throw new Session("trust store contains malformed JSON", err, {
       code: "TrustStoreUnavailable",
       path: filePath,
@@ -107,8 +176,151 @@ async function loadEntries(filePath: string): Promise<TrustEntry[]> {
 /**
  * Sort entries lexicographically by `canonicalPath` (post-condition of `list`).
  */
-function sortedEntries(entries: TrustEntry[]): TrustEntry[] {
-  return [...entries].sort((a, b) => a.canonicalPath.localeCompare(b.canonicalPath));
+function latestDecisions(entries: readonly TrustDecisionEntry[]): Map<string, TrustDecisionEntry> {
+  const latest = new Map<string, TrustDecisionEntry>();
+  for (const entry of entries) {
+    validateDecisionEntry(entry);
+    const existing = latest.get(entry.canonicalPath);
+    if (existing === undefined || existing.grantedAt <= entry.grantedAt) {
+      latest.set(entry.canonicalPath, entry);
+    }
+  }
+  return latest;
+}
+
+function trustedView(entries: readonly TrustDecisionEntry[]): TrustEntry[] {
+  return [...latestDecisions(entries).values()]
+    .filter((entry) => entry.decision === "trusted")
+    .sort((a, b) => a.canonicalPath.localeCompare(b.canonicalPath))
+    .map((entry) => ({
+      canonicalPath: entry.canonicalPath,
+      grantedAt: entry.grantedAt,
+      kind: "project",
+    }));
+}
+
+function assertGlobalTrustPath(trustJsonPath: string, userHome: string | undefined): void {
+  if (
+    isUnderStudDir(trustJsonPath) &&
+    resolve(trustJsonPath) !== canonicalHomeTrustPath(userHome)
+  ) {
+    throw new Validation(
+      `trustJsonPath '${trustJsonPath}' is under a .stud/ directory; ` +
+        "the trust store must reside in the global scope",
+      undefined,
+      { code: "TrustScopeViolation", trustJsonPath },
+    );
+  }
+}
+
+function sortedDecisionEntries(entries: readonly TrustDecisionEntry[]): TrustDecisionEntry[] {
+  return [...entries].sort((a, b) => {
+    if (a.canonicalPath === b.canonicalPath) {
+      return a.grantedAt.localeCompare(b.grantedAt);
+    }
+    return a.canonicalPath.localeCompare(b.canonicalPath);
+  });
+}
+
+function serializeDocument(document: TrustListDocument): string {
+  return JSON.stringify({ entries: sortedDecisionEntries(document.entries) }, null, 2);
+}
+
+async function persistDocument(trustJsonPath: string, document: TrustListDocument): Promise<void> {
+  try {
+    await atomicWrite(trustJsonPath, serializeDocument(document));
+  } catch (err) {
+    if (err instanceof Session) {
+      throw err;
+    }
+    throw new Session("failed to write trust store", err, {
+      code: "TrustStoreUnavailable",
+      path: trustJsonPath,
+    });
+  }
+}
+
+function validateCanonicalPath(canonicalPath: string): void {
+  if (!canonicalPath || !isAbsolute(canonicalPath)) {
+    throw new Validation("trust entry canonicalPath must be a non-empty absolute path", undefined, {
+      code: "TrustEntryInvalid",
+      canonicalPath,
+    });
+  }
+}
+
+function trustedDecision(entry: TrustEntry): TrustDecisionEntry {
+  return {
+    canonicalPath: entry.canonicalPath,
+    decision: "trusted",
+    grantedAt: entry.grantedAt,
+    schemaVersion: 1,
+  };
+}
+
+function declinedDecision(
+  canonicalPath: string,
+  grantedAt: string,
+  note?: string,
+): TrustDecisionEntry {
+  return {
+    canonicalPath,
+    decision: "declined",
+    grantedAt,
+    schemaVersion: 1,
+    ...(note !== undefined ? { note } : {}),
+  };
+}
+
+function createTrustStore(trustJsonPath: string, initialDocument: TrustListDocument): TrustStore {
+  let document = initialDocument;
+  const isTrusted = (canonicalPath: string): boolean =>
+    latestDecisions(document.entries).get(canonicalPath)?.decision === "trusted";
+
+  return {
+    list(): readonly TrustEntry[] {
+      return trustedView(document.entries);
+    },
+
+    has(canonicalPath: string): boolean {
+      return isTrusted(canonicalPath);
+    },
+
+    async grant(entry: TrustEntry): Promise<void> {
+      validateEntry(entry);
+      // Idempotency: if already trusted, retain the original grantedAt.
+      if (isTrusted(entry.canonicalPath)) {
+        return;
+      }
+      document = { entries: [...document.entries, trustedDecision(entry)] };
+      await persistDocument(trustJsonPath, document);
+    },
+
+    async recordDecline(canonicalPath: string, declinedAt: string, note?: string): Promise<void> {
+      validateCanonicalPath(canonicalPath);
+      document = {
+        entries: [...document.entries, declinedDecision(canonicalPath, declinedAt, note)],
+      };
+      await persistDocument(trustJsonPath, document);
+    },
+
+    async revoke(canonicalPath: string): Promise<void> {
+      if (!isTrusted(canonicalPath)) {
+        return;
+      }
+      document = {
+        entries: [...document.entries, declinedDecision(canonicalPath, new Date().toISOString())],
+      };
+      await persistDocument(trustJsonPath, document);
+    },
+
+    async clearAll(): Promise<void> {
+      document = { entries: [] };
+      await persistDocument(trustJsonPath, document);
+      // Remove the temp file if it was left behind (best-effort cleanup).
+      await rm(`${trustJsonPath}.tmp`, { force: true });
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -128,74 +340,10 @@ function sortedEntries(entries: TrustEntry[]): TrustEntry[] {
  * @throws `Validation/TrustScopeViolation` when `trustJsonPath` is under `.stud/`.
  * @throws `Session/TrustStoreUnavailable` on I/O failure during initial load.
  */
-export async function openTrustStore(trustJsonPath: string): Promise<TrustStore> {
-  // Scope invariant: reject project-scope paths.
-  if (isUnderStudDir(trustJsonPath)) {
-    throw new Validation(
-      `trustJsonPath '${trustJsonPath}' is under a .stud/ directory; ` +
-        "the trust store must reside in the global scope",
-      undefined,
-      { code: "TrustScopeViolation", trustJsonPath },
-    );
-  }
-
-  // Load existing entries (or start empty).
-  let _entries: TrustEntry[] = await loadEntries(trustJsonPath);
-
-  // ---------------------------------------------------------------------------
-  // Persistence helper — wraps I/O errors.
-  // ---------------------------------------------------------------------------
-  async function persist(): Promise<void> {
-    try {
-      await atomicWrite(trustJsonPath, JSON.stringify(sortedEntries(_entries), null, 2));
-    } catch (err) {
-      if (err instanceof Session) {
-        throw err;
-      }
-      throw new Session("failed to write trust store", err, {
-        code: "TrustStoreUnavailable",
-        path: trustJsonPath,
-      });
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // TrustStore implementation
-  // ---------------------------------------------------------------------------
-  const store: TrustStore = {
-    list(): readonly TrustEntry[] {
-      return sortedEntries(_entries);
-    },
-
-    has(canonicalPath: string): boolean {
-      return _entries.some((e) => e.canonicalPath === canonicalPath);
-    },
-
-    async grant(entry: TrustEntry): Promise<void> {
-      validateEntry(entry);
-      // Idempotency: if already present, retain original grantedAt.
-      if (_entries.some((e) => e.canonicalPath === entry.canonicalPath)) {
-        return;
-      }
-      _entries = [..._entries, entry];
-      await persist();
-    },
-
-    async revoke(canonicalPath: string): Promise<void> {
-      const before = _entries.length;
-      _entries = _entries.filter((e) => e.canonicalPath !== canonicalPath);
-      if (_entries.length !== before) {
-        await persist();
-      }
-    },
-
-    async clearAll(): Promise<void> {
-      _entries = [];
-      await persist();
-      // Remove the temp file if it was left behind (best-effort cleanup).
-      await rm(`${trustJsonPath}.tmp`, { force: true });
-    },
-  };
-
-  return store;
+export async function openTrustStore(
+  trustJsonPath: string,
+  options: { readonly userHome?: string } = {},
+): Promise<TrustStore> {
+  assertGlobalTrustPath(trustJsonPath, options.userHome);
+  return createTrustStore(trustJsonPath, await loadEntries(trustJsonPath));
 }

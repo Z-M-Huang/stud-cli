@@ -121,6 +121,16 @@ describe("openTrustStore — scope validation", () => {
       return true;
     });
   });
+
+  it("allows the configured user-global ~/.stud/trust.json path", async () => {
+    const scope = await tempGlobalScope();
+    after(() => scope.cleanup());
+
+    const path = `${scope.root}/.stud/trust.json`;
+    const store = await openTrustStore(path, { userHome: scope.root });
+    await store.clearAll();
+    assert.deepEqual(store.list(), []);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -51,7 +51,19 @@ Most coding CLIs hard-wire one provider, one toolset, and one workflow — integ
 
 ## Status
 
-`0.0.1` is a **name reservation** on npm. No usable features ship yet; the architecture is being stood up first.
+`0.0.1` is still **pre-release**, but the CLI is no longer just a placeholder. The current source tree now includes a real bootstrap slice:
+
+- `stud-cli` can run a first-run provider setup flow and write `~/.stud/settings.json`.
+- entering a directory with `<cwd>/.stud/` now triggers a real project-trust decision before project settings are read.
+- `stud-cli --version` and `stud-cli --help` work again.
+- a minimal interactive chat loop now starts after bootstrap.
+
+What is still incomplete:
+
+- `--continue` still returns `Session/ResumeMismatch`.
+- `--headless` session execution is not wired yet.
+- bundled-provider quality is uneven: `openai-compatible`, `gemini`, and `cli-wrapper` are the practical paths today; the Anthropic adapter is still incomplete.
+- the full extension-discovery/runtime graph described in the wiki is not what the CLI boot path uses yet; bundled providers are statically registered for now.
 
 | Phase                                 | Scope                                                               | State       |
 | ------------------------------------- | ------------------------------------------------------------------- | ----------- |
@@ -70,14 +82,26 @@ Track progress on [GitHub Issues](https://github.com/Z-M-Huang/stud-cli/issues) 
 npm install -g stud-cli
 ```
 
-> `0.0.1` is a placeholder release. Installing gives you a CLI that prints its version and a status notice — nothing else yet.
-
 ## Usage
 
 ```bash
-stud-cli            # prints a placeholder notice
-stud-cli --version  # prints the current version
+stud-cli
+stud-cli --help
+stud-cli --version
 ```
+
+On a fresh machine the CLI now prompts for:
+
+1. a provider selection
+2. a provider auth path
+3. project trust when `<cwd>/.stud/` exists
+
+The resulting global files live under `~/.stud/`:
+
+- `settings.json` for provider selection and config
+- `trust.json` for project trust decisions
+- `secrets.json` for locally stored secret references used by non-env auth paths
+- `audit.jsonl` for bootstrap-side audit records
 
 ## Architecture
 

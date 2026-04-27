@@ -1,7 +1,15 @@
 import type { AnthropicConfig } from "./config.schema.js";
 import type { HostAPI } from "../../../core/host/host-api.js";
 
-export async function init(_host: HostAPI, _config: AnthropicConfig): Promise<void> {
+const configsByHost = new WeakMap<HostAPI, AnthropicConfig>();
+const disposedHosts = new WeakSet<HostAPI>();
+
+export function configForHost(host: HostAPI): AnthropicConfig | undefined {
+  return configsByHost.get(host);
+}
+
+export async function init(host: HostAPI, config: AnthropicConfig): Promise<void> {
+  configsByHost.set(host, config);
   return Promise.resolve();
 }
 
@@ -13,13 +21,12 @@ export async function deactivate(_host: HostAPI): Promise<void> {
   return Promise.resolve();
 }
 
-let disposed = false;
-
-export async function dispose(_host: HostAPI): Promise<void> {
-  if (disposed) {
+export async function dispose(host: HostAPI): Promise<void> {
+  if (disposedHosts.has(host)) {
     return Promise.resolve();
   }
 
-  disposed = true;
+  disposedHosts.add(host);
+  configsByHost.delete(host);
   return Promise.resolve();
 }
