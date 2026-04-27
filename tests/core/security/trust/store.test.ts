@@ -13,7 +13,7 @@
  */
 
 import assert from "node:assert/strict";
-import { writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { after, describe, it } from "node:test";
 
 import { Session } from "../../../../src/core/errors/session.js";
@@ -106,6 +106,41 @@ describe("openTrustStore — clearAll", () => {
     assert.deepEqual(store.list(), []);
     const reopened = await openTrustStore(path);
     assert.deepEqual(reopened.list(), []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Legacy document migration
+// ---------------------------------------------------------------------------
+
+describe("openTrustStore — legacy document migration", () => {
+  it("loads the legacy array format as trusted decisions", async () => {
+    const scope = await tempGlobalScope();
+    after(() => scope.cleanup());
+
+    const path = `${scope.root}/trust.json`;
+    await writeFile(
+      path,
+      JSON.stringify([
+        {
+          canonicalPath: "/legacy/project/.stud",
+          grantedAt: "2026-04-19T00:00:00Z",
+          kind: "project",
+        },
+      ]),
+      "utf-8",
+    );
+
+    const store = await openTrustStore(path);
+
+    assert.equal(store.has("/legacy/project/.stud"), true);
+    assert.deepEqual(store.list(), [
+      {
+        canonicalPath: "/legacy/project/.stud",
+        grantedAt: "2026-04-19T00:00:00Z",
+        kind: "project",
+      },
+    ]);
   });
 });
 
@@ -241,6 +276,56 @@ describe("openTrustStore — revoke", () => {
 });
 
 // ---------------------------------------------------------------------------
+// recordDecline
+// ---------------------------------------------------------------------------
+
+describe("openTrustStore — recordDecline", () => {
+  it("persists a decline decision and removes the path from the trusted view", async () => {
+    const scope = await tempGlobalScope();
+    after(() => scope.cleanup());
+
+    const path = `${scope.root}/trust.json`;
+    const store = await openTrustStore(path);
+    await store.grant({
+      canonicalPath: "/declined/project/.stud",
+      grantedAt: "2026-04-19T00:00:00Z",
+      kind: "project",
+    });
+    await store.recordDecline(
+      "/declined/project/.stud",
+      "2026-04-20T00:00:00Z",
+      "user declined project scope",
+    );
+
+    assert.equal(store.has("/declined/project/.stud"), false);
+    assert.deepEqual(store.list(), []);
+
+    const document = JSON.parse(await readFile(path, "utf-8")) as {
+      readonly entries: readonly { readonly note?: string }[];
+    };
+    assert.equal(document.entries.at(-1)?.note, "user declined project scope");
+
+    const reopened = await openTrustStore(path);
+    assert.equal(reopened.has("/declined/project/.stud"), false);
+  });
+
+  it("rejects a relative canonicalPath", async () => {
+    const scope = await tempGlobalScope();
+    after(() => scope.cleanup());
+
+    const store = await openTrustStore(`${scope.root}/trust.json`);
+    await assert.rejects(
+      store.recordDecline("relative/project/.stud", "2026-04-20T00:00:00Z"),
+      (err: unknown) => {
+        assert.ok(err instanceof Validation);
+        assert.equal(err.context["code"], "TrustEntryInvalid");
+        return true;
+      },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Entry validation — invalid kind
 // ---------------------------------------------------------------------------
 
@@ -282,6 +367,61 @@ describe("openTrustStore — malformed JSON", () => {
       assert.equal(err.context["code"], "TrustStoreUnavailable");
       return true;
     });
+  });
+
+  it("well-formed JSON with the wrong shape throws Session/TrustStoreUnavailable", async () => {
+    const scope = await tempGlobalScope();
+    after(() => scope.cleanup());
+
+    const path = `${scope.root}/trust.json`;
+    await writeFile(path, "42", "utf-8");
+
+    await assert.rejects(openTrustStore(path), (err: unknown) => {
+      assert.ok(err instanceof Session);
+      assert.equal(err.context["code"], "TrustStoreUnavailable");
+      return true;
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// I/O failures
+// ---------------------------------------------------------------------------
+
+describe("openTrustStore — I/O failures", () => {
+  it("non-ENOENT read errors throw Session/TrustStoreUnavailable", async () => {
+    const scope = await tempGlobalScope();
+    after(() => scope.cleanup());
+
+    await assert.rejects(openTrustStore(scope.root), (err: unknown) => {
+      assert.ok(err instanceof Session);
+      assert.equal(err.context["code"], "TrustStoreUnavailable");
+      assert.equal(err.context["path"], scope.root);
+      return true;
+    });
+  });
+
+  it("write errors throw Session/TrustStoreUnavailable", async () => {
+    const scope = await tempGlobalScope();
+    after(() => scope.cleanup());
+
+    const path = `${scope.root}/trust.json`;
+    const store = await openTrustStore(path);
+    await mkdir(`${path}.tmp`);
+
+    await assert.rejects(
+      store.grant({
+        canonicalPath: "/write/failure/.stud",
+        grantedAt: "2026-04-19T00:00:00Z",
+        kind: "project",
+      }),
+      (err: unknown) => {
+        assert.ok(err instanceof Session);
+        assert.equal(err.context["code"], "TrustStoreUnavailable");
+        assert.equal(err.context["path"], path);
+        return true;
+      },
+    );
   });
 });
 
