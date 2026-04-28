@@ -32,9 +32,9 @@ describe("default console UI runtime", () => {
     });
 
     assert.equal(output().includes("stud-cli"), true);
-    assert.equal(output().includes("session: s1"), true);
-    assert.equal(output().includes("model: gpt-5.4"), true);
-    assert.equal(output().includes("cwd: /repo"), true);
+    assert.equal(output().includes("session s1"), true);
+    assert.equal(output().includes("model gpt-5.4"), true);
+    assert.equal(output().includes("cwd /repo"), true);
     assert.equal(output().includes("/tools"), true);
   });
 
@@ -63,14 +63,17 @@ describe("default console UI runtime", () => {
       },
     ]);
 
-    assert.equal(output().includes("Previous conversation:"), true);
-    assert.equal(output().includes("user: first request"), true);
-    assert.equal(output().includes("assistant: I will inspect the repo."), true);
-    assert.equal(output().includes("  [using read]"), true);
-    assert.equal(output().includes("tool: [read result] README contents"), true);
+    assert.equal(output().includes("previous conversation (3)"), true);
+    assert.equal(output().includes("user #1"), true);
+    assert.equal(output().includes("first request"), true);
+    assert.equal(output().includes("assistant #2"), true);
+    assert.equal(output().includes("I will inspect the repo."), true);
+    assert.equal(output().includes("[using read]"), true);
+    assert.equal(output().includes("tool #3"), true);
+    assert.equal(output().includes("[read result] README contents"), true);
   });
 
-  it("renders assistant deltas and tool calls on one assistant line", () => {
+  it("renders assistant deltas, tool calls, and tool status", () => {
     const { ui, output } = captureUI();
 
     ui.appendAssistantDelta("I will inspect it.");
@@ -78,8 +81,8 @@ describe("default console UI runtime", () => {
     ui.endAssistant();
     ui.renderToolStart("read");
 
-    assert.equal(output().includes("assistant: I will inspect it. [using read]\n"), true);
-    assert.equal(output().includes("tool: read\n"), true);
+    assert.equal(output().includes("assistant\n  I will inspect it.\n  [tool call] read\n"), true);
+    assert.equal(output().includes("tool read running\n"), true);
   });
 
   it("renders explicit no-output assistant turns", () => {
@@ -87,6 +90,6 @@ describe("default console UI runtime", () => {
 
     ui.endAssistant();
 
-    assert.equal(output(), "assistant: (no output)\n");
+    assert.equal(output(), "\nassistant\n  (no output)\n");
   });
 });

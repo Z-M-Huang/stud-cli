@@ -160,8 +160,8 @@ describe("CLI filesystem session persistence", () => {
         String(message["content"]),
       );
       assert.equal(handle?.session.id, "session-resume");
-      assert.equal(stdout.includes("Previous conversation:"), true);
-      assert.equal(stdout.includes("user: first"), true);
+      assert.equal(stdout.includes("previous conversation"), true);
+      assert.equal(stdout.includes("first"), true);
       assert.equal(
         contents.some((content) => content.includes("first")),
         true,

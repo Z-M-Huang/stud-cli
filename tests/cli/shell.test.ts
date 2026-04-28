@@ -336,7 +336,7 @@ describe("runShell (bootstrap session)", () => {
         });
       });
       assert.equal(stdout.includes("stud-cli"), true);
-      assert.equal(stdout.includes("assistant: "), true);
+      assert.equal(stdout.includes("assistant\n"), true);
       assert.equal(stdout.includes("stud-cli:"), true);
     });
   });
@@ -358,8 +358,8 @@ describe("runShell (bootstrap session)", () => {
             sessionIdFactory: () => "session-tools",
           });
         });
-        assert.equal(stdout.includes("assistant: [using read]"), true);
-        assert.equal(stdout.includes("tool: read"), true);
+        assert.equal(stdout.includes("assistant\n  [tool call] read"), true);
+        assert.equal(stdout.includes("  tool read running"), true);
         assert.equal(stdout.includes("This project is a CLI workspace test."), true);
       });
     } finally {
