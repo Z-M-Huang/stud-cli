@@ -298,7 +298,7 @@ function createConnector(
       });
     }
 
-    const client = new Client({ name: "stud-cli", version: "0.0.1" });
+    const client = new Client({ name: "stud-cli", version: "0.1.0" });
     const transport = createTransport(config);
     transport.onclose = () => {
       connections.delete(id);

@@ -1,6 +1,6 @@
 {
   "name": "stud-cli",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A bare-bones, 100% customizable and extensible coding CLI tool. Placeholder release — architecture in progress.",
   "bin": {
     "stud-cli": "bin/stud-cli.js"

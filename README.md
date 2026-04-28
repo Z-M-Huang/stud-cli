@@ -51,7 +51,7 @@ Most coding CLIs hard-wire one provider, one toolset, and one workflow — integ
 
 ## Status
 
-`0.0.1` is still **pre-release**, but the CLI is no longer just a placeholder. The current source tree now includes a real bootstrap slice:
+`0.1.0` is still **pre-release**, but the CLI is no longer just a placeholder. The current source tree now includes a real bootstrap slice:
 
 - `stud-cli` can run a first-run provider setup flow and write `~/.stud/settings.json`.
 - entering a directory with `<cwd>/.stud/` now triggers a real project-trust decision before project settings are read.
