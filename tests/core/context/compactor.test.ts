@@ -28,6 +28,12 @@ interface HistoryMessage {
   readonly turnId: string;
 }
 
+interface LooseHistoryMessage {
+  readonly role: "system" | "user" | "assistant" | "tool";
+  readonly content: unknown;
+  readonly turnId?: string;
+}
+
 interface MockAuditWriter {
   readonly records: readonly AuditRecord[];
   write(record: AuditRecord): Promise<void>;
@@ -54,6 +60,12 @@ function mockAudit(): MockAuditWriter {
       return Promise.resolve();
     },
   };
+}
+
+function asHistory(
+  messages: readonly LooseHistoryMessage[],
+): Parameters<typeof compactHistory>[0]["history"] {
+  return messages as unknown as Parameters<typeof compactHistory>[0]["history"];
 }
 
 describe("hasOverflow", () => {
@@ -109,6 +121,76 @@ describe("compactHistory", () => {
     assert.deepEqual(
       out.messages.map((message) => message.content),
       ["SUMMARY", "Understood.", "m2"],
+    );
+  });
+});
+
+describe("compactHistory content normalization", () => {
+  it("handles primitive and unserializable content while estimating tokens", async () => {
+    const cyclic: { self?: unknown } = {};
+    cyclic.self = cyclic;
+    const history = asHistory([
+      { role: "user", content: null },
+      { role: "assistant", content: 42 },
+      { role: "user", content: true },
+      { role: "assistant", content: 10n },
+      { role: "user", content: cyclic },
+    ]);
+
+    const out = await compactHistory({
+      history,
+      targetTokens: 20,
+      summarize: () => Promise.reject(new Error("should not summarize")),
+      audit: mockAudit(),
+      eventBus: stubBus(),
+    });
+
+    assert.equal(out.messages.length, history.length);
+  });
+
+  it("normalizes non-string recent content after compaction", async () => {
+    const out = await compactHistory({
+      history: asHistory([
+        { role: "user", content: "older", turnId: "older" },
+        { role: "assistant", content: "older response", turnId: "older" },
+        { role: "user", content: { purpose: "recent" }, turnId: "recent" },
+      ]),
+      targetTokens: 4,
+      summarize: () => Promise.resolve("SUMMARY"),
+      audit: mockAudit(),
+      eventBus: stubBus(),
+    });
+
+    assert.deepEqual(
+      out.messages.map((message) => message.content),
+      ["SUMMARY", "Understood.", '{"purpose":"recent"}'],
+    );
+  });
+
+  it("flattens array content from the compacted recent window", async () => {
+    const out = await compactHistory({
+      history: asHistory([
+        { role: "user", content: "older", turnId: "older" },
+        { role: "assistant", content: "older response", turnId: "older" },
+        {
+          role: "user",
+          content: [
+            { text: "text part" },
+            { content: "content part" },
+            { type: "metadata", value: 7 },
+          ],
+          turnId: "recent",
+        },
+      ]),
+      targetTokens: 5,
+      summarize: () => Promise.resolve("SUMMARY"),
+      audit: mockAudit(),
+      eventBus: stubBus(),
+    });
+
+    assert.equal(
+      out.messages.at(-1)?.content,
+      'text part\ncontent part\n{"type":"metadata","value":7}',
     );
   });
 });
