@@ -146,17 +146,22 @@ describe("CLI filesystem session persistence", () => {
         sessionIdFactory: () => "session-resume",
       });
 
-      const handle = await runShell(launchArgs(projectRoot, { continue: true }), {
-        homedir: () => home,
-        prompt: new ScriptedPrompt(["second", "/exit"]),
-        sessionIdFactory: () => "unused-new-id",
+      let handle: Awaited<ReturnType<typeof runShell>> | undefined;
+      const stdout = await captureStdout(async () => {
+        handle = await runShell(launchArgs(projectRoot, { continue: true }), {
+          homedir: () => home,
+          prompt: new ScriptedPrompt(["second", "/exit"]),
+          sessionIdFactory: () => "unused-new-id",
+        });
       });
 
       const manifest = await readPersistedManifest(home, "session-resume");
       const contents = (manifest["messages"] as readonly Record<string, unknown>[]).map((message) =>
         String(message["content"]),
       );
-      assert.equal(handle.session.id, "session-resume");
+      assert.equal(handle?.session.id, "session-resume");
+      assert.equal(stdout.includes("Previous conversation:"), true);
+      assert.equal(stdout.includes("user: first"), true);
       assert.equal(
         contents.some((content) => content.includes("first")),
         true,

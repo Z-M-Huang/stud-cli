@@ -1,8 +1,11 @@
+import { compactMessages } from "agentool/context-compaction";
+
 import { ProviderTransient, Validation } from "../errors/index.js";
 
 import type { ChatMessage } from "./assembler.ts";
 import type { hasOverflow as HasOverflow } from "./memory.ts";
 import type { EventBus, EventEnvelope } from "../events/bus.ts";
+import type { ModelMessage } from "ai";
 
 interface MemoryModule {
   readonly hasOverflow: typeof HasOverflow;
@@ -31,6 +34,24 @@ export interface CompactedHistory {
 }
 
 type MessageWithTurnId = ChatMessage & { readonly turnId?: string };
+type ModelMessageWithTurnId = ModelMessage & { readonly turnId?: string };
+
+function stringifyUnknown(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "[unserializable]";
+  }
+}
 
 function emit(eventBus: EventBus, name: string, payload: Record<string, unknown>): void {
   const envelope: EventEnvelope = {
@@ -42,18 +63,25 @@ function emit(eventBus: EventBus, name: string, payload: Record<string, unknown>
   eventBus.emit(envelope);
 }
 
-function estimateTokens(messages: readonly ChatMessage[]): number {
+function contentTokens(content: unknown): number {
+  const text = stringifyUnknown(content);
+  return Math.max(1, Math.ceil(text.length / 1000));
+}
+
+function estimateModelTokens(messages: readonly ModelMessage[]): number {
   return messages.reduce((sum, message) => {
-    const messageWithTurnId = message as MessageWithTurnId;
-    const contentTokens = Math.max(1, Math.ceil(message.content.length / 1000));
+    const messageWithTurnId = message as ModelMessageWithTurnId;
+    const tokens = contentTokens((message as { readonly content?: unknown }).content);
     const turnIdTokens = typeof messageWithTurnId.turnId === "string" ? 1 : 0;
-    return sum + contentTokens + turnIdTokens;
+    return sum + tokens + turnIdTokens;
   }, 0);
 }
 
-function collectOriginalTurnIds(messages: readonly ChatMessage[]): readonly string[] {
+function collectOriginalTurnIds(
+  messages: readonly (ChatMessage | ModelMessage)[],
+): readonly string[] {
   const ids = new Set<string>();
-  for (const message of messages as readonly MessageWithTurnId[]) {
+  for (const message of messages as readonly (MessageWithTurnId | ModelMessageWithTurnId)[]) {
     if (typeof message.turnId === "string" && message.turnId.length > 0) {
       ids.add(message.turnId);
     }
@@ -63,13 +91,6 @@ function collectOriginalTurnIds(messages: readonly ChatMessage[]): readonly stri
 
 function exceedsTarget(tokens: number, targetTokens: number): boolean {
   return memoryModule.hasOverflow(tokens, targetTokens);
-}
-
-function createSummaryMessage(summary: string, originalTurnIds: readonly string[]): ChatMessage {
-  return {
-    role: "assistant",
-    content: `${summary}\n\n[metadata:${JSON.stringify({ originalTurnIds })}]`,
-  };
 }
 
 async function summarizeSegment(
@@ -85,6 +106,69 @@ async function summarizeSegment(
   }
 }
 
+function toModelMessage(message: ChatMessage): ModelMessage {
+  const withTurnId = message as MessageWithTurnId;
+  return {
+    role: message.role,
+    content: message.content,
+    ...(withTurnId.turnId === undefined ? {} : { turnId: withTurnId.turnId }),
+  } as unknown as ModelMessage;
+}
+
+function contentToText(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return stringifyUnknown(content);
+  }
+  return content
+    .map((part) => {
+      const record = part as Readonly<Record<string, unknown>>;
+      if (typeof record["text"] === "string") return record["text"];
+      if (typeof record["content"] === "string") return record["content"];
+      return JSON.stringify(record);
+    })
+    .join("\n");
+}
+
+function toChatMessage(message: ModelMessage): ChatMessage {
+  const record = message as Readonly<Record<string, unknown>>;
+  return {
+    role: record["role"] as ChatMessage["role"],
+    content: contentToText(record["content"]),
+  };
+}
+
+function summaryTargetTokens(maxContextTokens: number): number {
+  return Math.max(1, Math.min(maxContextTokens - 1, Math.floor(maxContextTokens * 0.2)));
+}
+
+async function compactWithAgentool(input: CompactorInput): Promise<{
+  readonly messages: readonly ModelMessage[];
+  readonly summarySegments: CompactedHistory["summarySegments"];
+}> {
+  const messages = input.history.map(toModelMessage);
+  const summarySegments: CompactedHistory["summarySegments"][number][] = [];
+  const maxContextTokens = Math.max(input.targetTokens, 2);
+  const compacted = await compactMessages({
+    messages,
+    maxContextTokens,
+    autoCompactThresholdPct: input.targetTokens / maxContextTokens,
+    reservedOutputTokens: 0,
+    summaryTargetTokens: summaryTargetTokens(maxContextTokens),
+    keepRecentMessages: 1,
+    estimateTokens: estimateModelTokens,
+    onCompactionFailure: "throw",
+    summarize: async (olderHistory) => {
+      const summary = await summarizeSegment(olderHistory.map(toChatMessage), input.summarize);
+      summarySegments.push({ summary, originalTurnIds: collectOriginalTurnIds(olderHistory) });
+      return summary;
+    },
+  });
+  return { messages: compacted, summarySegments };
+}
+
 function validateTargetTokens(targetTokens: number): void {
   if (!Number.isInteger(targetTokens) || targetTokens <= 0) {
     throw new Validation("targetTokens must be a positive integer", undefined, {
@@ -97,7 +181,7 @@ function validateTargetTokens(targetTokens: number): void {
 export async function compactHistory(input: CompactorInput): Promise<CompactedHistory> {
   validateTargetTokens(input.targetTokens);
 
-  const originalTokens = estimateTokens(input.history);
+  const originalTokens = estimateModelTokens(input.history.map(toModelMessage));
   emit(input.eventBus, "CompactionInvoked", {
     totalTokens: originalTokens,
     targetTokens: input.targetTokens,
@@ -122,36 +206,21 @@ export async function compactHistory(input: CompactorInput): Promise<CompactedHi
     return result;
   }
 
-  const summarySegments: {
-    readonly summary: string;
-    readonly originalTurnIds: readonly string[];
-  }[] = [];
-
-  let compactedMessages = [...input.history];
-
-  if (compactedMessages.length > 1) {
-    const segment = compactedMessages.slice(0, -1);
-    const originalTurnIds = collectOriginalTurnIds(segment);
-    const summary = await summarizeSegment(segment, input.summarize);
-    summarySegments.push({ summary, originalTurnIds });
-    compactedMessages = [createSummaryMessage(summary, originalTurnIds), compactedMessages.at(-1)!];
-  } else if (compactedMessages.length === 1) {
-    const originalTurnIds = collectOriginalTurnIds(compactedMessages);
-    const summary = await summarizeSegment(compactedMessages, input.summarize);
-    summarySegments.push({ summary, originalTurnIds });
-    compactedMessages = [createSummaryMessage(summary, originalTurnIds)];
+  let compacted;
+  try {
+    compacted = await compactWithAgentool(input);
+  } catch (error) {
+    if (error instanceof ProviderTransient) {
+      throw error;
+    }
+    throw new Validation("compacted history still exceeds target token budget", error, {
+      code: "ContextOverflow",
+      originalTokens,
+      targetTokens: input.targetTokens,
+    });
   }
 
-  let compactedTokens = estimateTokens(compactedMessages);
-
-  if (exceedsTarget(compactedTokens, input.targetTokens) && compactedMessages.length > 0) {
-    const originalTurnIds = collectOriginalTurnIds(compactedMessages);
-    const summary = await summarizeSegment(compactedMessages, input.summarize);
-    summarySegments.push({ summary, originalTurnIds });
-    compactedMessages = [createSummaryMessage(summary, originalTurnIds)];
-    compactedTokens = estimateTokens(compactedMessages);
-  }
-
+  const compactedTokens = estimateModelTokens(compacted.messages);
   if (exceedsTarget(compactedTokens, input.targetTokens)) {
     throw new Validation("compacted history still exceeds target token budget", undefined, {
       code: "ContextOverflow",
@@ -162,18 +231,18 @@ export async function compactHistory(input: CompactorInput): Promise<CompactedHi
   }
 
   const result: CompactedHistory = {
-    messages: compactedMessages,
-    summarySegments,
+    messages: compacted.messages.map(toChatMessage),
+    summarySegments: compacted.summarySegments,
   };
 
   emit(input.eventBus, "CompactionPerformed", {
-    segmentsCompacted: summarySegments.length,
+    segmentsCompacted: compacted.summarySegments.length,
     originalTokens,
     compactedTokens,
   });
   await input.audit.write({
     class: "Compaction",
-    segmentsCompacted: summarySegments.length,
+    segmentsCompacted: compacted.summarySegments.length,
     originalTokens,
     compactedTokens,
   });

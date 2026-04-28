@@ -1,6 +1,7 @@
 import { join } from "node:path";
 
 import { Session, ToolTerminal } from "../../core/errors/index.js";
+import { createDefaultConsoleUI } from "../../extensions/ui/default-tui/index.js";
 
 import { providerLabel } from "./bootstrap.js";
 import { createProviderHost } from "./provider-host.js";
@@ -32,21 +33,8 @@ import type {
 } from "../../contracts/providers.js";
 import type { SessionManifest } from "../../contracts/session-store.js";
 import type { HostAPI } from "../../core/host/host-api.js";
+import type { DefaultConsoleUI } from "../../extensions/ui/default-tui/index.js";
 import type { PromptIO } from "../prompt.js";
-
-function sessionBanner(session: SessionBootstrap): string {
-  return [
-    "stud-cli",
-    `  session: ${session.sessionId}`,
-    `  provider: ${providerLabel(session.provider.providerId)}`,
-    `  model: ${session.provider.modelId}`,
-    `  mode: ${session.securityMode}`,
-    `  project trust: ${session.projectTrusted ? "granted" : "global-only"}`,
-    "",
-    "Type `/exit` to quit.",
-    "",
-  ].join("\n");
-}
 
 function renderTurnError(session: SessionBootstrap, error: unknown): string {
   const code =
@@ -161,14 +149,13 @@ async function runAssistantIteration(args: {
   readonly host: HostAPI;
   readonly history: ProviderMessage[];
   readonly toolDefinitions: readonly ProviderToolDefinition[];
-  readonly deps: ResolvedShellDeps;
+  readonly ui: DefaultConsoleUI;
 }): Promise<{
   readonly assistantMessage: ProviderMessage;
   readonly finishReason: "stop" | "tool-calls" | "length" | "content-filter" | "error" | "other";
   readonly toolCalls: readonly Extract<ProviderContentPart, { type: "tool-call" }>[];
 }> {
   let assistantText = "";
-  let assistantLineOpen = false;
   let finishReason: "stop" | "tool-calls" | "length" | "content-filter" | "error" | "other" =
     "stop";
   const toolCalls: Extract<ProviderContentPart, { type: "tool-call" }>[] = [];
@@ -186,12 +173,8 @@ async function runAssistantIteration(args: {
       finishReason = event.reason;
       continue;
     }
-    if (!assistantLineOpen) {
-      args.deps.stdout.write("assistant: ");
-      assistantLineOpen = true;
-    }
     if (event.type === "tool-call") {
-      args.deps.stdout.write(`${toolCalls.length > 0 ? " " : ""}[using ${event.toolName}]`);
+      args.ui.appendAssistantToolCall(event.toolName);
       toolCalls.push({
         type: "tool-call",
         toolCallId: event.toolCallId,
@@ -203,10 +186,10 @@ async function runAssistantIteration(args: {
 
     const delta = event.type === "text-delta" ? event.delta : event.delta;
     assistantText += event.type === "text-delta" ? event.delta : "";
-    args.deps.stdout.write(delta);
+    args.ui.appendAssistantDelta(delta);
   }
 
-  args.deps.stdout.write(assistantLineOpen ? "\n" : "assistant: (no output)\n");
+  args.ui.endAssistant();
   return {
     assistantMessage: {
       role: "assistant",
@@ -225,6 +208,7 @@ async function resolveToolCallResult(args: {
   readonly approvalCache: ReturnType<typeof createApprovalCache>;
   readonly workspaceRoot: string;
   readonly deps: ResolvedShellDeps;
+  readonly ui: DefaultConsoleUI;
 }): Promise<RuntimeToolResult> {
   const tool = args.toolMap.get(args.call.toolName);
   if (tool === undefined) {
@@ -265,7 +249,7 @@ async function resolveToolCallResult(args: {
     };
   }
 
-  args.deps.stdout.write(`tool: ${tool.id}\n`);
+  args.ui.renderToolStart(tool.id);
   return tool.execute(normalized.value, args.call.toolCallId);
 }
 
@@ -279,6 +263,7 @@ async function continueAssistantTurn(args: {
   readonly approvalCache: ReturnType<typeof createApprovalCache>;
   readonly deps: ResolvedShellDeps;
   readonly prompt: PromptIO;
+  readonly ui: DefaultConsoleUI;
 }): Promise<void> {
   const toolMap = new Map(args.tools.map((tool) => [tool.name, tool] as const));
   const workspaceRoot = sessionWorkspaceRoot(args.session, args.deps);
@@ -302,6 +287,7 @@ async function continueAssistantTurn(args: {
             approvalCache: args.approvalCache,
             workspaceRoot,
             deps: args.deps,
+            ui: args.ui,
           }),
         ),
       );
@@ -343,11 +329,23 @@ export async function runProviderSession(
 
   const history = providerMessagesFromManifest(manifest);
   const approvalCache = createApprovalCache(loadedTools);
-  deps.stdout.write(`${sessionBanner(session)}\n`);
+  const workspaceRoot = sessionWorkspaceRoot(session, deps);
+  const ui = createDefaultConsoleUI({ stdout: deps.stdout });
+  ui.renderSessionStart({
+    sessionId: session.sessionId,
+    providerLabel: providerLabel(session.provider.providerId),
+    modelId: session.provider.modelId,
+    mode: session.securityMode,
+    projectTrust: session.projectTrusted ? "granted" : "global-only",
+    cwd: workspaceRoot,
+  });
+  if (session.resumed) {
+    ui.renderHistory(history);
+  }
 
   try {
     while (true) {
-      const trimmed = (await prompt.input("user")).trim();
+      const trimmed = (await prompt.input(ui.promptLabel())).trim();
       if (trimmed.length === 0) {
         continue;
       }
@@ -383,6 +381,7 @@ export async function runProviderSession(
           approvalCache,
           deps,
           prompt,
+          ui,
         });
         manifest = await persistHistorySnapshot({ manifest, history, deps });
         await appendAudit(
@@ -390,7 +389,7 @@ export async function runProviderSession(
           sessionLifecycleAudit("SessionPersisted", session.sessionId, deps),
         );
       } catch (error) {
-        deps.stdout.write(`${renderTurnError(session, error)}\n`);
+        ui.renderTurnError(renderTurnError(session, error));
       }
     }
   } finally {

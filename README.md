@@ -56,8 +56,8 @@ Most coding CLIs hard-wire one provider, one toolset, and one workflow — integ
 - `stud-cli` can run a first-run provider setup flow and write `~/.stud/settings.json`.
 - entering a directory with `<cwd>/.stud/` now triggers a real project-trust decision before project settings are read.
 - `stud-cli --version` and `stud-cli --help` work again.
-- a minimal interactive chat loop now starts after bootstrap.
-- sessions persist under `~/.stud/sessions/<sessionId>/manifest.json`, and `stud-cli --continue` resumes the latest session.
+- the bundled default console TUI owns the session header, resumed-history replay, assistant streaming, tool-call notices, and turn errors.
+- sessions persist under `~/.stud/sessions/<sessionId>/manifest.json`, and `stud-cli --continue` resumes the latest session with prior conversation visible.
 - `--headless` consumes stdin for a single turn; interaction prompts emit a structured headless-required error unless `--yolo` is set.
 - the default runtime toolset is backed by `agentool` and includes all non-`task-*` tools (`bash`, `glob`, `grep`, `read`, `edit`, `write`, `multi-edit`, `diff`, `lsp`, `web-fetch`, `http-request`, `memory`, `sleep`, `web-search`, `tool-search`, and `ask-user`).
 
@@ -65,17 +65,16 @@ What is still incomplete:
 
 - bundled-provider quality is uneven: `openai-compatible`, `gemini`, and `cli-wrapper` are the practical paths today; the Anthropic adapter is still incomplete.
 - the full extension-discovery/runtime graph described in the wiki is not what the CLI boot path uses yet; bundled providers are statically registered for now.
-- the default TUI is still a line-oriented shell surface, not the full reference TUI described in the wiki.
 - MCP, dynamic extension discovery/reload, SM runtime attach, and capability-negotiated provider/model switching are still integration gaps.
 
-| Phase                                 | Scope                                                               | State       |
-| ------------------------------------- | ------------------------------------------------------------------- | ----------- |
-| Core types + error model              | Contract meta-shape, 9 contract interfaces, 8 typed error classes   | Planning    |
-| Lifecycle + registries + message loop | Stage pipeline, per-category registries, validation                 | Planning    |
-| Provider + Tools + UI (bundled)       | First-party provider, default toolset, reference TUI                | Planning    |
-| Security + Session Store + audit      | Trust prompt, allowlist / ask / yolo, filesystem store, audit trail | Planning    |
-| State Machines + MCP                  | Stage definitions, `grantStageTool`, MCP client                     | Planning    |
-| `0.1.0` — first usable release        | Everything above + CI + packaging                                   | Not started |
+| Phase                                 | Scope                                                               | State         |
+| ------------------------------------- | ------------------------------------------------------------------- | ------------- |
+| Core types + error model              | Contract meta-shape, 9 contract interfaces, 8 typed error classes   | Planning      |
+| Lifecycle + registries + message loop | Stage pipeline, per-category registries, validation                 | Planning      |
+| Provider + Tools + UI (bundled)       | First-party provider, default toolset, default console TUI          | Runtime slice |
+| Security + Session Store + audit      | Trust prompt, allowlist / ask / yolo, filesystem store, audit trail | Planning      |
+| State Machines + MCP                  | Stage definitions, `grantStageTool`, MCP client                     | Planning      |
+| `0.1.0` — first usable release        | Everything above + CI + packaging                                   | Not started   |
 
 Track progress on [GitHub Issues](https://github.com/Z-M-Huang/stud-cli/issues) and the [wiki](https://github.com/Z-M-Huang/stud-cli/wiki).
 

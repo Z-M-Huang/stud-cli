@@ -93,6 +93,27 @@ describe("compactHistory", () => {
     assert.ok(audit.records.some((record) => record.class === "Compaction"));
   });
 
+  it("returns the compactMessages summary turn plus recent window", async () => {
+    const out = await compactHistory({
+      history: [
+        { role: "user", content: "m1", turnId: "t1" },
+        { role: "assistant", content: "r1", turnId: "t1" },
+        { role: "user", content: "m2", turnId: "t2" },
+      ] as readonly HistoryMessage[],
+      targetTokens: 4,
+      summarize: () => Promise.resolve("SUMMARY"),
+      audit: mockAudit(),
+      eventBus: stubBus(),
+    });
+
+    assert.deepEqual(
+      out.messages.map((message) => message.content),
+      ["SUMMARY", "Understood.", "m2"],
+    );
+  });
+});
+
+describe("compactHistory error and event handling", () => {
   it("post-compaction still over window → Validation/ContextOverflow", async () => {
     const promise = compactHistory({
       history: [
@@ -118,8 +139,12 @@ describe("compactHistory", () => {
 
   it("summarize throws → ProviderTransient/SummarizeFailed", async () => {
     const promise = compactHistory({
-      history: [{ role: "user", content: "m", turnId: "t1" }] as readonly HistoryMessage[],
-      targetTokens: 1,
+      history: [
+        { role: "user", content: "m", turnId: "t1" },
+        { role: "assistant", content: "r", turnId: "t1" },
+        { role: "user", content: "again", turnId: "t2" },
+      ] as readonly HistoryMessage[],
+      targetTokens: 4,
       summarize: () => Promise.reject(new Error("upstream")),
       audit: mockAudit(),
       eventBus: stubBus(),
@@ -162,7 +187,7 @@ describe("compactHistory", () => {
         { role: "user", content: "m1", turnId: "t1" },
         { role: "user", content: "m2", turnId: "t2" },
       ] as readonly HistoryMessage[],
-      targetTokens: 1,
+      targetTokens: 4,
       summarize: () => Promise.resolve("S"),
       audit: mockAudit(),
       eventBus: bus,

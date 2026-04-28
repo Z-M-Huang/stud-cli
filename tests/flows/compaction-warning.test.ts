@@ -38,7 +38,8 @@ function recordingAudit() {
 
 function bigHistory(): ChatMessage[] {
   // Each message contributes ~10 tokens (10k chars / 1000), so 5 messages
-  // totals ~50 tokens. With targetTokens=5 the compactor must summarize.
+  // totals ~50 tokens. With targetTokens=25 the compactor must summarize
+  // while still leaving room for agentool's preserved recent window.
   return [
     { role: "user", content: "x".repeat(10_000) },
     { role: "assistant", content: "y".repeat(10_000) },
@@ -89,7 +90,7 @@ describe("Compaction-Warning + CompactionPerformed events", () => {
     let summarizeCalls = 0;
     const result = await compactHistory({
       history: bigHistory(),
-      targetTokens: 5,
+      targetTokens: 25,
       summarize: (msgs) => {
         summarizeCalls += 1;
         return Promise.resolve(`summary of ${msgs.length} messages`);
