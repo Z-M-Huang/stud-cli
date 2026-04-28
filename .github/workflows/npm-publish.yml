@@ -1,0 +1,84 @@
+name: NPM Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "*.*.*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: "Validate / Build / Publish"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Validate tag matches package version
+        run: |
+          node <<'NODE'
+          const tagName = process.env.GITHUB_REF_NAME ?? "";
+          const tagVersion = tagName.startsWith("v") ? tagName.slice(1) : tagName;
+          const { version } = require("./package.json");
+          if (tagVersion !== version) {
+            console.error(`Git tag ${tagName} does not match package.json version ${version}.`);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Format check
+        run: bun run format:check
+
+      - name: Test
+        run: bun run test
+
+      - name: Coverage gate
+        run: bun run test:coverage
+
+      - name: Security audit
+        run: bun audit --audit-level=high
+
+      - name: Banned vocabulary scan
+        run: bun run banned-vocab
+
+      - name: Ban Bun globals scan
+        run: bun run ban-bun-globals
+
+      - name: Extensibility boundary check
+        run: bun run boundary-check
+
+      - name: Examples parity check
+        run: bun run examples-check
+
+      - name: Build package
+        run: bun run build
+
+      - name: Publish to npm
+        run: npm publish --access public --provenance --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
