@@ -1,6 +1,9 @@
+import { runtimeCommandCatalog } from "./command-catalog.js";
+
 import type { LoadedTool, ResolvedShellDeps, SessionBootstrap } from "./types.js";
 import type { ProviderMessage } from "../../contracts/providers.js";
 import type { SessionManifest } from "../../contracts/session-store.js";
+import type { RuntimeReader } from "../../core/host/api/metrics.js";
 
 export type RuntimeCommandOutcome = "handled" | "exit" | "not-command";
 
@@ -11,6 +14,7 @@ export async function handleRuntimeCommand(args: {
   readonly manifest: SessionManifest;
   readonly history: readonly ProviderMessage[];
   readonly deps: ResolvedShellDeps;
+  readonly metrics?: RuntimeReader;
   readonly persist: (
     manifest: SessionManifest,
     history: readonly ProviderMessage[],
@@ -22,6 +26,42 @@ export async function handleRuntimeCommand(args: {
 
   const [name, ...rest] = args.line.slice(1).trim().split(/\s+/u);
   switch (name) {
+    case "help": {
+      const catalog = runtimeCommandCatalog();
+      args.deps.stdout.write(
+        catalog
+          .map(
+            (entry) =>
+              `${entry.name}${entry.argumentHint ? ` ${entry.argumentHint}` : ""}\t${entry.description}`,
+          )
+          .join("\n") + "\n",
+      );
+      return "handled";
+    }
+    case "ui": {
+      const snap = args.metrics?.snapshot();
+      const items = snap?.ui.items ?? [];
+      if (items.length === 0) {
+        args.deps.stdout.write(
+          "no UI extensions reported (metrics.ui not yet wired by extension manager)\n",
+        );
+      } else {
+        args.deps.stdout.write(
+          items
+            .map((ui) => {
+              const roles = ui.roles.join(",");
+              const target = ui.targetUI !== undefined ? ` -> ${ui.targetUI}` : "";
+              const contributions = ui.regionContributions
+                ?.map((r) => `${r.region}:${r.mode}@${r.priority}`)
+                .join(",");
+              const tail = contributions !== undefined ? `  regions=${contributions}` : "";
+              return `${ui.id}\t[${roles}]${target}${tail}`;
+            })
+            .join("\n") + "\n",
+        );
+      }
+      return "handled";
+    }
     case "health":
       args.deps.stdout.write(
         [

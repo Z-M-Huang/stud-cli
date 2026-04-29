@@ -20,8 +20,41 @@ export interface CommandDispatchResult {
   readonly output?: string;
 }
 
+/** UI-facing slash-command catalog entry. */
+export interface CommandCatalogEntry {
+  readonly name: `/${string}`;
+  readonly description: string;
+  readonly argumentHint?: string;
+  readonly category?: string;
+  readonly source?: "runtime" | "prompt" | "mcp-prompt" | "extension";
+  readonly turnSafe?: boolean;
+}
+
+/** Pure completion suggestion for an in-progress slash-command line. */
+export interface CommandCompletion {
+  readonly name: `/${string}`;
+  readonly replacement: string;
+  readonly description: string;
+}
+
 /** Slash-command dispatch surface. */
 export interface CommandsAPI {
+  /**
+   * Return a UI-safe snapshot of registered slash commands.
+   *
+   * This is a catalog/projection surface only. It does not execute commands and
+   * it must not include secret-bearing argument values.
+   */
+  list(): readonly CommandCatalogEntry[];
+
+  /**
+   * Return pure completion suggestions for the current input line.
+   *
+   * Completion is side-effect free; command execution still goes through
+   * `dispatch`.
+   */
+  complete(input: string, cursor?: number): readonly CommandCompletion[];
+
   /**
    * Dispatch a slash command by name, with optional arguments.
    *

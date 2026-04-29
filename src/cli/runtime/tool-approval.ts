@@ -1,7 +1,8 @@
 import { runApprovalStack } from "../../core/security/approval/stack.js";
 
-import { appendAudit, nowIso, studHome } from "./storage.js";
+import { nowIso } from "./storage.js";
 
+import type { SessionAuditBus } from "./audit-bus.js";
 import type { ToolContract } from "../../contracts/tools.js";
 import type {
   ApprovalCacheEntry,
@@ -10,6 +11,18 @@ import type {
 } from "../../core/security/approval/cache.js";
 import type { PromptIO } from "../prompt.js";
 import type { LoadedTool, ResolvedShellDeps, SessionBootstrap } from "./types.js";
+
+export type ToolApprovalDecision = "approve" | "deny";
+
+export interface ToolApprovalPromptRequest {
+  readonly toolId: string;
+  readonly approvalKey: string;
+  readonly displayApprovalKey: string;
+}
+
+export type RequestToolApproval = (
+  request: ToolApprovalPromptRequest,
+) => Promise<ToolApprovalDecision>;
 
 function approvalCacheKey(toolId: string, approvalKey: string): string {
   return `${toolId}:${approvalKey}`;
@@ -144,6 +157,8 @@ export async function ensureToolApproval(args: {
   readonly workspaceRoot: string;
   readonly cache: ApprovalCacheReadWrite;
   readonly deps: ResolvedShellDeps;
+  readonly auditBus?: SessionAuditBus;
+  readonly requestApproval?: RequestToolApproval;
 }): Promise<boolean> {
   if (!args.tool.gated) {
     return true;
@@ -167,23 +182,24 @@ export async function ensureToolApproval(args: {
     },
     cache: args.cache,
     raiseApproval: async ({ toolId, approvalKey }) => {
-      const approved = await args.prompt.select(
-        `Allow tool '${toolId}' for '${displayApprovalKey(approvalKey)}'?`,
-        [
-          { value: "approve", label: "approve and remember for this session" },
-          { value: "deny", label: "deny" },
-        ] as const,
-      );
+      const visibleKey = displayApprovalKey(approvalKey);
+      const approved =
+        args.requestApproval === undefined
+          ? await args.prompt.select(`Allow tool '${toolId}' for '${visibleKey}'?`, [
+              { value: "approve", label: "approve and remember for this session" },
+              { value: "deny", label: "deny" },
+            ] as const)
+          : await args.requestApproval({ toolId, approvalKey, displayApprovalKey: visibleKey });
       return approved === "approve" ? { kind: "approve" } : { kind: "deny" };
     },
     guardHooks: [],
     audit: {
       write(record) {
-        return appendAudit(studHome(args.deps.homedir()), {
-          type: "Approval",
+        args.auditBus?.emit("Approval", {
           at: nowIso(args.deps),
           ...record,
         });
+        return Promise.resolve();
       },
     },
   });

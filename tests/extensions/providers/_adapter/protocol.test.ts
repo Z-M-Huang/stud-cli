@@ -64,6 +64,21 @@ describe("createToolCallAssembler", () => {
     });
   });
 
+  it("ignores no-op deltas after a tool-call has already completed", () => {
+    const asm = createToolCallAssembler();
+    asm.ingest({ kind: "tool-call-delta", callId: "c1", nameDelta: "read_file" });
+    asm.ingest({ kind: "tool-call-delta", callId: "c1", argsJsonDelta: '{"path":"a.txt"}' });
+    asm.ingest({ kind: "tool-call-delta", callId: "c1", argsJsonDelta: "" });
+    asm.ingest({ kind: "finish", reason: "tool_calls" });
+
+    const events = asm.drain();
+    assert.equal(events.length, 1);
+    assert.equal(events[0]?.kind, "tool-call");
+    assert.deepEqual(events[0]?.kind === "tool-call" ? events[0].args : undefined, {
+      path: "a.txt",
+    });
+  });
+
   it("does not emit a partial tool-call while the args JSON is incomplete", () => {
     const asm = createToolCallAssembler();
     asm.ingest({ kind: "tool-call-delta", callId: "c1", nameDelta: "read_file" });
@@ -89,6 +104,13 @@ describe("createToolCallAssembler", () => {
       class: "ProviderCapability",
       code: "OutputMalformed",
       message: "Tool call 'c1' ended before producing valid JSON arguments.",
+      context: {
+        callId: "c1",
+        partialName: "x",
+        partialArgsJson: "{bad",
+        partialArgsLength: 4,
+        partialNameLength: 1,
+      },
     });
   });
 });

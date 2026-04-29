@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { createRuntimeCollector } from "../../../src/core/host/internal/runtime-collector.js";
 import { attachSM } from "../../../src/core/sm/attach.js";
 
 import type { HostAPI } from "../../../src/core/host/host-api.js";
@@ -78,7 +79,8 @@ function newHost(order: string[] = []): AttachTestHost {
     },
     observability: { emit: () => undefined, suppress: () => undefined },
     interaction: { raise: () => Promise.resolve({ value: "ok" }) },
-    commands: { dispatch: () => Promise.resolve({ ok: true }) },
+    commands: { list: () => [], complete: () => [], dispatch: () => Promise.resolve({ ok: true }) },
+    metrics: createRuntimeCollector().reader,
     smRuntime: {
       async attach(runtimeHost: HostAPI): Promise<void> {
         const sawSlot = (await runtimeHost.session.stateSlot("ralph").read()) !== null;

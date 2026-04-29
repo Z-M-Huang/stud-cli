@@ -3,8 +3,12 @@ import type { JSONSchemaObject } from "../../../contracts/meta.js";
 export interface DefaultTUIConfig {
   readonly enabled?: boolean;
   readonly theme?: "dark" | "light" | "auto";
+  readonly color?: "auto" | "always" | "never";
   readonly maxLogLines?: number;
   readonly startupViewEnabled?: boolean;
+  readonly statusLine?: {
+    readonly enabled?: boolean;
+  };
 }
 
 export const defaultTUIConfigSchema: JSONSchemaObject = {
@@ -19,6 +23,10 @@ export const defaultTUIConfigSchema: JSONSchemaObject = {
       type: "string",
       enum: ["dark", "light", "auto"],
     },
+    color: {
+      type: "string",
+      enum: ["auto", "always", "never"],
+    },
     maxLogLines: {
       type: "integer",
       minimum: 1,
@@ -26,6 +34,13 @@ export const defaultTUIConfigSchema: JSONSchemaObject = {
     },
     startupViewEnabled: {
       type: "boolean",
+    },
+    statusLine: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        enabled: { type: "boolean" },
+      },
     },
   },
 };

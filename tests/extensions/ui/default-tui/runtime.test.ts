@@ -33,7 +33,8 @@ describe("default console UI runtime", () => {
 
     assert.equal(output().includes("stud-cli"), true);
     assert.equal(output().includes("session s1"), true);
-    assert.equal(output().includes("model gpt-5.4"), true);
+    assert.equal(output().includes("openai-compatible:gpt-5.4"), true);
+    assert.equal(output().includes("mode ask"), true);
     assert.equal(output().includes("cwd /repo"), true);
     assert.equal(output().includes("/tools"), true);
   });

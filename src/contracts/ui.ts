@@ -30,8 +30,39 @@ import type { HostAPI } from "../core/host/host-api.js";
  *
  * `subscriber`  — receives events from the event bus (read-only projection).
  * `interactor`  — handles typed Interaction Protocol requests (authoritative).
+ * `region`      — contributes a renderer-local component to a target UI's
+ *                 sub-region (for example the bundled TUI's `statusLine` or
+ *                 `composer`). Region contributors customize projection and
+ *                 input chrome; they do not create a new core authority path.
+ *
+ * Wiki: contracts/UI.md and reference-extensions/ui/Default-TUI.md § UI regions
  */
-export type UIRole = "subscriber" | "interactor";
+export type UIRole = "subscriber" | "interactor" | "region";
+
+/** Sub-region names exposed by a target UI's renderer-local ABI. */
+export type UIRegionName = "startup" | "transcript" | "composer" | "statusLine" | "dialogs";
+
+/** Composition mode for a region contribution. */
+export type UIRegionMode = "replace" | "append" | "decorate";
+
+/**
+ * A single region contribution declared by a UI extension whose `roles`
+ * include `'region'`. `targetUI` names the UI whose renderer-local ABI is
+ * being targeted (currently `'default-tui'`); the runtime registers the
+ * contribution against that target's region registry at activate time.
+ *
+ * The component itself is opaque to core — its concrete type is owned by the
+ * target UI's region ABI. We type it as `unknown` here so the contract has no
+ * dependency on a specific renderer (Ink, web, …).
+ */
+export interface UIRegionContribution {
+  readonly id: string;
+  readonly region: UIRegionName;
+  readonly mode: UIRegionMode;
+  readonly priority: number;
+  readonly targetUI: string;
+  readonly component: unknown;
+}
 
 // ---------------------------------------------------------------------------
 // Interaction Protocol surface
@@ -119,14 +150,16 @@ export type InteractorHandler = (
  *   - `kind: 'UI'`
  *   - `loadedCardinality: 'unlimited'` — any number may load
  *   - `activeCardinality: 'unlimited'` — all are active concurrently (Q-9)
- *   - `roles`         — non-empty subset of `{ subscriber, interactor }`
+ *   - `roles`         — non-empty subset of `{ subscriber, interactor, region }`
  *   - `onEvent`       — required when `roles` includes `'subscriber'`
  *   - `onInteraction` — required when `roles` includes `'interactor'`
+ *   - `regions`       — required (non-empty) when `roles` includes `'region'`
  *
  * Load-time validation emits `Validation/UIRoleHandlerMissing` when a declared
- * role has no matching handler.
+ * role has no matching handler or region declaration.
  *
- * Wiki: contracts/UI.md + core/Interaction-Protocol.md
+ * Wiki: contracts/UI.md + core/Interaction-Protocol.md +
+ *       reference-extensions/ui/Default-TUI.md § UI regions
  */
 export interface UIContract<TConfig = unknown> extends ExtensionContract<TConfig> {
   readonly kind: "UI";
@@ -135,7 +168,7 @@ export interface UIContract<TConfig = unknown> extends ExtensionContract<TConfig
 
   /**
    * The roles this extension participates in.
-   * Must be a non-empty subset of `{ 'subscriber', 'interactor' }`.
+   * Must be a non-empty subset of `{ 'subscriber', 'interactor', 'region' }`.
    * A contract with `roles: []` is non-conformant and fails validation.
    */
   readonly roles: readonly UIRole[];
@@ -152,6 +185,15 @@ export interface UIContract<TConfig = unknown> extends ExtensionContract<TConfig
    * First-to-respond wins; others receive the `InteractionAnswered` broadcast.
    */
   readonly onInteraction?: InteractorHandler;
+
+  /**
+   * Required (non-empty) when `roles` includes `'region'`.
+   *
+   * Each entry contributes a renderer-local component to a target UI's
+   * sub-region. The target UI owns the component shape; the contract carries
+   * `unknown` for the renderer-agnostic boundary.
+   */
+  readonly regions?: readonly UIRegionContribution[];
 }
 
 // ---------------------------------------------------------------------------

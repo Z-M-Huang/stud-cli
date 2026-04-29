@@ -19,6 +19,7 @@
  */
 
 import { ExtensionHost, Validation } from "../../src/core/errors/index.js";
+import { createRuntimeCollector } from "../../src/core/host/internal/runtime-collector.js";
 
 import { createAuditRecorder, createEventRecorder } from "./event-recorder.js";
 
@@ -271,6 +272,12 @@ function buildStubs(): StubAPIs {
     },
   };
   const commands: CommandsAPI = {
+    list() {
+      return [];
+    },
+    complete() {
+      return [];
+    },
     dispatch(_name: string, _args?: Readonly<Record<string, unknown>>) {
       throw new ExtensionHost(STUB_MSG, undefined, { code: "NotImplemented" });
     },
@@ -301,6 +308,7 @@ export function mockHost(opts: MockHostOptions): MockHost {
   const audit = buildAudit(callerExtId, auditRec);
   const observability = buildObservability(eventRec);
   const { tools, prompts, resources, mcp, interaction, commands } = buildStubs();
+  const collector = createRuntimeCollector();
 
   const host: HostAPI = Object.freeze({
     session,
@@ -315,6 +323,7 @@ export function mockHost(opts: MockHostOptions): MockHost {
     observability,
     interaction,
     commands,
+    metrics: collector.reader,
   });
 
   return {

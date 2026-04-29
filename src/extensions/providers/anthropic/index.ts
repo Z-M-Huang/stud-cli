@@ -81,7 +81,7 @@ export const contract: ProviderContract<AnthropicConfig> = {
 
         if (event.kind === "error") {
           const Cls = event.class === "ProviderCapability" ? ProviderCapability : ProviderTransient;
-          throw new Cls(event.message, undefined, { code: event.code });
+          throw new Cls(event.message, undefined, { code: event.code, ...(event.context ?? {}) });
         }
 
         if (event.kind === "finish") {

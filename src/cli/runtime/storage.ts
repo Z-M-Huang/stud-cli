@@ -1,5 +1,15 @@
-import { appendFile, mkdir, open, readFile, stat, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import {
+  appendFile,
+  mkdir,
+  open,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 
 import { Session, Validation } from "../../core/errors/index.js";
 import { validateSettings } from "../../core/settings/validator.js";
@@ -141,7 +151,40 @@ export async function resolveKeyringSecret(path: string, name: string): Promise<
   return value;
 }
 
+const AUDIT_ROTATE_AT_BYTES = 2 * 1024 * 1024;
+const AUDIT_MAX_ROTATED_FILES = 10;
+
+async function rotateAuditFile(path: string): Promise<void> {
+  const folder = dirname(path);
+  const prefix = `${basename(path)}.`;
+  const rotated = `${path}.${new Date().toISOString().replaceAll(/[:.]/g, "-")}`;
+  try {
+    await rename(path, rotated);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return;
+    }
+    throw err;
+  }
+  const entries = await readdir(folder, { withFileTypes: true });
+  const olderRotated = entries
+    .filter((entry) => entry.isFile() && entry.name.startsWith(prefix))
+    .map((entry) => join(folder, entry.name))
+    .sort();
+  const overflow = Math.max(0, olderRotated.length - AUDIT_MAX_ROTATED_FILES);
+  for (const file of olderRotated.slice(0, overflow)) {
+    await rm(file, { force: true });
+  }
+}
+
 export async function appendAudit(globalRoot: string, record: AuditRecord): Promise<void> {
   await mkdir(globalRoot, { recursive: true });
-  await appendFile(join(globalRoot, "audit.jsonl"), `${JSON.stringify(record)}\n`, "utf8");
+  const path = join(globalRoot, "audit.jsonl");
+  const size = await stat(path)
+    .then((entry) => entry.size)
+    .catch(() => 0);
+  if (size >= AUDIT_ROTATE_AT_BYTES) {
+    await rotateAuditFile(path);
+  }
+  await appendFile(path, `${JSON.stringify(record)}\n`, "utf8");
 }

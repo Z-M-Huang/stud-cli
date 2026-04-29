@@ -63,6 +63,14 @@ function validateConfig(config: DefaultTUIConfig): void {
     throw toValidationError("theme must be dark, light, or auto", "theme");
   }
   if (
+    config.color !== undefined &&
+    config.color !== "auto" &&
+    config.color !== "always" &&
+    config.color !== "never"
+  ) {
+    throw toValidationError("color must be auto, always, or never", "color");
+  }
+  if (
     config.maxLogLines !== undefined &&
     (!Number.isInteger(config.maxLogLines) || config.maxLogLines < 1)
   ) {
@@ -127,9 +135,10 @@ function writeRenderTarget(host: HostAPI, state: DefaultTUIRuntimeState): void {
     target.ui.startupDetails = state.startupDetails;
     target.ui.modeDisplay = state.modeDisplay;
   }
-  if (process.stdout.isTTY) {
-    process.stdout.write(`\u001b[2J\u001b[H${state.stream.rendered}`);
-  }
+  // Lifecycle no longer paints stdout directly. The Ink mount in mount.tsx
+  // owns the terminal display on TTY; non-TTY runs go through createDefaultConsoleUI.
+  // Lifecycle keeps state for tests and the future event-driven path, but it
+  // never writes to stdout here.
 }
 
 function withRenderGuard(host: HostAPI, fn: () => void, reason: string): void {

@@ -5,7 +5,7 @@
  * and frozen at construction (the shape does not grow new methods at runtime).
  * Sub-surfaces are individually documented in `./api/`.
  *
- * Sanctioned surfaces (twelve total):
+ * Sanctioned surfaces (thirteen total):
  *   session      — session id, mode, projectRoot, stateSlot
  *   events       — projection-only event bus (on / off / emit)
  *   config       — scoped configuration reader (readOwn)
@@ -18,6 +18,7 @@
  *   observability — projection event emission + SuppressedError
  *   interaction  — Interaction-Protocol request surface
  *   commands     — slash-command dispatch (Command / UI extensions only)
+ *   metrics      — read-only runtime-state projection (RuntimeReader)
  *
  * Wiki: core/Host-API.md
  */
@@ -28,6 +29,7 @@ import type { EnvAPI } from "./api/env.js";
 import type { EventsAPI } from "./api/events.js";
 import type { InteractionAPI } from "./api/interaction.js";
 import type { MCPAPI } from "./api/mcp.js";
+import type { RuntimeReader } from "./api/metrics.js";
 import type { ObservabilityAPI } from "./api/observability.js";
 import type { PromptsAPI } from "./api/prompts.js";
 import type { ResourcesAPI } from "./api/resources.js";
@@ -46,6 +48,17 @@ export type { PromptsAPI } from "./api/prompts.js";
 export type { ResourcesAPI } from "./api/resources.js";
 export type { SessionAPI, StateSlotHandle } from "./api/session.js";
 export type { ToolsAPI } from "./api/tools.js";
+export type {
+  DiagnosticItem,
+  ExtensionInfo,
+  HookInfo,
+  McpServerInfo,
+  ProviderInfo,
+  RuntimeReader,
+  RuntimeSnapshot,
+  ToolInfo,
+  UiInfo,
+} from "./api/metrics.js";
 
 /**
  * The complete host surface given to every extension.
@@ -107,4 +120,13 @@ export interface HostAPI {
    * all other categories receive a stub that throws `ToolTerminal/Forbidden`.
    */
   readonly commands: CommandsAPI;
+
+  /**
+   * Read-only runtime-state projection.
+   *
+   * Every extension may snapshot or subscribe. The reader carries no
+   * authority — snapshotting cannot mutate session behavior. The shape is
+   * specified in `core/Host-API.md § metrics — RuntimeReader`.
+   */
+  readonly metrics: RuntimeReader;
 }

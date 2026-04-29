@@ -1,13 +1,17 @@
+/* eslint-disable max-lines, max-lines-per-function */
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 
 import { Session, ToolTerminal } from "../../core/errors/index.js";
-import { createDefaultConsoleUI } from "../../extensions/ui/default-tui/index.js";
+import { mountTUI } from "../../extensions/ui/default-tui/mount.js";
 
+import { startSessionAuditBus, type SessionAuditBus } from "./audit-bus.js";
 import { providerLabel } from "./bootstrap.js";
+import { runtimeCommandCatalog } from "./command-catalog.js";
 import { createProviderHost } from "./provider-host.js";
 import { handleRuntimeCommand } from "./session-commands.js";
-import { persistSessionManifest, sessionLifecycleAudit } from "./session-store.js";
-import { appendAudit, studHome } from "./storage.js";
+import { persistSessionManifest } from "./session-store.js";
+import { studHome } from "./storage.js";
 import { createApprovalCache, ensureToolApproval } from "./tool-approval.js";
 import {
   disposeBundledTools,
@@ -21,6 +25,7 @@ import { PROVIDERS, TOOL_CALL_CONTINUATION_LIMIT } from "./types.js";
 
 import type {
   LoadedTool,
+  ProviderId,
   ResolvedShellDeps,
   RuntimeToolResult,
   SessionBootstrap,
@@ -33,7 +38,8 @@ import type {
 } from "../../contracts/providers.js";
 import type { SessionManifest } from "../../contracts/session-store.js";
 import type { HostAPI } from "../../core/host/host-api.js";
-import type { DefaultConsoleUI } from "../../extensions/ui/default-tui/index.js";
+import type { RuntimeCollector } from "../../core/host/internal/runtime-collector.js";
+import type { MountedTUI } from "../../extensions/ui/default-tui/mount.js";
 import type { PromptIO } from "../prompt.js";
 
 function renderTurnError(session: SessionBootstrap, error: unknown): string {
@@ -143,13 +149,21 @@ async function persistHistorySnapshot(args: {
   );
 }
 
+/** Coarse token estimator: ~4 chars per token. Source-of-truth comes from the provider when available. */
+function estimateTokens(text: string): number {
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
 async function runAssistantIteration(args: {
   readonly session: SessionBootstrap;
   readonly provider: ProviderContract<unknown>;
   readonly host: HostAPI;
   readonly history: ProviderMessage[];
   readonly toolDefinitions: readonly ProviderToolDefinition[];
-  readonly ui: DefaultConsoleUI;
+  readonly ui: MountedTUI;
+  readonly collector: RuntimeCollector;
+  readonly auditBus: SessionAuditBus;
+  readonly deps: ResolvedShellDeps;
 }): Promise<{
   readonly assistantMessage: ProviderMessage;
   readonly finishReason: "stop" | "tool-calls" | "length" | "content-filter" | "error" | "other";
@@ -160,36 +174,88 @@ async function runAssistantIteration(args: {
     "stop";
   const toolCalls: Extract<ProviderContentPart, { type: "tool-call" }>[] = [];
 
-  for await (const event of args.provider.surface.request(
-    {
-      messages: args.history,
-      tools: args.toolDefinitions,
-      modelId: args.session.provider.modelId,
-    },
-    args.host,
-    new AbortController().signal,
-  )) {
-    if (event.type === "finish") {
-      finishReason = event.reason;
-      continue;
-    }
-    if (event.type === "tool-call") {
-      args.ui.appendAssistantToolCall(event.toolName);
-      toolCalls.push({
-        type: "tool-call",
-        toolCallId: event.toolCallId,
-        toolName: event.toolName,
-        args: event.args,
-      });
-      continue;
-    }
+  // Estimate input tokens from the assembled history at compose time.
+  const inputTokens = args.history.reduce((acc, message) => {
+    const content =
+      typeof message.content === "string"
+        ? message.content
+        : message.content
+            .map((part) => (part.type === "text" ? part.text : `[${part.type}]`))
+            .join(" ");
+    return acc + estimateTokens(content);
+  }, 0);
+  args.collector.addTokens(inputTokens, 0);
+  args.collector.setContext({ usedTokens: inputTokens });
 
-    const delta = event.type === "text-delta" ? event.delta : event.delta;
-    assistantText += event.type === "text-delta" ? event.delta : "";
-    args.ui.appendAssistantDelta(delta);
+  const requestStartedAt = args.deps.now().getTime();
+  args.auditBus.emit("ProviderRequest", {
+    providerId: args.session.provider.providerId,
+    modelId: args.session.provider.modelId,
+    messages: args.history,
+    tools: args.toolDefinitions,
+    estimatedInputTokens: inputTokens,
+  });
+
+  let outputTokens = 0;
+  let providerError: unknown = undefined;
+  try {
+    for await (const event of args.provider.surface.request(
+      {
+        messages: args.history,
+        tools: args.toolDefinitions,
+        modelId: args.session.provider.modelId,
+      },
+      args.host,
+      new AbortController().signal,
+    )) {
+      if (event.type === "finish") {
+        finishReason = event.reason;
+        continue;
+      }
+      if (event.type === "tool-call") {
+        args.ui.appendAssistantToolCall(event.toolName);
+        toolCalls.push({
+          type: "tool-call",
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          args: event.args,
+        });
+        continue;
+      }
+
+      const delta = event.type === "text-delta" ? event.delta : event.delta;
+      if (event.type === "text-delta") {
+        assistantText += event.delta;
+        const deltaTokens = estimateTokens(event.delta);
+        outputTokens += deltaTokens;
+        args.collector.addTokens(0, deltaTokens);
+      }
+      args.ui.appendAssistantDelta(delta);
+    }
+  } catch (error) {
+    providerError = error;
   }
 
   args.ui.endAssistant();
+  args.auditBus.emit("ProviderResponse", {
+    providerId: args.session.provider.providerId,
+    modelId: args.session.provider.modelId,
+    finishReason: providerError === undefined ? finishReason : "error",
+    assistantText,
+    toolCalls,
+    estimatedOutputTokens: outputTokens,
+    durationMs: args.deps.now().getTime() - requestStartedAt,
+    error: providerError === undefined ? undefined : errorToAuditPayload(providerError),
+  });
+  if (providerError !== undefined) {
+    if (providerError instanceof Error) {
+      throw providerError;
+    }
+    throw new Session("provider stream emitted a non-Error value", undefined, {
+      code: "ProviderProtocolViolation",
+      providerError: safeStringify(providerError),
+    });
+  }
   return {
     assistantMessage: {
       role: "assistant",
@@ -208,10 +274,24 @@ async function resolveToolCallResult(args: {
   readonly approvalCache: ReturnType<typeof createApprovalCache>;
   readonly workspaceRoot: string;
   readonly deps: ResolvedShellDeps;
-  readonly ui: DefaultConsoleUI;
+  readonly ui: MountedTUI;
+  readonly auditBus: SessionAuditBus;
 }): Promise<RuntimeToolResult> {
+  const startedAt = args.deps.now().getTime();
+  const callBase = {
+    toolCallId: args.call.toolCallId,
+    toolName: args.call.toolName,
+    args: args.call.args,
+  };
+  args.auditBus.emit("ToolCallStarted", callBase);
+
   const tool = args.toolMap.get(args.call.toolName);
   if (tool === undefined) {
+    args.auditBus.emit("ToolCallFailed", {
+      ...callBase,
+      durationMs: args.deps.now().getTime() - startedAt,
+      reason: "tool-not-available",
+    });
     return toolResultError(args.call.toolName, `tool '${args.call.toolName}' is not available`, {
       toolName: args.call.toolName,
     });
@@ -219,6 +299,12 @@ async function resolveToolCallResult(args: {
 
   const validated = await tool.validateArgs(args.call.args);
   if (!validated.ok) {
+    args.auditBus.emit("ToolCallFailed", {
+      ...callBase,
+      durationMs: args.deps.now().getTime() - startedAt,
+      reason: "schema-violation",
+      errors: validated.errors,
+    });
     return toolResultError(tool.id, `tool '${tool.id}' arguments failed schema validation`, {
       errors: validated.errors,
     });
@@ -226,6 +312,11 @@ async function resolveToolCallResult(args: {
 
   const normalized = tool.normalizeArgs(validated.value, args.workspaceRoot);
   if (!normalized.ok) {
+    args.auditBus.emit("ToolCallFailed", {
+      ...callBase,
+      durationMs: args.deps.now().getTime() - startedAt,
+      reason: "normalize-failed",
+    });
     return normalized;
   }
 
@@ -238,8 +329,15 @@ async function resolveToolCallResult(args: {
       workspaceRoot: args.workspaceRoot,
       cache: args.approvalCache,
       deps: args.deps,
+      auditBus: args.auditBus,
+      requestApproval: (request) => args.ui.requestApproval(request),
     }))
   ) {
+    args.auditBus.emit("ToolCallFailed", {
+      ...callBase,
+      durationMs: args.deps.now().getTime() - startedAt,
+      reason: "approval-denied",
+    });
     return {
       ok: false,
       error: new ToolTerminal(`tool '${tool.id}' was denied`, undefined, {
@@ -250,7 +348,17 @@ async function resolveToolCallResult(args: {
   }
 
   args.ui.renderToolStart(tool.id);
-  return tool.execute(normalized.value, args.call.toolCallId);
+  const result = await tool.execute(normalized.value, args.call.toolCallId);
+  args.auditBus.emit(result.ok ? "ToolCallSucceeded" : "ToolCallFailed", {
+    ...callBase,
+    normalizedArgs: normalized.value,
+    durationMs: args.deps.now().getTime() - startedAt,
+    result: result.ok ? result : undefined,
+    error: result.ok
+      ? undefined
+      : { class: result.error?.class, code: result.error?.code, message: result.error?.message },
+  });
+  return result;
 }
 
 async function continueAssistantTurn(args: {
@@ -263,7 +371,10 @@ async function continueAssistantTurn(args: {
   readonly approvalCache: ReturnType<typeof createApprovalCache>;
   readonly deps: ResolvedShellDeps;
   readonly prompt: PromptIO;
-  readonly ui: DefaultConsoleUI;
+  readonly ui: MountedTUI;
+  readonly collector: RuntimeCollector;
+  readonly auditBus: SessionAuditBus;
+  readonly turnId: string;
 }): Promise<void> {
   const toolMap = new Map(args.tools.map((tool) => [tool.name, tool] as const));
   const workspaceRoot = sessionWorkspaceRoot(args.session, args.deps);
@@ -288,6 +399,7 @@ async function continueAssistantTurn(args: {
             workspaceRoot,
             deps: args.deps,
             ui: args.ui,
+            auditBus: args.auditBus,
           }),
         ),
       );
@@ -300,37 +412,60 @@ async function continueAssistantTurn(args: {
   });
 }
 
-export async function runProviderSession(
+function seedRuntimeMetrics(
+  collector: RuntimeCollector,
+  descriptor: (typeof PROVIDERS)[ProviderId],
   session: SessionBootstrap,
+  loadedTools: readonly LoadedTool[],
+): void {
+  collector.setProvider(
+    {
+      id: descriptor.id,
+      label: descriptor.label,
+      modelId: session.provider.modelId,
+      capabilities: { streaming: true, toolCalling: true, thinking: false },
+    },
+    Object.values(PROVIDERS).map((d) => ({
+      id: d.id,
+      label: d.label,
+      modelId: d.defaultModel,
+      capabilities: { streaming: true, toolCalling: true, thinking: false },
+    })),
+  );
+  collector.setTools(
+    loadedTools.map((tool) => ({
+      id: tool.id,
+      name: tool.name,
+      description: tool.description,
+      source: "bundled",
+      sensitivity: tool.gated ? "guarded" : "safe",
+      allowedNow: !tool.gated || session.yolo,
+      invocations: { total: 0, succeeded: 0, failed: 0 },
+    })),
+  );
+}
+
+function mountSessionUI(
   deps: ResolvedShellDeps,
   prompt: PromptIO,
-): Promise<void> {
-  const descriptor = PROVIDERS[session.provider.providerId];
-  const loadedTools: LoadedTool[] = [];
-  const host = createProviderHost(
-    session,
-    deps,
-    join(studHome(deps.homedir()), "secrets.json"),
-    loadedTools,
-  );
-  await descriptor.contract.lifecycle.init?.(host, session.provider.config as never);
-  await descriptor.contract.lifecycle.activate?.(host);
-  loadedTools.push(...(await initializeBundledTools(session, deps, prompt)));
-
-  let manifest = await persistSessionManifest(session.manifest, deps);
-  await appendAudit(
-    studHome(deps.homedir()),
-    sessionLifecycleAudit(
-      session.resumed ? "SessionResumed" : "SessionStarted",
-      session.sessionId,
-      deps,
-    ),
-  );
-
-  const history = providerMessagesFromManifest(manifest);
-  const approvalCache = createApprovalCache(loadedTools);
-  const workspaceRoot = sessionWorkspaceRoot(session, deps);
-  const ui = createDefaultConsoleUI({ stdout: deps.stdout });
+  collector: RuntimeCollector,
+  session: SessionBootstrap,
+  workspaceRoot: string,
+  resumedHistory: readonly ProviderMessage[],
+): MountedTUI {
+  const catalog = runtimeCommandCatalog().map((entry) => ({
+    name: entry.name,
+    description: entry.description,
+    category: entry.category,
+  }));
+  const ui = mountTUI({
+    stdout: deps.stdout,
+    stdin: deps.stdin,
+    fallbackPrompt: prompt,
+    version: deps.packageVersion,
+    metrics: collector.reader,
+    catalog,
+  });
   ui.renderSessionStart({
     sessionId: session.sessionId,
     providerLabel: providerLabel(session.provider.providerId),
@@ -340,12 +475,104 @@ export async function runProviderSession(
     cwd: workspaceRoot,
   });
   if (session.resumed) {
-    ui.renderHistory(history);
+    ui.renderHistory(resumedHistory);
   }
+  return ui;
+}
+
+function safeStringify(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return String(value);
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  if (value instanceof Error) return value.message;
+  try {
+    return JSON.stringify(value) ?? "[unserializable]";
+  } catch {
+    return "[unserializable]";
+  }
+}
+
+function errorToAuditPayload(error: unknown): Readonly<Record<string, unknown>> {
+  if (error === null || typeof error !== "object") {
+    return { message: safeStringify(error) };
+  }
+  const candidate = error as {
+    class?: unknown;
+    code?: unknown;
+    message?: unknown;
+    context?: unknown;
+    cause?: unknown;
+  };
+  const causeChain: unknown[] = [];
+  let walker: unknown = candidate.cause;
+  while (walker !== undefined && walker !== null && causeChain.length < 8) {
+    if (typeof walker === "object") {
+      const w = walker as { message?: unknown; code?: unknown; class?: unknown; cause?: unknown };
+      causeChain.push({
+        class: typeof w.class === "string" ? w.class : undefined,
+        code: typeof w.code === "string" ? w.code : undefined,
+        message: typeof w.message === "string" ? w.message : safeStringify(walker),
+      });
+      walker = w.cause;
+    } else {
+      causeChain.push({ message: safeStringify(walker) });
+      break;
+    }
+  }
+  return {
+    class: typeof candidate.class === "string" ? candidate.class : undefined,
+    code: typeof candidate.code === "string" ? candidate.code : undefined,
+    message: typeof candidate.message === "string" ? candidate.message : safeStringify(error),
+    context: (candidate.context as Readonly<Record<string, unknown>> | undefined) ?? {},
+    causeChain,
+  };
+}
+
+export async function runProviderSession(
+  session: SessionBootstrap,
+  deps: ResolvedShellDeps,
+  prompt: PromptIO,
+): Promise<void> {
+  const descriptor = PROVIDERS[session.provider.providerId];
+  const loadedTools: LoadedTool[] = [];
+  let auditBus: SessionAuditBus | null = null;
+  const host = createProviderHost(
+    session,
+    deps,
+    join(studHome(deps.homedir()), "secrets.json"),
+    loadedTools,
+    () => auditBus,
+  );
+  const collector = host.collector;
+  auditBus = await startSessionAuditBus({
+    host,
+    sessionId: session.sessionId,
+    globalRoot: studHome(deps.homedir()),
+  });
+  auditBus.emit(session.resumed ? "SessionResumed" : "SessionStarted", {
+    storeId: "filesystem-session-store",
+    projectRoot: session.projectRoot,
+    mode: session.securityMode,
+    providerId: session.provider.providerId,
+    modelId: session.provider.modelId,
+  });
+  await descriptor.contract.lifecycle.init?.(host, session.provider.config as never);
+  await descriptor.contract.lifecycle.activate?.(host);
+  loadedTools.push(...(await initializeBundledTools(session, deps, prompt)));
+  seedRuntimeMetrics(collector, descriptor, session, loadedTools);
+
+  let manifest = await persistSessionManifest(session.manifest, deps);
+
+  const history = providerMessagesFromManifest(manifest);
+  const approvalCache = createApprovalCache(loadedTools);
+  const workspaceRoot = sessionWorkspaceRoot(session, deps);
+  const ui = mountSessionUI(deps, prompt, collector, session, workspaceRoot, history);
 
   try {
     while (true) {
-      const trimmed = (await prompt.input(ui.promptLabel())).trim();
+      const trimmed = (await ui.waitForInput()).trim();
       if (trimmed.length === 0) {
         continue;
       }
@@ -359,6 +586,7 @@ export async function runProviderSession(
         manifest,
         history,
         deps,
+        metrics: collector.reader,
         persist: (currentManifest, currentHistory) =>
           persistHistorySnapshot({ manifest: currentManifest, history: currentHistory, deps }),
       });
@@ -369,36 +597,73 @@ export async function runProviderSession(
         continue;
       }
 
+      ui.appendUserMessage(trimmed);
       history.push({ role: "user", content: trimmed });
-      try {
-        await continueAssistantTurn({
-          session,
-          provider: descriptor.contract,
-          host,
-          history,
-          tools: loadedTools,
-          toolDefinitions: providerToolDefinitions(loadedTools),
-          approvalCache,
-          deps,
-          prompt,
-          ui,
+      collector.beginTurn();
+      const turnId = `turn-${randomUUID()}`;
+      const turnStartedAt = deps.now().getTime();
+      const turnAuditBus = auditBus;
+      await turnAuditBus.withTurn(turnId, async () => {
+        turnAuditBus.emit("TurnStarted", {
+          turnId,
+          userInput: trimmed,
+          historyLength: history.length,
         });
-        manifest = await persistHistorySnapshot({ manifest, history, deps });
-        await appendAudit(
-          studHome(deps.homedir()),
-          sessionLifecycleAudit("SessionPersisted", session.sessionId, deps),
-        );
-      } catch (error) {
-        ui.renderTurnError(renderTurnError(session, error));
-      }
+        try {
+          await continueAssistantTurn({
+            session,
+            provider: descriptor.contract,
+            host,
+            history,
+            tools: loadedTools,
+            toolDefinitions: providerToolDefinitions(loadedTools),
+            approvalCache,
+            deps,
+            prompt,
+            ui,
+            collector,
+            auditBus: turnAuditBus,
+            turnId,
+          });
+          manifest = await persistHistorySnapshot({ manifest, history, deps });
+          turnAuditBus.emit("SessionPersisted", {
+            storeId: "filesystem-session-store",
+            messageCount: history.length,
+          });
+          turnAuditBus.emit("TurnEnded", {
+            turnId,
+            durationMs: deps.now().getTime() - turnStartedAt,
+            historyLength: history.length,
+          });
+          collector.setSession({ online: true });
+        } catch (error) {
+          ui.renderTurnError(renderTurnError(session, error));
+          collector.setSession({ online: false });
+          turnAuditBus.emit("TurnError", {
+            turnId,
+            durationMs: deps.now().getTime() - turnStartedAt,
+            ...errorToAuditPayload(error),
+          });
+          collector.pushDiagnostic({
+            at: deps.now().getTime(),
+            level: "error",
+            source: "session-loop",
+            code: "TurnFailed",
+            message: renderTurnError(session, error),
+          });
+        } finally {
+          collector.endTurn();
+        }
+      });
     }
   } finally {
-    await appendAudit(
-      studHome(deps.homedir()),
-      sessionLifecycleAudit("SessionClosed", session.sessionId, deps),
-    );
+    await ui.unmount();
+    auditBus.emit("SessionClosed", {
+      storeId: "filesystem-session-store",
+    });
     await disposeBundledTools();
     await descriptor.contract.lifecycle.deactivate?.(host);
     await descriptor.contract.lifecycle.dispose?.(host);
+    await auditBus.close();
   }
 }

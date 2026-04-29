@@ -109,15 +109,17 @@ export interface LoggingSettings {
  *
  * `sessionStore` (required) — the single active Session Store for the session.
  *   Resume always uses the same store that wrote the session.
- * `interactor` (optional) — hint identifying the primary UI interactor when
- *   multiple are loaded. Per Q-9, multiple interactors may be active
- *   simultaneously; this is a selection hint, not a singleton gate.
+ *
+ * There is **no** `interactor` selector. UI participation is controlled per
+ * extension via `ui.<name>.disable` / `ui.<name>.enabled` configuration; every
+ * enabled UI extension whose `roles` array includes `'interactor'` participates
+ * in Interaction-Protocol fan-out (first-response-wins). See
+ * `contracts/UI.md` and `contracts/Cardinality-and-Activation.md`.
  *
  * Wiki: contracts/Settings-Shape.md § active, contracts/Cardinality-and-Activation.md
  */
 export interface ActiveSelectors {
   readonly provider?: string; // extId — current Provider for composition
-  readonly interactor?: string; // extId — Q-9: multiple may be active; this is a hint
   readonly sessionStore?: string; // extId — used for resume when configured
   readonly attachedSM?: string; // extId — the currently attached State Machine
 }
@@ -253,7 +255,6 @@ export const settingsSchema: JSONSchemaObject = {
       additionalProperties: false,
       properties: {
         provider: { type: "string", minLength: 1 },
-        interactor: { type: "string" },
         sessionStore: { type: "string", minLength: 1 },
         attachedSM: { type: "string", minLength: 1 },
       },

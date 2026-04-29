@@ -1,3 +1,9 @@
+import {
+  defaultStatusLineItems,
+  renderStatusLine as renderPlainStatusLine,
+  type StatusLineItem,
+} from "./status-line.js";
+
 import type { ProviderContentPart, ProviderMessage } from "../../../contracts/providers.js";
 import type { SecurityMode } from "../../../contracts/settings-shape.js";
 
@@ -20,6 +26,7 @@ export interface DefaultConsoleUI {
   endAssistant(): void;
   renderToolStart(toolId: string): void;
   renderTurnError(message: string): void;
+  renderStatusLine(items: readonly StatusLineItem[]): void;
 }
 
 interface DefaultConsoleUIOptions {
@@ -43,6 +50,7 @@ const ANSI = {
   green: `${ANSI_ESCAPE}[32m`,
   yellow: `${ANSI_ESCAPE}[33m`,
   blue: `${ANSI_ESCAPE}[34m`,
+  magenta: `${ANSI_ESCAPE}[35m`,
   cyan: `${ANSI_ESCAPE}[36m`,
   gray: `${ANSI_ESCAPE}[90m`,
 } as const;
@@ -82,9 +90,12 @@ function createStyler(useColor: boolean) {
     assistant: (value: string): string => color(value, ANSI.green),
     dim: (value: string): string => color(value, ANSI.gray),
     error: (value: string): string => color(value, ANSI.red),
+    good: (value: string): string => color(value, ANSI.green),
+    muted: (value: string): string => color(value, ANSI.gray),
     notice: (value: string): string => color(value, ANSI.yellow),
     title: (value: string): string => color(value, ANSI.bold),
     tool: (value: string): string => color(value, ANSI.blue),
+    warn: (value: string): string => color(value, ANSI.magenta),
   };
 }
 
@@ -146,7 +157,7 @@ function rule(width: number, label: string | undefined = undefined): string {
   return `${prefix}${"-".repeat(width - prefix.length - 1)}+`;
 }
 
-function boxedLine(content: string, width: number): string {
+function _boxedLine(content: string, width: number): string {
   return `| ${fitCell(content, width - 4)} |`;
 }
 
@@ -204,20 +215,63 @@ function renderSessionStartView(
   style: ConsoleStyler,
 ): string {
   const title = `${style.title("stud-cli")} ${style.dim("coding agent runtime")}`;
+  const status = renderStyledStatusLine(
+    defaultStatusLineItems({
+      sessionId: session.sessionId,
+      providerLabel: session.providerLabel,
+      modelId: session.modelId,
+      mode: session.mode,
+      projectTrust: session.projectTrust,
+      cwd: session.cwd,
+      diagnostics: 0,
+    }),
+    style,
+  );
+  // Provider/model/mode live in the header per
+  // reference-extensions/ui/Default-TUI.md § Status line ("Provider/model and
+  // security mode belong in the compact header, not the stats line").
   return (
     [
-      rule(width),
-      boxedLine(title, width),
-      rule(width),
-      boxedLine(`session ${session.sessionId}`, width),
-      boxedLine(`provider ${session.providerLabel}  model ${session.modelId}`, width),
-      boxedLine(`mode ${session.mode}  trust ${session.projectTrust}`, width),
-      boxedLine(`cwd ${session.cwd}`, width),
-      rule(width),
-      `  ${style.dim("/exit")} quit   ${style.dim("/tools")} tools   ${style.dim("/health")} runtime`,
+      title,
+      `${style.muted("session")} ${session.sessionId}`,
+      `${style.muted("model")} ${session.providerLabel}:${session.modelId}`,
+      `${style.muted("mode")} ${session.mode}`,
+      `${style.muted("cwd")} ${session.cwd}`,
+      `${style.muted("trust")} ${session.projectTrust}`,
+      `${style.accent("status")} ${status}`,
+      "",
+      rule(width, "transcript"),
+      style.muted("tool calls, thinking, approvals, and diagnostics render inline here"),
+      rule(width, "composer"),
+      `  ${style.dim("/")} commands   ${style.dim("/model")} model picker   ${style.dim("/tools")} tools   ${style.dim("/exit")} quit`,
       "",
     ].join("\n") + "\n"
   );
+}
+
+function styleStatusValue(item: StatusLineItem, style: ConsoleStyler): string {
+  switch (item.tone) {
+    case "good":
+      return style.good(item.value);
+    case "warn":
+      return style.notice(item.value);
+    case "bad":
+      return style.error(item.value);
+    case "accent":
+      return style.accent(item.value);
+    case "muted":
+      return style.muted(item.value);
+    case "normal":
+    case undefined:
+    default:
+      return item.value;
+  }
+}
+
+function renderStyledStatusLine(items: readonly StatusLineItem[], style: ConsoleStyler): string {
+  return items
+    .map((item) => `${style.muted(item.label)} ${styleStatusValue(item, style)}`)
+    .join(style.muted(" | "));
 }
 
 export function createDefaultConsoleUI(options: DefaultConsoleUIOptions): DefaultConsoleUI {
@@ -316,5 +370,12 @@ export function createDefaultConsoleUI(options: DefaultConsoleUIOptions): Defaul
         write(`  ${line}\n`);
       });
     },
+
+    renderStatusLine(items): void {
+      write(`${style.accent("status")} ${renderStyledStatusLine(items, style)}\n`);
+    },
   };
 }
+
+export { defaultStatusLineItems, renderPlainStatusLine as renderStatusLine };
+export type { StatusLineContext, StatusLineItem } from "./status-line.js";

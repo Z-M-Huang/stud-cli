@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { ExtensionHost } from "../../../src/core/errors/extension-host.js";
+import { createRuntimeCollector } from "../../../src/core/host/internal/runtime-collector.js";
 import { runParallel } from "../../../src/core/sm/fan-out.js";
 
 import type { StageDefinition } from "../../../src/contracts/state-machines.js";
@@ -95,7 +96,8 @@ function baseHost(
     audit: { write: () => Promise.resolve() },
     observability: { emit: () => undefined, suppress: () => undefined },
     interaction: { raise: () => Promise.resolve({ value: "ok" }) },
-    commands: { dispatch: () => Promise.resolve({ ok: true }) },
+    commands: { list: () => [], complete: () => [], dispatch: () => Promise.resolve({ ok: true }) },
+    metrics: createRuntimeCollector().reader,
     smRuntime: {
       resolveStage(stageId: string): RuntimeStage {
         const stage = stageMap.get(stageId);

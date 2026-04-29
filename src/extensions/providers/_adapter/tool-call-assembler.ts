@@ -28,12 +28,19 @@ function parseCompletedToolCall(callId: string, pendingCall: PendingToolCall): S
   }
 }
 
-function malformedToolCallError(callId: string): StreamEvent {
+function malformedToolCallError(callId: string, pending: PendingToolCall): StreamEvent {
   return {
     kind: "error",
     class: "ProviderCapability",
     code: "OutputMalformed",
     message: `Tool call '${callId}' ended before producing valid JSON arguments.`,
+    context: {
+      callId,
+      partialName: pending.name,
+      partialArgsJson: pending.argsJson,
+      partialArgsLength: pending.argsJson.length,
+      partialNameLength: pending.name.length,
+    },
   };
 }
 
@@ -44,6 +51,9 @@ export function createToolCallAssembler(): ToolCallAssembler {
   return {
     ingest(delta: StreamEvent): void {
       if (delta.kind === "tool-call-delta") {
+        if ((delta.nameDelta ?? "").length === 0 && (delta.argsJsonDelta ?? "").length === 0) {
+          return;
+        }
         const current = pendingCalls.get(delta.callId) ?? { name: "", argsJson: "" };
         const next: PendingToolCall = {
           name: current.name + (delta.nameDelta ?? ""),
@@ -62,8 +72,8 @@ export function createToolCallAssembler(): ToolCallAssembler {
       }
 
       if (delta.kind === "finish") {
-        for (const [callId] of pendingCalls) {
-          ready.push(malformedToolCallError(callId));
+        for (const [callId, pending] of pendingCalls) {
+          ready.push(malformedToolCallError(callId, pending));
         }
         pendingCalls.clear();
       }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { ExtensionHost } from "../../../src/core/errors/index.js";
+import { createRuntimeCollector } from "../../../src/core/host/internal/runtime-collector.js";
 import { schedule } from "../../../src/core/sm/scheduler.js";
 import { runStage } from "../../../src/core/sm/stage-executor.js";
 
@@ -100,7 +101,8 @@ function makeHost(stages: readonly RuntimeStage[], events: string[] = []): Fixtu
     audit: { write: () => Promise.resolve() },
     observability: { emit: () => undefined, suppress: () => undefined },
     interaction: { raise: () => Promise.resolve({ value: "yes" }) },
-    commands: { dispatch: () => Promise.resolve({ ok: true }) },
+    commands: { list: () => [], complete: () => [], dispatch: () => Promise.resolve({ ok: true }) },
+    metrics: createRuntimeCollector().reader,
     smRuntime: {
       resolveStage(stageId: string): RuntimeStage {
         const stage = stageMap.get(stageId);

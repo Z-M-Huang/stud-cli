@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import { Cancellation } from "../../../src/core/errors/cancellation.js";
 import { ExtensionHost } from "../../../src/core/errors/extension-host.js";
+import { createRuntimeCollector } from "../../../src/core/host/internal/runtime-collector.js";
 import { runSequential } from "../../../src/core/sm/sequential.js";
 
 import type { StageDefinition } from "../../../src/contracts/state-machines.js";
@@ -140,7 +141,8 @@ function makeHost(
     audit: { write: () => Promise.resolve() },
     observability: { emit: () => undefined, suppress: () => undefined },
     interaction: { raise: () => Promise.resolve({ value: "ok" }) },
-    commands: { dispatch: () => Promise.resolve({ ok: true }) },
+    commands: { list: () => [], complete: () => [], dispatch: () => Promise.resolve({ ok: true }) },
+    metrics: createRuntimeCollector().reader,
     smRuntime: makeSmRuntime(stages, executeActOverride),
   } as SequentialTestHost;
 }

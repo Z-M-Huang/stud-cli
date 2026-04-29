@@ -66,7 +66,7 @@ export const contract: ProviderContract<GeminiConfig> = {
       )) {
         if (event.kind === "error") {
           const Cls = event.class === "ProviderCapability" ? ProviderCapability : ProviderTransient;
-          throw new Cls(event.message, undefined, { code: event.code });
+          throw new Cls(event.message, undefined, { code: event.code, ...(event.context ?? {}) });
         }
 
         if (event.kind === "text-delta") {

@@ -39,7 +39,7 @@ type Equals<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 // exactly twelve sanctioned surfaces
 // ---------------------------------------------------------------------------
 
-/** The canonical set of twelve sanctioned HostAPI surface names. */
+/** The canonical set of thirteen sanctioned HostAPI surface names. */
 type SanctionedHostAPISurfaces =
   | "session"
   | "events"
@@ -52,12 +52,13 @@ type SanctionedHostAPISurfaces =
   | "audit"
   | "observability"
   | "interaction"
-  | "commands";
+  | "commands"
+  | "metrics";
 
 /**
  * Compile-time exhaustiveness assertion.
  *
- * If `HostAPI` gains a 13th surface, `keyof HostAPI` is no longer assignable
+ * If `HostAPI` gains a 14th surface, `keyof HostAPI` is no longer assignable
  * to `SanctionedHostAPISurfaces` and `Equals` resolves to `false`, making the
  * `true` assignment below a compile error.
  *
@@ -67,7 +68,7 @@ type SanctionedHostAPISurfaces =
 const _assertExactSurfaces: Equals<keyof HostAPI, SanctionedHostAPISurfaces> = true;
 
 describe("HostAPI shape", () => {
-  it("declares exactly the twelve sanctioned surfaces (exhaustive compile-time check)", () => {
+  it("declares exactly the thirteen sanctioned surfaces (exhaustive compile-time check)", () => {
     // The compile-time assertion `_assertExactSurfaces` above is the primary
     // guard.  This runtime check documents the expected count so a reader
     // immediately sees the number without reconstructing it from the union.
@@ -84,14 +85,15 @@ describe("HostAPI shape", () => {
       "observability",
       "interaction",
       "commands",
+      "metrics",
     ];
-    assert.equal(expected.length, 12);
+    assert.equal(expected.length, 13);
     // Runtime-level exhaust: every element in `expected` is a valid key and
     // the length matches the union size.
     assert.ok(_assertExactSurfaces, "compile-time exhaustiveness sentinel must be true");
   });
 
-  it("all twelve surfaces are declared readonly on the interface", () => {
+  it("all thirteen surfaces are declared readonly on the interface", () => {
     // Readonly is enforced at the type level; the runtime frozen-sentinel test
     // is in surfaces-not-extensible.test.ts.
     const surface: readonly (keyof HostAPI)[] = [
@@ -107,8 +109,9 @@ describe("HostAPI shape", () => {
       "observability",
       "interaction",
       "commands",
+      "metrics",
     ];
-    assert.equal(surface.length, 12);
+    assert.equal(surface.length, 13);
   });
 });
 

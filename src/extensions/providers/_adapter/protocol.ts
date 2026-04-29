@@ -43,6 +43,7 @@ export type StreamEvent =
       readonly class: "ProviderTransient" | "ProviderCapability";
       readonly code: string;
       readonly message: string;
+      readonly context?: Readonly<Record<string, unknown>>;
     };
 
 export interface ProtocolAdapter {

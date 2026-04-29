@@ -34,6 +34,7 @@ export default tseslint.config(
           allowDefaultProject: [
             "eslint.config.js",
             "scripts/*.ts",
+            "scripts/*.tsx",
             "tests/scripts/*.ts",
             "tests/ci/*.ts",
             "tests/cli/*.ts",
