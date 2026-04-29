@@ -8,7 +8,6 @@ import { mockHost } from "../../../helpers/mock-host.js";
 import type { HostAPI } from "../../../../src/core/host/host-api.js";
 
 interface TestUIState {
-  rendered: string;
   activeDialogs: readonly unknown[];
   startupHeader: string;
   startupDetails: readonly string[];
@@ -26,7 +25,6 @@ interface TestHost extends HostAPI {
   readonly startup?: StartupState;
   readonly answeredRequests?: ReadonlySet<string>;
   readonly events: HostAPI["events"] & {
-    emitTokenDelta(delta: { correlationId: string; text: string }): void;
     raiseInteraction(request: { kind: string; correlationId: string; prompt: string }): void;
   };
 }
@@ -55,7 +53,6 @@ function createTestHost(opts?: {
 }): TestHost {
   const { host } = mockHost({ extId: opts?.extId ?? "default-tui", mode: opts?.mode ?? "ask" });
   const ui: TestUIState = {
-    rendered: "",
     activeDialogs: [],
     startupHeader: "",
     startupDetails: [],
@@ -69,9 +66,6 @@ function createTestHost(opts?: {
     ...(opts?.answeredRequests !== undefined ? { answeredRequests: opts.answeredRequests } : {}),
     events: {
       ...host.events,
-      emitTokenDelta(delta: { correlationId: string; text: string }): void {
-        host.events.emit("TokenDelta", delta);
-      },
       raiseInteraction(request: { kind: string; correlationId: string; prompt: string }): void {
         host.events.emit("InteractionRaised", request);
       },
@@ -118,14 +112,6 @@ function registerCoreContractTests(): void {
 }
 
 function registerInteractionTests(): void {
-  it("renders stream deltas in registration order", async () => {
-    const host = createTestHost();
-    await initAndActivate(host, { maxLogLines: 1000 });
-    host.events.emitTokenDelta({ correlationId: "t1", text: "hello " });
-    host.events.emitTokenDelta({ correlationId: "t1", text: "world" });
-    assert.match(host.ui.rendered, /hello world/);
-  });
-
   it("dismisses dialog on InteractionAnswered broadcast", async () => {
     const host = createTestHost();
     await initAndActivate(host);

@@ -304,7 +304,7 @@ describe("tool approval cache", () => {
 
       assert.deepEqual(prompt.selectPrompts, ["Allow tool 'glob' for '.'?"]);
       assert.equal(stdout.includes("assistant error"), false);
-      assert.equal(stdout.match(/^ {2}tool glob running$/gmu)?.length, 2);
+      assert.equal(stdout.match(/^ {2}tool glob[^\n]+running$/gmu)?.length, 2);
     } finally {
       restoreFetch();
       await rm(home, { recursive: true, force: true });
@@ -334,7 +334,7 @@ describe("tool approval cache", () => {
 
       assert.deepEqual(prompt.selectPrompts, []);
       assert.equal(stdout.includes("assistant error"), false);
-      assert.equal(stdout.match(/^ {2}tool read running$/gmu)?.length, 1);
+      assert.equal(stdout.match(/^ {2}tool read[^\n]+running$/gmu)?.length, 1);
     } finally {
       restoreFetch();
       await rm(home, { recursive: true, force: true });
@@ -365,7 +365,7 @@ describe("tool approval cache", () => {
 
       assert.deepEqual(prompt.selectPrompts, ["Allow tool 'bash' for 'pwd'?"]);
       assert.equal(stdout.includes("assistant error"), false);
-      assert.equal(stdout.match(/^ {2}tool bash running$/gmu)?.length, 1);
+      assert.equal(stdout.match(/^ {2}tool bash[^\n]+running$/gmu)?.length, 1);
       assert.equal(stdout.includes("Bash executed."), true);
     } finally {
       restoreFetch();

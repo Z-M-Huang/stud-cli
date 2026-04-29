@@ -33,8 +33,9 @@ describe("EVENT_TYPES — declared names", () => {
     assert.equal(EVENT_TYPES.SuppressedError.payloadShape, "diagnostic");
   });
 
-  it("declares all 12 bootstrap event names", () => {
+  it("declares all bootstrap + provider/tool event names", () => {
     const expected = [
+      // bootstrap (turn / stage / persistence / diagnostic / env / interaction)
       "SessionTurnStart",
       "SessionTurnEnd",
       "StagePreFired",
@@ -45,8 +46,21 @@ describe("EVENT_TYPES — declared names", () => {
       "EnvResolved",
       "CompactionPerformed",
       "ContextProviderFailed",
+      "InteractionRaised",
       "InteractionAnswered",
       "OrderingRewrite",
+      // provider stream lifecycle (wiki Event-Bus.md § Event kinds)
+      "ProviderRequestStarted",
+      "ProviderTokensStreamed",
+      "ProviderReasoningStreamed",
+      "ProviderRequestCompleted",
+      "ProviderRequestFailed",
+      // tool invocation lifecycle (wiki Event-Bus.md § Event kinds)
+      "ToolInvocationProposed",
+      "ToolInvocationStarted",
+      "ToolInvocationSucceeded",
+      "ToolInvocationFailed",
+      "ToolInvocationCancelled",
     ] as const;
 
     for (const name of expected) {

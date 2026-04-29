@@ -26,8 +26,19 @@ export type EventName =
   | "EnvResolved"
   | "CompactionPerformed"
   | "ContextProviderFailed"
+  | "InteractionRaised"
   | "InteractionAnswered"
-  | "OrderingRewrite";
+  | "OrderingRewrite"
+  | "ProviderRequestStarted"
+  | "ProviderTokensStreamed"
+  | "ProviderReasoningStreamed"
+  | "ProviderRequestCompleted"
+  | "ProviderRequestFailed"
+  | "ToolInvocationProposed"
+  | "ToolInvocationStarted"
+  | "ToolInvocationSucceeded"
+  | "ToolInvocationFailed"
+  | "ToolInvocationCancelled";
 
 // ---------------------------------------------------------------------------
 // Descriptor shape
@@ -35,7 +46,15 @@ export type EventName =
 
 export interface EventTypeDescriptor<TName extends EventName, _TPayload> {
   readonly name: TName;
-  readonly payloadShape: "turn" | "stage" | "persistence" | "diagnostic" | "env" | "interaction";
+  readonly payloadShape:
+    | "turn"
+    | "stage"
+    | "persistence"
+    | "diagnostic"
+    | "env"
+    | "interaction"
+    | "provider"
+    | "tool";
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +81,17 @@ export const EVENT_TYPES: EventTypeRegistry = Object.freeze({
   EnvResolved: makeDescriptor("EnvResolved", "env"),
   CompactionPerformed: makeDescriptor("CompactionPerformed", "diagnostic"),
   ContextProviderFailed: makeDescriptor("ContextProviderFailed", "diagnostic"),
+  InteractionRaised: makeDescriptor("InteractionRaised", "interaction"),
   InteractionAnswered: makeDescriptor("InteractionAnswered", "interaction"),
   OrderingRewrite: makeDescriptor("OrderingRewrite", "diagnostic"),
+  ProviderRequestStarted: makeDescriptor("ProviderRequestStarted", "provider"),
+  ProviderTokensStreamed: makeDescriptor("ProviderTokensStreamed", "provider"),
+  ProviderReasoningStreamed: makeDescriptor("ProviderReasoningStreamed", "provider"),
+  ProviderRequestCompleted: makeDescriptor("ProviderRequestCompleted", "provider"),
+  ProviderRequestFailed: makeDescriptor("ProviderRequestFailed", "provider"),
+  ToolInvocationProposed: makeDescriptor("ToolInvocationProposed", "tool"),
+  ToolInvocationStarted: makeDescriptor("ToolInvocationStarted", "tool"),
+  ToolInvocationSucceeded: makeDescriptor("ToolInvocationSucceeded", "tool"),
+  ToolInvocationFailed: makeDescriptor("ToolInvocationFailed", "tool"),
+  ToolInvocationCancelled: makeDescriptor("ToolInvocationCancelled", "tool"),
 } satisfies Record<EventName, EventTypeDescriptor<EventName, unknown>>);

@@ -69,6 +69,11 @@ export const contract: ProviderContract<AnthropicConfig> = {
           continue;
         }
 
+        if (event.kind === "reasoning") {
+          yield { type: "thinking-delta", delta: event.text };
+          continue;
+        }
+
         if (event.kind === "tool-call") {
           yield {
             type: "tool-call",

@@ -359,7 +359,7 @@ describe("runShell (bootstrap session)", () => {
           });
         });
         assert.equal(stdout.includes("assistant\n  [tool call] read"), true);
-        assert.equal(stdout.includes("  tool read running"), true);
+        assert.match(stdout, /^ {2}tool read[^\n]+running$/mu);
         assert.equal(stdout.includes("This project is a CLI workspace test."), true);
       });
     } finally {

@@ -48,6 +48,8 @@ export default tseslint.config(
             "tests/core/host/*.ts",
             // tests/core/host/impl/*.ts — host impl wrapper tests.
             "tests/core/host/impl/*.ts",
+            // tests/core/host/internal/*.ts — internal collector / writer tests.
+            "tests/core/host/internal/*.ts",
             // tests/core/concurrency/*.ts — scope tree and serializer tests.
             "tests/core/concurrency/*.ts",
             // tests/core/session/*.ts — SessionManifest tests.

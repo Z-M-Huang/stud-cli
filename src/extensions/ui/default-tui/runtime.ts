@@ -24,7 +24,8 @@ export interface DefaultConsoleUI {
   appendAssistantDelta(delta: string): void;
   appendAssistantToolCall(toolName: string): void;
   endAssistant(): void;
-  renderToolStart(toolId: string): void;
+  appendThinkingDelta(delta: string): void;
+  renderToolStart(toolId: string, argsSummary?: string): void;
   renderTurnError(message: string): void;
   renderStatusLine(items: readonly StatusLineItem[]): void;
 }
@@ -274,9 +275,37 @@ function renderStyledStatusLine(items: readonly StatusLineItem[], style: Console
     .join(style.muted(" | "));
 }
 
+function writeHistoryBlock(args: {
+  readonly write: WriteText;
+  readonly style: ConsoleStyler;
+  readonly width: number;
+  readonly contentWidth: number;
+  readonly messages: readonly ProviderMessage[];
+}): void {
+  if (args.messages.length === 0) {
+    return;
+  }
+  args.write(`${rule(args.width, `previous conversation (${args.messages.length.toString()})`)}\n`);
+  args.messages.forEach((message, index) => {
+    writeRoleBlock({
+      write: args.write,
+      style: args.style,
+      role: message.role,
+      content: message.content,
+      index: index + 1,
+      contentWidth: args.contentWidth,
+    });
+    if (index < args.messages.length - 1) {
+      args.write("\n");
+    }
+  });
+  args.write(`${rule(args.width)}\n\n`);
+}
+
 export function createDefaultConsoleUI(options: DefaultConsoleUIOptions): DefaultConsoleUI {
   let assistantOpen = false;
   let assistantHasOutput = false;
+  let thinkingOpen = false;
   const width = terminalWidth(options.stdout);
   const contentWidth = width - 6;
   const style = createStyler(shouldUseColor(options.stdout, options.useColor));
@@ -285,7 +314,15 @@ export function createDefaultConsoleUI(options: DefaultConsoleUIOptions): Defaul
     options.stdout.write(text);
   }
 
+  function closeThinkingBlock(): void {
+    if (thinkingOpen) {
+      write("\n");
+      thinkingOpen = false;
+    }
+  }
+
   function ensureAssistantLine(): void {
+    closeThinkingBlock();
     if (!assistantOpen) {
       write(`\n${style.assistant("assistant")}\n  `);
       assistantOpen = true;
@@ -302,25 +339,7 @@ export function createDefaultConsoleUI(options: DefaultConsoleUIOptions): Defaul
     },
 
     renderHistory(messages): void {
-      if (messages.length === 0) {
-        return;
-      }
-
-      write(`${rule(width, `previous conversation (${messages.length})`)}\n`);
-      messages.forEach((message, index) => {
-        writeRoleBlock({
-          write,
-          style,
-          role: message.role,
-          content: message.content,
-          index: index + 1,
-          contentWidth,
-        });
-        if (index < messages.length - 1) {
-          write("\n");
-        }
-      });
-      write(`${rule(width)}\n\n`);
+      writeHistoryBlock({ write, style, width, contentWidth, messages });
     },
 
     promptLabel(): string {
@@ -351,6 +370,7 @@ export function createDefaultConsoleUI(options: DefaultConsoleUIOptions): Defaul
     },
 
     endAssistant(): void {
+      closeThinkingBlock();
       if (assistantOpen) {
         write("\n");
       } else {
@@ -360,11 +380,23 @@ export function createDefaultConsoleUI(options: DefaultConsoleUIOptions): Defaul
       assistantHasOutput = false;
     },
 
-    renderToolStart(toolId): void {
-      write(`  ${style.tool("tool")} ${toolId} ${style.dim("running")}\n`);
+    appendThinkingDelta(delta): void {
+      if (!thinkingOpen) {
+        write(`\n${style.dim("stud-cli[thinking]")}\n  `);
+        thinkingOpen = true;
+      }
+      write(style.dim(delta.replace(/\n/gu, "\n  ")));
+    },
+
+    renderToolStart(toolId, argsSummary): void {
+      closeThinkingBlock();
+      const suffix =
+        argsSummary !== undefined && argsSummary.length > 0 ? ` ${style.dim(argsSummary)}` : "";
+      write(`  ${style.tool("tool")} ${toolId}${suffix} ${style.dim("running")}\n`);
     },
 
     renderTurnError(message): void {
+      closeThinkingBlock();
       write(`\n${style.error("assistant error")}\n`);
       wrapText(message, contentWidth).forEach((line) => {
         write(`  ${line}\n`);

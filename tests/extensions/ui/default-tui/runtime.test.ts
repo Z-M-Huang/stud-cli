@@ -93,4 +93,45 @@ describe("default console UI runtime", () => {
 
     assert.equal(output(), "\nassistant\n  (no output)\n");
   });
+
+  it("opens a stud-cli[thinking] block on the first thinking delta", () => {
+    const { ui, output } = captureUI();
+
+    ui.appendThinkingDelta("Looking at the repo. ");
+    ui.appendThinkingDelta("Picking the smallest fix.");
+
+    assert.equal(output().includes("stud-cli[thinking]"), true);
+    assert.equal(output().includes("Looking at the repo."), true);
+    assert.equal(output().includes("Picking the smallest fix."), true);
+  });
+
+  it("closes the thinking block before assistant output starts", () => {
+    const { ui, output } = captureUI();
+
+    ui.appendThinkingDelta("plan: short");
+    ui.appendAssistantDelta("Done.");
+    ui.endAssistant();
+
+    const text = output();
+    const thinkingIdx = text.indexOf("stud-cli[thinking]");
+    const assistantIdx = text.indexOf("assistant\n");
+    // The thinking block must appear before the assistant block, and there
+    // must be a newline that closes the thinking block before assistant
+    // output starts.
+    assert.equal(thinkingIdx > -1, true);
+    assert.equal(assistantIdx > thinkingIdx, true);
+    assert.equal(text.includes("Done."), true);
+  });
+
+  it("closes the thinking block before a tool start line", () => {
+    const { ui, output } = captureUI();
+
+    ui.appendThinkingDelta("about to run a tool");
+    ui.renderToolStart("read", 'path="src/index.ts"');
+
+    const text = output();
+    assert.equal(text.includes("stud-cli[thinking]"), true);
+    assert.equal(text.includes("tool read"), true);
+    assert.equal(text.includes('path="src/index.ts"'), true);
+  });
 });

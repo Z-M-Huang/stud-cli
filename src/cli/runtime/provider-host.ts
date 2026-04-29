@@ -6,14 +6,48 @@ import { resolveKeyringSecret } from "./storage.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
 import type { LoadedTool, ResolvedShellDeps, SecretsHost, SessionBootstrap } from "./types.js";
+import type { EventBus } from "../../core/events/bus.js";
 import type { AuditAPI } from "../../core/host/api/audit.js";
 import type { CommandsAPI } from "../../core/host/api/commands.js";
+import type { EventsAPI } from "../../core/host/api/events.js";
 import type { ObservabilityAPI } from "../../core/host/api/observability.js";
 import type { ToolDescriptor } from "../../core/host/api/tools.js";
 import type { RuntimeCollector } from "../../core/host/internal/runtime-collector.js";
 
-function noop(): undefined {
-  return undefined;
+/**
+ * Adapt the internal `EventBus` (envelope-shaped) into the `EventsAPI`
+ * surface that `HostAPI` exposes (payload-shaped). Subscribers receive the
+ * raw payload; emit wraps payload into an envelope with a fresh
+ * correlationId and a monotonic timestamp.
+ */
+function buildEventsAPI(bus: EventBus, sessionId: string): EventsAPI {
+  // Each handler registered via EventsAPI.on is wrapped into a bus-shaped
+  // handler. Track the mapping so EventsAPI.off can remove the right entry.
+  const wrapped = new WeakMap<(payload: unknown) => void, () => void>();
+  return {
+    on(name, handler) {
+      const cb = (env: { readonly payload: unknown }): void => {
+        (handler as (payload: unknown) => void)(env.payload);
+      };
+      const unsubscribe = bus.on(name, cb);
+      wrapped.set(handler as (payload: unknown) => void, unsubscribe);
+    },
+    off(_name, handler) {
+      const unsubscribe = wrapped.get(handler as (payload: unknown) => void);
+      if (unsubscribe !== undefined) {
+        unsubscribe();
+        wrapped.delete(handler as (payload: unknown) => void);
+      }
+    },
+    emit(name, payload) {
+      bus.emit({
+        name,
+        correlationId: `session:${sessionId}`,
+        monotonicTs: process.hrtime.bigint(),
+        payload,
+      });
+    },
+  };
 }
 
 function descriptors(loadedTools: readonly LoadedTool[]): readonly ToolDescriptor[] {
@@ -105,7 +139,8 @@ export function createProviderHost(
   loadedTools: readonly LoadedTool[],
   getAuditBus: () => SessionAuditBus | null = () => null,
   collector: RuntimeCollector = createRuntimeCollector({ now: () => deps.now().getTime() }),
-): SecretsHost & { readonly collector: RuntimeCollector } {
+  eventBus?: EventBus,
+): SecretsHost & { readonly collector: RuntimeCollector; readonly eventBus: EventBus | undefined } {
   const env = deps.env;
   const toolDescriptors = (): readonly ToolDescriptor[] => descriptors(loadedTools);
 
@@ -116,8 +151,14 @@ export function createProviderHost(
     mode: session.securityMode,
   });
 
+  const events: EventsAPI =
+    eventBus !== undefined
+      ? buildEventsAPI(eventBus, session.sessionId)
+      : { on: () => undefined, off: () => undefined, emit: () => undefined };
+
   return {
     collector,
+    eventBus,
     session: {
       id: session.sessionId,
       mode: session.securityMode,
@@ -126,7 +167,7 @@ export function createProviderHost(
         return { read: () => Promise.resolve(null), write: () => Promise.resolve() };
       },
     },
-    events: { on: noop, off: noop, emit: noop },
+    events,
     config: { readOwn: () => Promise.resolve({}) },
     env: {
       get(name: string): Promise<string> {

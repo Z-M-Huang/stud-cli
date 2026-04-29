@@ -12,23 +12,14 @@ import {
   type InteractionDialogState,
   type PendingInteraction,
 } from "./dialogs/interaction.js";
-import {
-  appendStreamDelta,
-  beginTurn,
-  createInitialStreamState,
-  type StreamRenderState,
-} from "./render/stream.js";
 import { renderStartupView, type StartupSurface } from "./startup-view.js";
 
 import type { DefaultTUIConfig } from "./config.schema.js";
 import type { InteractionRequest, InteractionResponse } from "../../../contracts/ui.js";
 import type { HostAPI } from "../../../core/host/host-api.js";
 
-const DEFAULT_MAX_LOG_LINES = 500;
-
 interface DefaultTUIRuntimeState {
   config: DefaultTUIConfig;
-  stream: StreamRenderState;
   dialogs: InteractionDialogState;
   subscriptions: (readonly [event: string, handler: (payload: unknown) => void])[];
   active: boolean;
@@ -41,10 +32,6 @@ interface DefaultTUIRuntimeState {
 
 const runtime = new WeakMap<HostAPI, DefaultTUIRuntimeState>();
 let activeHost: HostAPI | null = null;
-
-function getMaxLogLines(config: DefaultTUIConfig): number {
-  return config.maxLogLines ?? DEFAULT_MAX_LOG_LINES;
-}
 
 function toValidationError(message: string, field: string): Validation {
   return new Validation(message, undefined, {
@@ -119,9 +106,12 @@ function consumePendingInteraction(
 }
 
 function writeRenderTarget(host: HostAPI, state: DefaultTUIRuntimeState): void {
+  // Lifecycle never writes to stdout. The Ink mount in `mount.tsx` owns the
+  // terminal display on TTY; non-TTY runs go through `createDefaultConsoleUI`.
+  // The only legitimate consumer of this projection is a test harness that
+  // attaches a `host.ui` shim to inspect state — production hosts don't.
   const target = host as HostAPI & {
     ui?: {
-      rendered?: string;
       activeDialogs?: readonly ActiveDialog[];
       startupHeader?: string;
       startupDetails?: readonly string[];
@@ -129,16 +119,11 @@ function writeRenderTarget(host: HostAPI, state: DefaultTUIRuntimeState): void {
     };
   };
   if (target.ui !== undefined) {
-    target.ui.rendered = state.stream.rendered;
     target.ui.activeDialogs = state.dialogs.dialogs;
     target.ui.startupHeader = state.startupHeader;
     target.ui.startupDetails = state.startupDetails;
     target.ui.modeDisplay = state.modeDisplay;
   }
-  // Lifecycle no longer paints stdout directly. The Ink mount in mount.tsx
-  // owns the terminal display on TTY; non-TTY runs go through createDefaultConsoleUI.
-  // Lifecycle keeps state for tests and the future event-driven path, but it
-  // never writes to stdout here.
 }
 
 function withRenderGuard(host: HostAPI, fn: () => void, reason: string): void {
@@ -167,7 +152,6 @@ export function init(host: HostAPI, config: DefaultTUIConfig): Promise<void> {
 
   const state: DefaultTUIRuntimeState = {
     config,
-    stream: createInitialStreamState(),
     dialogs: createInitialDialogState(
       (host as HostAPI & { answeredRequests?: ReadonlySet<string> }).answeredRequests,
     ),
@@ -201,32 +185,11 @@ export function activate(host: HostAPI): Promise<void> {
     return Promise.resolve();
   }
 
-  register(host, "TokenDelta", (payload) => {
-    withRenderGuard(
-      host,
-      () => {
-        const delta = payload as { correlationId: string; text: string };
-        state.stream = appendStreamDelta(state.stream, delta, getMaxLogLines(state.config));
-        writeRenderTarget(host, state);
-      },
-      "default-tui.token-delta",
-    );
-  });
-
-  register(host, "SessionTurnStart", () => {
-    withRenderGuard(
-      host,
-      () => {
-        state.stream = beginTurn(state.stream, getMaxLogLines(state.config));
-        writeRenderTarget(host, state);
-      },
-      "default-tui.turn-start",
-    );
-  });
-
-  register(host, "SessionTurnEnd", () => {
-    withRenderGuard(host, () => writeRenderTarget(host, state), "default-tui.turn-end");
-  });
+  // Stream rendering (ProviderTokensStreamed / SessionTurnStart / SessionTurnEnd)
+  // is owned by the Ink mount in `mount.tsx`, which subscribes to the same
+  // event bus directly. lifecycle.ts only handles the interactor side here so
+  // the dialog state and the Promise-returning `onInteraction` stay coherent
+  // when the bundled TUI is loaded through the (future) extension manager.
 
   register(host, "InteractionRaised", (payload) => {
     withRenderGuard(
@@ -272,13 +235,10 @@ export function activate(host: HostAPI): Promise<void> {
     );
   });
 
-  register(host, "StartupSurfaceUpdated", (payload) => {
-    withRenderGuard(
-      host,
-      () => updateStartup(host, payload as StartupSurface),
-      "default-tui.startup",
-    );
-  });
+  // Note: an earlier draft subscribed to a `StartupSurfaceUpdated` event.
+  // No emitter ever existed and the wiki does not list it, so the listener
+  // was dead code. The startup surface is rendered through the imperative
+  // `updateStartup(host, surface)` path triggered by `init` instead.
 
   state.active = true;
   return Promise.resolve();

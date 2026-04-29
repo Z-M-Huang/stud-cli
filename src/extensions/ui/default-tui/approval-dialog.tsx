@@ -89,15 +89,3 @@ export function ApprovalDialog(props: {
     </Box>
   );
 }
-
-const APPROVAL_DIALOG_CLEARANCE_ROWS = 7;
-
-export function ApprovalDialogClearance(): React.ReactElement {
-  return (
-    <Box flexDirection="column" marginBottom={1}>
-      {Array.from({ length: APPROVAL_DIALOG_CLEARANCE_ROWS }, (_, index) => (
-        <Text key={index}> </Text>
-      ))}
-    </Box>
-  );
-}

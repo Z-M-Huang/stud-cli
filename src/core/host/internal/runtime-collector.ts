@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function */
 /**
  * RuntimeCollector — internal writer that backs `host.metrics`.
  *
@@ -159,13 +158,25 @@ function initialState(now: number): MutableState {
   };
 }
 
-export function createRuntimeCollector(options: CollectorOptions = {}): RuntimeCollector {
-  const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
-  const bufferSize = options.diagnosticBufferSize ?? DEFAULT_DIAGNOSTIC_BUFFER;
-  const now = options.now ?? ((): number => Date.now());
-
-  const state = initialState(now());
-  let snapshot = freezeSnapshot(state);
+/**
+ * Snapshot publisher: owns the debounce timer, listener sets, and the
+ * `dispose` flag. Returns the trio that the writers and reader call into.
+ */
+function createSnapshotPublisher(args: {
+  readonly state: MutableState;
+  readonly debounceMs: number;
+}): {
+  readonly scheduleSnapshot: () => void;
+  readonly emitTokens: () => void;
+  readonly snapshotListeners: Set<SnapshotListener>;
+  readonly tokenListeners: Set<TokenListener>;
+  readonly getSnapshot: () => RuntimeSnapshot;
+  readonly markClean: () => void;
+  readonly isDirty: () => boolean;
+  readonly dispose: () => void;
+  readonly isDisposed: () => boolean;
+} {
+  let snapshot = freezeSnapshot(args.state);
   let snapshotDirty = false;
   let pendingTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
@@ -173,79 +184,108 @@ export function createRuntimeCollector(options: CollectorOptions = {}): RuntimeC
   const snapshotListeners = new Set<SnapshotListener>();
   const tokenListeners = new Set<TokenListener>();
 
-  function publish(): void {
-    if (disposed) {
-      return;
-    }
+  const refreshSnapshot = (): void => {
     if (snapshotDirty) {
-      snapshot = freezeSnapshot(state);
+      snapshot = freezeSnapshot(args.state);
       snapshotDirty = false;
     }
-    snapshotListeners.forEach((listener) => {
-      listener(snapshot);
-    });
-  }
+  };
 
-  function scheduleSnapshot(): void {
-    if (disposed) {
-      return;
-    }
+  const publish = (): void => {
+    if (disposed) return;
+    refreshSnapshot();
+    snapshotListeners.forEach((listener) => listener(snapshot));
+  };
+
+  const scheduleSnapshot = (): void => {
+    if (disposed) return;
     snapshotDirty = true;
-    if (pendingTimer !== null) {
-      return;
-    }
+    if (pendingTimer !== null) return;
     pendingTimer = setTimeout(() => {
       pendingTimer = null;
       publish();
-    }, debounceMs);
-    // Allow Node to exit even if a snapshot is pending.
+    }, args.debounceMs);
     if (typeof pendingTimer === "object" && pendingTimer !== null && "unref" in pendingTimer) {
       (pendingTimer as { unref: () => void }).unref();
     }
-  }
+  };
 
-  function emitTokens(): void {
-    const frozen = Object.freeze({ ...state.tokens });
-    tokenListeners.forEach((listener) => {
-      listener(frozen);
-    });
-  }
-
-  const reader: RuntimeReader = {
-    snapshot() {
-      if (snapshotDirty) {
-        snapshot = freezeSnapshot(state);
-        snapshotDirty = false;
-      }
-      return snapshot;
-    },
-    subscribe(handler) {
-      snapshotListeners.add(handler);
-      return () => {
-        snapshotListeners.delete(handler);
-      };
-    },
-    subscribeToTokens(handler) {
-      tokenListeners.add(handler);
-      return () => {
-        tokenListeners.delete(handler);
-      };
-    },
+  const emitTokens = (): void => {
+    const frozen = Object.freeze({ ...args.state.tokens });
+    tokenListeners.forEach((listener) => listener(frozen));
   };
 
   return {
-    reader,
+    scheduleSnapshot,
+    emitTokens,
+    snapshotListeners,
+    tokenListeners,
+    getSnapshot(): RuntimeSnapshot {
+      refreshSnapshot();
+      return snapshot;
+    },
+    markClean(): void {
+      snapshotDirty = false;
+    },
+    isDirty(): boolean {
+      return snapshotDirty;
+    },
+    dispose(): void {
+      disposed = true;
+      if (pendingTimer !== null) {
+        clearTimeout(pendingTimer);
+        pendingTimer = null;
+      }
+      snapshotListeners.clear();
+      tokenListeners.clear();
+    },
+    isDisposed(): boolean {
+      return disposed;
+    },
+  };
+}
 
+function createReader(publisher: ReturnType<typeof createSnapshotPublisher>): RuntimeReader {
+  return {
+    snapshot() {
+      return publisher.getSnapshot();
+    },
+    subscribe(handler) {
+      publisher.snapshotListeners.add(handler);
+      return () => {
+        publisher.snapshotListeners.delete(handler);
+      };
+    },
+    subscribeToTokens(handler) {
+      publisher.tokenListeners.add(handler);
+      return () => {
+        publisher.tokenListeners.delete(handler);
+      };
+    },
+  };
+}
+
+/**
+ * Build the writer half of the collector. The writers mutate `state` and
+ * call into the publisher to fan out updates to subscribers.
+ */
+function createWriters(args: {
+  readonly state: MutableState;
+  readonly bufferSize: number;
+  readonly now: () => number;
+  readonly scheduleSnapshot: () => void;
+  readonly emitTokens: () => void;
+}): Omit<RuntimeCollector, "reader" | "dispose"> {
+  const { state, bufferSize, now, scheduleSnapshot, emitTokens } = args;
+  return {
     setSession(update) {
       Object.assign(state.session, update);
       scheduleSnapshot();
     },
-
     setProvider(current, available) {
       state.provider = { current, available };
       scheduleSnapshot();
     },
-
     addTokens(deltaInput, deltaOutput) {
       state.tokens = {
         inputTotal: state.tokens.inputTotal + deltaInput,
@@ -256,49 +296,34 @@ export function createRuntimeCollector(options: CollectorOptions = {}): RuntimeC
       emitTokens();
       scheduleSnapshot();
     },
-
     beginTurn() {
-      state.tokens = {
-        ...state.tokens,
-        lastTurnInput: 0,
-        lastTurnOutput: 0,
-      };
+      state.tokens = { ...state.tokens, lastTurnInput: 0, lastTurnOutput: 0 };
       state.session.turnCount += 1;
       state.session.lastTurnAt = now();
       scheduleSnapshot();
     },
-
     endTurn() {
       state.session.lastTurnAt = now();
       scheduleSnapshot();
     },
-
     setContext(update) {
       Object.assign(state.context, update);
       scheduleSnapshot();
     },
-
     setTools(items) {
       const activeCount = items.filter((t) => t.allowedNow).length;
-      state.tools = {
-        items,
-        activeCount,
-        totalCount: items.length,
-      };
+      state.tools = { items, activeCount, totalCount: items.length };
       scheduleSnapshot();
     },
-
     setMcp(servers, configuredCount) {
       const connectedCount = servers.filter((s) => s.status === "connected").length;
       state.mcp = { servers, connectedCount, configuredCount };
       scheduleSnapshot();
     },
-
     setStateMachine(value) {
       state.stateMachine = value;
       scheduleSnapshot();
     },
-
     pushDiagnostic(item) {
       const recent = state.diagnostics.recent;
       recent.push(item);
@@ -312,30 +337,37 @@ export function createRuntimeCollector(options: CollectorOptions = {}): RuntimeC
       };
       scheduleSnapshot();
     },
-
     setUi(items) {
       state.ui = { items };
       scheduleSnapshot();
     },
-
     setHooks(items) {
       state.hooks = { items };
       scheduleSnapshot();
     },
-
     setExtensions(items) {
       state.extensions = { loaded: items };
       scheduleSnapshot();
     },
+  };
+}
 
-    dispose() {
-      disposed = true;
-      if (pendingTimer !== null) {
-        clearTimeout(pendingTimer);
-        pendingTimer = null;
-      }
-      snapshotListeners.clear();
-      tokenListeners.clear();
-    },
+export function createRuntimeCollector(options: CollectorOptions = {}): RuntimeCollector {
+  const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+  const bufferSize = options.diagnosticBufferSize ?? DEFAULT_DIAGNOSTIC_BUFFER;
+  const now = options.now ?? ((): number => Date.now());
+  const state = initialState(now());
+  const publisher = createSnapshotPublisher({ state, debounceMs });
+  const writers = createWriters({
+    state,
+    bufferSize,
+    now,
+    scheduleSnapshot: publisher.scheduleSnapshot,
+    emitTokens: publisher.emitTokens,
+  });
+  return {
+    reader: createReader(publisher),
+    ...writers,
+    dispose: publisher.dispose,
   };
 }

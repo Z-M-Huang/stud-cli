@@ -1,21 +1,25 @@
 import { Box, Static, Text, useInput } from "ink";
 import React, { useEffect, useState } from "react";
 
+import { ApprovalDialog, type ApprovalDialogView } from "./approval-dialog.js";
 import {
-  ApprovalDialog,
-  ApprovalDialogClearance,
-  type ApprovalDialogView,
-} from "./approval-dialog.js";
+  AssistantDraft,
+  ErrorBlock,
+  MessageCard,
+  ThinkingRow,
+  ToolCard,
+} from "./transcript-rows.js";
 
 import type { StatusLineItem } from "./status-line.js";
 import type { Theme } from "./theme.js";
-import type { ProviderMessage, ProviderContentPart } from "../../../contracts/providers.js";
+import type { ProviderMessage } from "../../../contracts/providers.js";
 import type { SecurityMode } from "../../../contracts/settings-shape.js";
 
 export interface ToolCardView {
   readonly id: string;
   readonly name: string;
   readonly status: "running" | "completed" | "failed";
+  readonly args?: string | undefined;
   readonly summary?: string | undefined;
 }
 
@@ -29,7 +33,7 @@ export type TranscriptItem =
       readonly timestamp?: string | undefined;
     }
   | { readonly kind: "tool"; readonly id: string; readonly card: ToolCardView }
-  | { readonly kind: "thinking"; readonly id: string }
+  | { readonly kind: "thinking"; readonly id: string; readonly text: string }
   | { readonly kind: "error"; readonly id: string; readonly message: string };
 
 export interface HeaderInfo {
@@ -61,7 +65,6 @@ export interface InkTUIFrameProps {
   readonly palette?: readonly PaletteEntry[] | undefined;
   readonly paletteSelectedIndex?: number | undefined;
   readonly approvalDialog?: ApprovalDialogView | undefined;
-  readonly approvalClearance?: boolean | undefined;
   readonly statusItems: readonly StatusLineItem[];
   readonly theme?: Theme | undefined;
   readonly onComposerKey: (input: string, key: ComposerKey) => void;
@@ -102,161 +105,6 @@ function statusToneToColor(
     default:
       return theme?.text;
   }
-}
-
-function partsAsLines(content: ProviderMessage["content"]): readonly string[] {
-  if (typeof content === "string") {
-    return content.split(/\r?\n/u);
-  }
-  return content.flatMap((part: ProviderContentPart): readonly string[] => {
-    switch (part.type) {
-      case "text":
-        return part.text.split(/\r?\n/u);
-      case "tool-call":
-        return [`[tool] ${part.toolName}`];
-      case "tool-result":
-        return [`[${part.toolName}] ${part.content}`.split(/\r?\n/u).join(" ")];
-      case "image":
-        return [`[image] ${part.url}`];
-    }
-  });
-}
-
-function roleLabel(role: ProviderMessage["role"]): string {
-  if (role === "user") return "you";
-  if (role === "tool") return "tool";
-  return "stud-cli";
-}
-
-function roleColor(role: ProviderMessage["role"], theme: Theme | undefined): string | undefined {
-  if (role === "user") return theme?.info;
-  if (role === "tool") return theme?.muted;
-  return theme?.accent;
-}
-
-function MessageCard({
-  message,
-  theme,
-  itemId,
-  timestamp,
-}: {
-  readonly message: ProviderMessage;
-  readonly theme?: Theme | undefined;
-  readonly itemId: string;
-  readonly timestamp?: string | undefined;
-}): React.ReactElement {
-  const lines = partsAsLines(message.content);
-  return (
-    <Box flexDirection="column" marginBottom={1}>
-      <Text>
-        <Text {...c(roleColor(message.role, theme))} bold>
-          {roleLabel(message.role)}
-        </Text>
-        {timestamp !== undefined ? (
-          <Text {...c(theme?.muted)}>
-            {"  "}
-            {timestamp}
-          </Text>
-        ) : null}
-      </Text>
-      {lines.map((line, idx) => (
-        <Text key={`${itemId}-l-${idx.toString()}`} {...c(theme?.text)}>
-          {line.length === 0 ? " " : line}
-        </Text>
-      ))}
-    </Box>
-  );
-}
-
-function AssistantDraft({
-  draft,
-  theme,
-}: {
-  readonly draft: string;
-  readonly theme?: Theme | undefined;
-}): React.ReactElement {
-  // Always render a Box (empty when no draft) instead of returning null. This
-  // keeps the React tree shape constant across renders so Ink's reconciler +
-  // log-update don't drop a leading row when transcript items are appended.
-  if (draft.length === 0) {
-    return <Box flexDirection="column" />;
-  }
-  const lines = draft.split(/\r?\n/u);
-  return (
-    <Box flexDirection="column" marginBottom={1}>
-      <Text {...c(theme?.accent)} bold>
-        stud-cli
-      </Text>
-      {lines.map((line, idx) => (
-        <Text key={`d-${idx.toString()}`} {...c(theme?.text)}>
-          {line.length === 0 ? " " : line}
-        </Text>
-      ))}
-    </Box>
-  );
-}
-
-function ThinkingRow({ theme }: { readonly theme?: Theme | undefined }): React.ReactElement {
-  return (
-    <Box marginBottom={1}>
-      <Text {...c(theme?.muted)}>▸ Thinking (collapsed)</Text>
-    </Box>
-  );
-}
-
-function ToolCard({
-  card,
-  theme,
-}: {
-  readonly card: ToolCardView;
-  readonly theme?: Theme | undefined;
-}): React.ReactElement {
-  const badgeColor =
-    card.status === "completed"
-      ? theme?.accent
-      : card.status === "failed"
-        ? theme?.bad
-        : theme?.warn;
-  const badgeLabel =
-    card.status === "completed"
-      ? "✓ completed"
-      : card.status === "failed"
-        ? "✗ failed"
-        : "… running";
-  return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      {...b(theme?.border)}
-      paddingX={1}
-      marginBottom={1}
-    >
-      <Box justifyContent="space-between">
-        <Text {...c(theme?.info)}>Tool: {card.name}</Text>
-        <Text {...c(badgeColor)}>{badgeLabel}</Text>
-      </Box>
-      {card.summary !== undefined && card.summary.length > 0 ? (
-        <Text {...c(theme?.muted)}>{card.summary}</Text>
-      ) : null}
-    </Box>
-  );
-}
-
-function ErrorBlock({
-  message,
-  theme,
-}: {
-  readonly message: string;
-  readonly theme?: Theme | undefined;
-}): React.ReactElement {
-  return (
-    <Box flexDirection="column" marginBottom={1}>
-      <Text {...c(theme?.bad)} bold>
-        error
-      </Text>
-      <Text {...c(theme?.text)}>{message}</Text>
-    </Box>
-  );
 }
 
 function Header(props: {
@@ -433,7 +281,7 @@ function renderTranscriptItem(
     case "tool":
       return <ToolCard card={item.card} theme={theme} />;
     case "thinking":
-      return <ThinkingRow theme={theme} />;
+      return <ThinkingRow text={item.text} theme={theme} />;
     case "error":
       return <ErrorBlock message={item.message} theme={theme} />;
   }
@@ -461,8 +309,6 @@ export function InkTUIFrame(props: InkTUIFrameProps): React.ReactElement {
         <Box flexDirection="column">
           {props.approvalDialog !== undefined ? (
             <ApprovalDialog dialog={props.approvalDialog} theme={props.theme} />
-          ) : props.approvalClearance === true ? (
-            <ApprovalDialogClearance />
           ) : null}
         </Box>
 

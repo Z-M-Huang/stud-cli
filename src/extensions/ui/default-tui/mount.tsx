@@ -1,39 +1,37 @@
-/* eslint-disable max-lines, max-lines-per-function */
 import { render, type Instance } from "ink";
-import React, { useEffect, useState } from "react";
+import React from "react";
 
+import { DEFAULT_INK_FRAME_HINT, type ComposerKey, type PaletteEntry } from "./ink-app.js";
+import { createApprovalManager } from "./ink-approval.js";
+import { createComposerController } from "./ink-composer.js";
+import { createInkMountActions } from "./ink-mount-actions.js";
 import {
-  resolveApprovalKeyAction,
-  type ApprovalDecision,
-  type ApprovalDialogView,
-} from "./approval-dialog.js";
-import {
-  append as appendBuffer,
-  backspace as backspaceBuffer,
-  createComposerBuffer,
-  type ComposerBuffer,
-} from "./composer-buffer.js";
-import {
-  InkTUIFrame,
-  DEFAULT_INK_FRAME_HINT,
-  type ComposerKey,
-  type InkTUIFrameProps,
-  type PaletteEntry,
-  type TranscriptItem,
-} from "./ink-app.js";
+  Root,
+  clockString,
+  createInputQueue,
+  createStore,
+  type InkStore,
+  type InputQueue,
+} from "./ink-store.js";
 import {
   createDefaultConsoleUI,
   type ConsoleSessionView,
   type DefaultConsoleUI,
 } from "./runtime.js";
-import {
-  defaultStatusLineItems,
-  statusContextFromRuntime,
-  type StatusLineItem,
-} from "./status-line.js";
-import { defaultTheme, type Theme } from "./theme.js";
+import { defaultTheme } from "./theme.js";
 
+import type { ApprovalDecision } from "./approval-dialog.js";
 import type { PromptIO } from "../../../cli/prompt.js";
+import type { EventBus, EventEnvelope } from "../../../core/events/bus.js";
+import type {
+  ProviderReasoningStreamedPayload,
+  ProviderRequestCompletedPayload,
+  ProviderRequestFailedPayload,
+  ProviderRequestStartedPayload,
+  ProviderTokensStreamedPayload,
+  ToolInvocationProposedPayload,
+  ToolInvocationStartedPayload,
+} from "../../../core/events/payloads.js";
 import type { RuntimeReader } from "../../../core/host/api/metrics.js";
 
 /**
@@ -79,204 +77,15 @@ interface MountOptions {
    * shown as a popup above the composer.
    */
   readonly catalog?: readonly PaletteEntry[];
+  /**
+   * Cross-extension event bus. When provided, the renderer subscribes to
+   * the wiki-named provider/tool events (`ProviderTokensStreamed`,
+   * `ProviderReasoningStreamed`, `ToolInvocation*`, ...) and updates its
+   * internal store from those subscriptions. Without a bus the imperative
+   * writer methods on `MountedTUI` still work (handy for tests).
+   */
+  readonly eventBus?: EventBus;
 }
-
-interface InkState {
-  readonly session: ConsoleSessionView | null;
-  /** Append-only transcript: header (always first), startup, messages, tool cards, errors. */
-  readonly transcriptItems: readonly TranscriptItem[];
-  readonly assistantDraft: string;
-  readonly composerText: string;
-  readonly statusItems: readonly StatusLineItem[];
-  readonly palette: readonly PaletteEntry[] | null;
-  readonly paletteSelectedIndex: number;
-  readonly approvalDialog: ApprovalDialogView | null;
-  readonly approvalClearance: boolean;
-  readonly online: boolean;
-  readonly startedAt: Date;
-}
-
-function initialState(): InkState {
-  return {
-    session: null,
-    transcriptItems: [],
-    assistantDraft: "",
-    composerText: "",
-    statusItems: [],
-    palette: null,
-    paletteSelectedIndex: 0,
-    approvalDialog: null,
-    approvalClearance: false,
-    online: true,
-    startedAt: new Date(),
-  };
-}
-
-interface InkStore {
-  getState(): InkState;
-  setState(updater: (state: InkState) => InkState): void;
-  subscribe(listener: () => void): () => void;
-}
-
-function createStore(): InkStore {
-  let state = initialState();
-  const listeners = new Set<() => void>();
-  return {
-    getState() {
-      return state;
-    },
-    setState(updater) {
-      state = updater(state);
-      listeners.forEach((listener) => {
-        listener();
-      });
-    },
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-  };
-}
-
-interface InputQueue {
-  enqueue(): Promise<string>;
-  resolveNext(value: string): boolean;
-  rejectAll(reason: unknown): void;
-}
-
-interface PendingApprovalRequest {
-  readonly request: ToolApprovalRequest;
-  readonly resolve: (decision: ApprovalDecision) => void;
-}
-
-function createInputQueue(): InputQueue {
-  const pending: ((value: string) => void)[] = [];
-  return {
-    enqueue() {
-      return new Promise<string>((resolve) => {
-        pending.push(resolve);
-      });
-    },
-    resolveNext(value) {
-      const next = pending.shift();
-      if (next === undefined) {
-        return false;
-      }
-      next(value);
-      return true;
-    },
-    rejectAll() {
-      pending.length = 0;
-    },
-  };
-}
-
-function clockString(date: Date): string {
-  const hh = date.getHours().toString().padStart(2, "0");
-  const mm = date.getMinutes().toString().padStart(2, "0");
-  const ss = date.getSeconds().toString().padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
-}
-
-interface RootProps {
-  readonly store: InkStore;
-  readonly metrics: RuntimeReader | undefined;
-  readonly theme: Theme | undefined;
-  readonly hint: string;
-  readonly onComposerKey: (input: string, key: ComposerKey) => void;
-}
-
-function useStoreSnapshot(store: InkStore): InkState {
-  const [snap, setSnap] = useState(store.getState());
-  useEffect(() => {
-    return store.subscribe(() => {
-      setSnap(store.getState());
-    });
-  }, [store]);
-  return snap;
-}
-
-function useMetrics(metrics: RuntimeReader | undefined): number {
-  // Returns a `version` counter incremented on every snapshot publish; the
-  // counter forces a re-render so widgets that read `metrics.snapshot()`
-  // reflect the latest values without holding their own copy.
-  const [version, setVersion] = useState(0);
-  useEffect(() => {
-    if (metrics === undefined) {
-      return undefined;
-    }
-    return metrics.subscribe(() => {
-      setVersion((v) => v + 1);
-    });
-  }, [metrics]);
-  return version;
-}
-
-function Root(props: RootProps): React.ReactElement {
-  const snap = useStoreSnapshot(props.store);
-  const metricsVersion = useMetrics(props.metrics);
-  const session = snap.session;
-  const runtime = props.metrics?.snapshot();
-  const _ignore = metricsVersion; // re-render trigger
-  void _ignore;
-  const liveStatusItems =
-    runtime !== undefined
-      ? defaultStatusLineItems(statusContextFromRuntime(runtime, { now: new Date() }))
-      : defaultStatusLineItems({
-          sessionId: session?.sessionId ?? "session",
-          providerLabel: session?.providerLabel ?? "provider",
-          modelId: session?.modelId ?? "model",
-          mode: session?.mode ?? "ask",
-          cwd: session?.cwd ?? process.cwd(),
-          projectTrust: session?.projectTrust ?? "global-only",
-          sessionStartedAt: snap.startedAt,
-          now: new Date(),
-        });
-  const frame: InkTUIFrameProps = {
-    transcriptItems: snap.transcriptItems,
-    assistantDraft: snap.assistantDraft,
-    composerText: snap.composerText,
-    composerHint: props.hint,
-    palette: snap.palette ?? undefined,
-    paletteSelectedIndex: snap.paletteSelectedIndex,
-    approvalDialog: snap.approvalDialog ?? undefined,
-    approvalClearance: snap.approvalClearance,
-    statusItems: snap.statusItems.length > 0 ? snap.statusItems : liveStatusItems,
-    theme: props.theme,
-    onComposerKey: props.onComposerKey,
-  };
-  return <InkTUIFrame {...frame} />;
-}
-
-function inkSupported(stdout: NodeJS.WriteStream, stdin: NodeJS.ReadableStream): boolean {
-  if (!stdout.isTTY) {
-    return false;
-  }
-  if (!(stdin as NodeJS.ReadStream).isTTY) {
-    return false;
-  }
-  if (process.env["TERM"] === "dumb") {
-    return false;
-  }
-  if (process.env["STUD_CLI_DISABLE_INK"] !== undefined) {
-    return false;
-  }
-  return true;
-}
-
-function tooLargeForInk(stdout: NodeJS.WriteStream): boolean {
-  return !(typeof stdout.columns === "number" && typeof stdout.rows === "number");
-}
-
-let nextItemSeq = 0;
-function nextId(prefix: string): string {
-  nextItemSeq += 1;
-  return `${prefix}-${nextItemSeq.toString()}`;
-}
-
-const APPROVAL_CLEARANCE_MS = 50;
 
 function fallbackMount(opts: MountOptions): MountedTUI {
   const ui = createDefaultConsoleUI({ stdout: opts.stdout });
@@ -306,11 +115,14 @@ function fallbackMount(opts: MountOptions): MountedTUI {
     appendAssistantToolCall(toolName) {
       ui.appendAssistantToolCall(toolName);
     },
+    appendThinkingDelta(delta) {
+      ui.appendThinkingDelta(delta);
+    },
     endAssistant() {
       ui.endAssistant();
     },
-    renderToolStart(toolId) {
-      ui.renderToolStart(toolId);
+    renderToolStart(toolId, argsSummary) {
+      ui.renderToolStart(toolId, argsSummary);
     },
     renderTurnError(message) {
       ui.renderTurnError(message);
@@ -342,193 +154,20 @@ function fallbackMount(opts: MountOptions): MountedTUI {
   };
 }
 
-function inkMount(opts: MountOptions): MountedTUI {
-  const store = createStore();
-  const queue = createInputQueue();
-  const theme = defaultTheme(opts.stdout);
-  const tagline = opts.tagline ?? "an coding assistant";
-  const approvalQueue: PendingApprovalRequest[] = [];
-  let activeApproval: PendingApprovalRequest | null = null;
-  let assistantOpen = false;
-  let unmounted = false;
+interface InkMountInternals {
+  readonly store: InkStore;
+  readonly queue: InputQueue;
+  readonly tagline: string;
+  instance: Instance;
+}
 
-  const showApproval = (pending: PendingApprovalRequest): void => {
-    activeApproval = pending;
-    store.setState((state) => ({
-      ...state,
-      palette: null,
-      paletteSelectedIndex: 0,
-      approvalClearance: false,
-      approvalDialog: {
-        toolId: pending.request.toolId,
-        approvalKey: pending.request.displayApprovalKey,
-        selectedIndex: 0,
-      },
-    }));
-  };
-
-  const pumpApprovalQueue = (): void => {
-    if (activeApproval !== null) {
-      return;
-    }
-    const next = approvalQueue.shift();
-    if (next !== undefined) {
-      showApproval(next);
-    }
-  };
-
-  const selectApprovalIndex = (selectedIndex: number): void => {
-    store.setState((state) =>
-      state.approvalDialog === null
-        ? state
-        : {
-            ...state,
-            approvalDialog: { ...state.approvalDialog, selectedIndex },
-          },
-    );
-  };
-
-  const resolveApproval = (decision: ApprovalDecision): void => {
-    const active = activeApproval;
-    if (active === null) {
-      return;
-    }
-    activeApproval = null;
-    store.setState((state) => ({
-      ...state,
-      approvalDialog: null,
-      approvalClearance: true,
-    }));
-    active.resolve(decision);
-    pumpApprovalQueue();
-    const clearanceTimer = setTimeout(() => {
-      if (unmounted) {
-        return;
-      }
-      store.setState((state) =>
-        state.approvalDialog === null && state.approvalClearance
-          ? { ...state, approvalClearance: false }
-          : state,
-      );
-    }, APPROVAL_CLEARANCE_MS);
-    clearanceTimer.unref();
-  };
-
-  const denyAllApprovals = (): void => {
-    const active = activeApproval;
-    activeApproval = null;
-    store.setState((state) => ({
-      ...state,
-      approvalDialog: null,
-      approvalClearance: false,
-    }));
-    active?.resolve("deny");
-    while (approvalQueue.length > 0) {
-      approvalQueue.shift()?.resolve("deny");
-    }
-  };
-
-  const filterPalette = (input: string): readonly PaletteEntry[] | null => {
-    if (opts.catalog === undefined || !input.startsWith("/")) {
-      return null;
-    }
-    const query = input.slice(1).toLowerCase();
-    const filtered = opts.catalog
-      .filter((entry) => entry.name.slice(1).toLowerCase().includes(query))
-      .slice(0, 8);
-    return filtered.length === 0 ? null : filtered;
-  };
-
-  let buffer: ComposerBuffer = createComposerBuffer();
-  const refreshDisplay = (): void => {
-    const display = buffer.display;
-    const palette = filterPalette(display);
-    store.setState((state) => {
-      // Reset selection when palette content changes shape (closed → open or new query).
-      const sameLength = palette?.length === state.palette?.length;
-      const nextSelected = palette === null ? 0 : sameLength ? state.paletteSelectedIndex : 0;
-      return {
-        ...state,
-        composerText: display,
-        palette,
-        paletteSelectedIndex: nextSelected,
-      };
-    });
-  };
-
-  const submit = (text: string): void => {
-    buffer = createComposerBuffer();
-    refreshDisplay();
-    queue.resolveNext(text);
-  };
-
-  const onComposerKey = (input: string, key: ComposerKey): void => {
-    const state = store.getState();
-    if (state.approvalDialog !== null) {
-      const action = resolveApprovalKeyAction(input, key, state.approvalDialog.selectedIndex);
-      if (action.kind === "select") {
-        selectApprovalIndex(action.selectedIndex);
-      } else if (action.kind === "decide") {
-        resolveApproval(action.decision);
-      }
-      return;
-    }
-
-    // Palette navigation (only when palette is open).
-    if (state.palette !== null && state.palette.length > 0) {
-      if (key.upArrow === true) {
-        store.setState((s) => ({
-          ...s,
-          paletteSelectedIndex: Math.max(0, s.paletteSelectedIndex - 1),
-        }));
-        return;
-      }
-      if (key.downArrow === true) {
-        store.setState((s) => ({
-          ...s,
-          paletteSelectedIndex: Math.min((s.palette?.length ?? 1) - 1, s.paletteSelectedIndex + 1),
-        }));
-        return;
-      }
-      if (key.return === true) {
-        const entry = state.palette[state.paletteSelectedIndex];
-        if (entry !== undefined) {
-          store.setState((s) => ({ ...s, palette: null, paletteSelectedIndex: 0 }));
-          submit(entry.name);
-          return;
-        }
-      }
-    }
-
-    if (key.return === true) {
-      submit(buffer.resolved);
-      return;
-    }
-    if (key.backspace === true || key.delete === true) {
-      buffer = backspaceBuffer(buffer);
-      refreshDisplay();
-      return;
-    }
-    if (
-      key.ctrl === true ||
-      key.meta === true ||
-      key.escape === true ||
-      key.tab === true ||
-      key.upArrow === true ||
-      key.downArrow === true ||
-      key.leftArrow === true ||
-      key.rightArrow === true
-    ) {
-      return;
-    }
-    if (input.length > 0) {
-      // Bracketed-paste mode delivers the entire pasted block in one chunk;
-      // the buffer's threshold-based heuristic also collapses long chunks.
-      buffer = appendBuffer(buffer, input);
-      refreshDisplay();
-    }
-  };
-
+function startInkRender(
+  opts: MountOptions,
+  internals: {
+    readonly store: InkStore;
+    readonly onComposerKey: (input: string, key: ComposerKey) => void;
+  },
+): Instance {
   // The readline-based fallback prompt is left ALIVE during the Ink session.
   // Closing readline before Ink finishes mounting causes Node to exit the
   // event loop (stdin is briefly without a consumer). Ink's `useInput` runs
@@ -536,14 +175,13 @@ function inkMount(opts: MountOptions): MountedTUI {
   // but cannot complete a line, so its handlers stay quiescent. Runtime tool
   // approval is handled by the Ink dialog while mounted; startup/trust prompts
   // continue to use PromptIO before or after the Ink lifecycle.
-
-  const instance: Instance = render(
+  return render(
     <Root
-      store={store}
+      store={internals.store}
       metrics={opts.metrics}
-      theme={theme}
+      theme={defaultTheme(opts.stdout)}
       hint={DEFAULT_INK_FRAME_HINT}
-      onComposerKey={onComposerKey}
+      onComposerKey={internals.onComposerKey}
     />,
     {
       stdout: opts.stdout,
@@ -557,161 +195,94 @@ function inkMount(opts: MountOptions): MountedTUI {
       exitOnCtrlC: false,
     },
   );
+}
 
+function inkMount(opts: MountOptions): MountedTUI {
+  const internals: InkMountInternals = createInkInternals(opts);
+  let unmounted = false;
+  const approval = createApprovalManager({
+    store: internals.store,
+    isUnmounted: () => unmounted,
+  });
+  const composer = createComposerController({
+    store: internals.store,
+    queue: internals.queue,
+    approval,
+    ...(opts.catalog !== undefined ? { catalog: opts.catalog } : {}),
+  });
+  const actions = createInkMountActions(internals.store);
+  internals.instance = startInkRender(opts, {
+    store: internals.store,
+    onComposerKey: (input, key) => composer.onKey(input, key),
+  });
+  return inkMountedTUI({
+    opts,
+    internals,
+    approval,
+    actions,
+    isUnmounted: () => unmounted,
+    markUnmounted: () => {
+      unmounted = true;
+    },
+  });
+}
+
+function createInkInternals(opts: MountOptions): InkMountInternals {
   return {
-    renderSessionStart(session) {
-      const headerInfo = {
+    store: createStore(),
+    queue: createInputQueue(),
+    tagline: opts.tagline ?? "an coding assistant",
+    instance: undefined as unknown as Instance,
+  };
+}
+
+function inkMountedTUI(args: {
+  readonly opts: MountOptions;
+  readonly internals: InkMountInternals;
+  readonly approval: ReturnType<typeof createApprovalManager>;
+  readonly actions: ReturnType<typeof createInkMountActions>;
+  readonly isUnmounted: () => boolean;
+  readonly markUnmounted: () => void;
+}): MountedTUI {
+  const { opts, internals, approval, actions, isUnmounted, markUnmounted } = args;
+  return {
+    renderSessionStart(session: ConsoleSessionView): void {
+      actions.renderSessionStart(session, {
         version: opts.version,
-        tagline,
+        tagline: internals.tagline,
         sessionId: session.sessionId,
         providerLabel: session.providerLabel,
         modelId: session.modelId,
         mode: session.mode,
         online: true,
-      };
-      store.setState((state) => {
-        // Header is always the first item in the transcript; insert once on first
-        // session-start (idempotent if called twice).
-        const hasHeader = state.transcriptItems.some((item) => item.kind === "header");
-        const headerItem: TranscriptItem = {
-          kind: "header",
-          id: "header",
-          header: headerInfo,
-        };
-        const startupItem: TranscriptItem = {
-          kind: "startup",
-          id: "startup",
-          startup: {
-            header: "stud-cli",
-            details: ["Type /help for commands", "● Loading context..."],
-          },
-        };
-        const next = hasHeader
-          ? state.transcriptItems
-          : [headerItem, startupItem, ...state.transcriptItems];
-        return { ...state, session, online: true, transcriptItems: next };
       });
     },
-    renderHistory(messages) {
-      // Used only on resume — replay each persisted message into the transcript.
-      store.setState((state) => {
-        const items: TranscriptItem[] = [...state.transcriptItems];
-        for (const message of messages) {
-          items.push({ kind: "message", id: nextId("m"), message });
-        }
-        return { ...state, transcriptItems: items };
-      });
-    },
-    appendUserMessage(text) {
-      const stamp = clockString(new Date());
-      const item: TranscriptItem = {
-        kind: "message",
-        id: nextId("m"),
-        message: { role: "user", content: text },
-        timestamp: stamp,
-      };
-      store.setState((state) => ({
-        ...state,
-        transcriptItems: [...state.transcriptItems, item],
-      }));
-    },
-    promptLabel() {
-      return "you";
-    },
-    beginAssistant() {
-      assistantOpen = true;
-      store.setState((state) => ({ ...state, assistantDraft: "" }));
-    },
-    appendAssistantDelta(delta) {
-      if (!assistantOpen) {
-        assistantOpen = true;
-      }
-      store.setState((state) => ({ ...state, assistantDraft: state.assistantDraft + delta }));
-    },
+    renderHistory: (messages) => actions.renderHistory(messages),
+    appendUserMessage: (text) => actions.appendUserMessage(text),
+    promptLabel: () => "you",
+    beginAssistant: () => actions.beginAssistant(),
+    appendAssistantDelta: (delta) => actions.appendAssistantDelta(delta),
     appendAssistantToolCall(_toolName) {
       // The actual tool card is added by `renderToolStart` when execution begins.
-      // We could surface a transient "proposed" card here; deferred to follow-up.
+      // A transient "proposed" card could go here; deferred to follow-up.
     },
-    endAssistant() {
-      assistantOpen = false;
-      const stamp = clockString(new Date());
-      store.setState((state) => {
-        if (state.assistantDraft.length === 0) {
-          return state;
-        }
-        const item: TranscriptItem = {
-          kind: "message",
-          id: nextId("m"),
-          message: { role: "assistant", content: state.assistantDraft },
-          timestamp: stamp,
-        };
-        return {
-          ...state,
-          transcriptItems: [...state.transcriptItems, item],
-          assistantDraft: "",
-        };
-      });
-    },
-    renderToolStart(toolId) {
-      // Round 2: tool cards are appended to the transcript immediately as
-      // "running"; lacking explicit completion events, they remain "running"
-      // visually until follow-up wiring lands.
-      const item: TranscriptItem = {
-        kind: "tool",
-        id: nextId("t"),
-        card: { id: toolId, name: toolId, status: "running" },
-      };
-      store.setState((state) => ({
-        ...state,
-        transcriptItems: [...state.transcriptItems, item],
-      }));
-    },
-    renderTurnError(message) {
-      const item: TranscriptItem = {
-        kind: "error",
-        id: nextId("e"),
-        message,
-      };
-      store.setState((state) => ({
-        ...state,
-        transcriptItems: [...state.transcriptItems, item],
-      }));
-    },
-    renderStatusLine(items) {
-      store.setState((state) => ({ ...state, statusItems: [...items] }));
-    },
-    setPalette(entries) {
-      store.setState((state) => ({
-        ...state,
-        palette: [...entries],
-        paletteSelectedIndex: 0,
-      }));
-    },
-    clearPalette() {
-      store.setState((state) => ({ ...state, palette: null, paletteSelectedIndex: 0 }));
-    },
-    requestApproval(request) {
-      if (unmounted) {
-        return Promise.resolve("deny");
-      }
-      return new Promise<ApprovalDecision>((resolve) => {
-        approvalQueue.push({ request, resolve });
-        pumpApprovalQueue();
-      });
-    },
-    waitForInput() {
-      return queue.enqueue();
-    },
+    appendThinkingDelta: (delta) => actions.appendThinkingDelta(delta),
+    endAssistant: () => actions.endAssistant(),
+    renderToolStart: (toolId, argsSummary) => actions.renderToolStart(toolId, argsSummary),
+    renderTurnError: (message) => actions.renderTurnError(message),
+    renderStatusLine: (items) => actions.renderStatusLine(items),
+    setPalette: (entries) => actions.setPalette(entries),
+    clearPalette: () => actions.clearPalette(),
+    requestApproval: (request) => approval.enqueue(request),
+    waitForInput: () => internals.queue.enqueue(),
     async unmount() {
-      if (unmounted) {
-        return;
-      }
-      unmounted = true;
-      queue.rejectAll(new Error("ui unmounted"));
-      denyAllApprovals();
+      if (isUnmounted()) return;
+      markUnmounted();
+      internals.queue.rejectAll(new Error("ui unmounted"));
+      approval.denyAll();
       try {
-        instance.unmount();
-        await instance.waitUntilExit().catch(() => {
+        internals.instance.unmount();
+        await internals.instance.waitUntilExit().catch(() => {
           // Ignore; the runtime is shutting down.
         });
       } catch {
@@ -721,9 +292,82 @@ function inkMount(opts: MountOptions): MountedTUI {
   };
 }
 
+function inkSupported(stdout: NodeJS.WriteStream, stdin: NodeJS.ReadableStream): boolean {
+  if (!stdout.isTTY) return false;
+  if (!(stdin as NodeJS.ReadStream).isTTY) return false;
+  if (process.env["TERM"] === "dumb") return false;
+  if (process.env["STUD_CLI_DISABLE_INK"] !== undefined) return false;
+  return true;
+}
+
+function tooLargeForInk(stdout: NodeJS.WriteStream): boolean {
+  return !(typeof stdout.columns === "number" && typeof stdout.rows === "number");
+}
+
+/**
+ * Wire the cross-extension event bus to the renderer's writer methods. The
+ * bundled TUI becomes a normal subscriber: every provider-stream / tool-
+ * lifecycle event mutates the same Ink (or console-fallback) state that the
+ * imperative methods would. Tests that call the writer methods directly
+ * still work — the bus is an alternative entry, not a replacement.
+ */
+function subscribeRendererToBus(bus: EventBus, target: MountedTUI): void {
+  bus.on(
+    "ProviderRequestStarted",
+    (_env: EventEnvelope<"ProviderRequestStarted", ProviderRequestStartedPayload>) => {
+      target.beginAssistant();
+    },
+  );
+  bus.on(
+    "ProviderTokensStreamed",
+    (env: EventEnvelope<"ProviderTokensStreamed", ProviderTokensStreamedPayload>) => {
+      target.appendAssistantDelta(env.payload.delta);
+    },
+  );
+  bus.on(
+    "ProviderReasoningStreamed",
+    (env: EventEnvelope<"ProviderReasoningStreamed", ProviderReasoningStreamedPayload>) => {
+      target.appendThinkingDelta(env.payload.delta);
+    },
+  );
+  bus.on(
+    "ProviderRequestCompleted",
+    (_env: EventEnvelope<"ProviderRequestCompleted", ProviderRequestCompletedPayload>) => {
+      target.endAssistant();
+    },
+  );
+  bus.on(
+    "ProviderRequestFailed",
+    (_env: EventEnvelope<"ProviderRequestFailed", ProviderRequestFailedPayload>) => {
+      // The outer turn-level catch in `runProviderSession` is the canonical
+      // user-facing error renderer (it covers persistence and orchestrator
+      // failures, not just provider ones). The subscriber's only job is to
+      // commit any partial assistant draft so the next iteration starts from
+      // a clean state.
+      target.endAssistant();
+    },
+  );
+  bus.on(
+    "ToolInvocationProposed",
+    (env: EventEnvelope<"ToolInvocationProposed", ToolInvocationProposedPayload>) => {
+      target.appendAssistantToolCall(env.payload.toolName);
+    },
+  );
+  bus.on(
+    "ToolInvocationStarted",
+    (env: EventEnvelope<"ToolInvocationStarted", ToolInvocationStartedPayload>) => {
+      target.renderToolStart(env.payload.toolName, env.payload.argsSummary);
+    },
+  );
+}
+
 export function mountTUI(opts: MountOptions): MountedTUI {
-  if (!inkSupported(opts.stdout, opts.stdin) || tooLargeForInk(opts.stdout)) {
-    return fallbackMount(opts);
+  const mounted =
+    !inkSupported(opts.stdout, opts.stdin) || tooLargeForInk(opts.stdout)
+      ? fallbackMount(opts)
+      : inkMount(opts);
+  if (opts.eventBus !== undefined) {
+    subscribeRendererToBus(opts.eventBus, mounted);
   }
-  return inkMount(opts);
+  return mounted;
 }
