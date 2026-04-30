@@ -4,7 +4,6 @@ import { describe, it } from "node:test";
 import { assertFragmentNotForbidden } from "../../../src/core/context/forbidden-source-guard.js";
 import { Validation } from "../../../src/core/errors/validation.js";
 
-
 import type { ContextFragment } from "../../../src/core/context/assembler.js";
 
 function fragment(content: string, ownerExtId = "test-ext"): ContextFragment {
