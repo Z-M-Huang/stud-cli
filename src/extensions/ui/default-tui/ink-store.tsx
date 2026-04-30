@@ -13,6 +13,7 @@ import {
   type ComposerKey,
   type InkTUIFrameProps,
   type PaletteEntry,
+  type ToolCardView,
   type TranscriptItem,
 } from "./ink-app.js";
 import {
@@ -35,6 +36,14 @@ export interface InkState {
   readonly assistantDraft: string;
   /** In-flight reasoning text accumulated since the last commit. */
   readonly thinkingDraft: string;
+  /**
+   * Tool cards for invocations that have not finished. They live here (not
+   * in `transcriptItems`, which is rendered through `<Static>` and is by
+   * design immutable) so their status can transition from "running" on
+   * `ToolInvocationSucceeded` / `Failed` / `Cancelled`. Once a card has a
+   * terminal status it commits to `transcriptItems`.
+   */
+  readonly runningToolCards: readonly ToolCardView[];
   readonly composerText: string;
   readonly statusItems: readonly StatusLineItem[];
   readonly palette: readonly PaletteEntry[] | null;
@@ -84,6 +93,7 @@ export function initialState(): InkState {
     transcriptItems: [],
     assistantDraft: "",
     thinkingDraft: "",
+    runningToolCards: [],
     composerText: "",
     statusItems: [],
     palette: null,
@@ -95,23 +105,41 @@ export function initialState(): InkState {
 }
 
 export function createInputQueue(): InputQueue {
-  const pending: ((value: string) => void)[] = [];
+  // FIFO of values from the user (e.g., a second message typed mid-turn) and
+  // FIFO of consumers awaiting input (the session-loop's `waitForInput`).
+  // When `resolveNext` runs with no consumer ready, the value is buffered so
+  // the next `enqueue()` returns immediately — no silent drop.
+  interface PendingConsumer {
+    resolve(value: string): void;
+    reject(reason: unknown): void;
+  }
+  const pendingConsumers: PendingConsumer[] = [];
+  const pendingValues: string[] = [];
   return {
     enqueue() {
-      return new Promise<string>((resolve) => {
-        pending.push(resolve);
+      const buffered = pendingValues.shift();
+      if (buffered !== undefined) {
+        return Promise.resolve(buffered);
+      }
+      return new Promise<string>((resolve, reject) => {
+        pendingConsumers.push({ resolve, reject });
       });
     },
     resolveNext(value) {
-      const next = pending.shift();
-      if (next === undefined) {
-        return false;
+      const consumer = pendingConsumers.shift();
+      if (consumer === undefined) {
+        pendingValues.push(value);
+      } else {
+        consumer.resolve(value);
       }
-      next(value);
       return true;
     },
-    rejectAll() {
-      pending.length = 0;
+    rejectAll(reason) {
+      const consumers = pendingConsumers.splice(0);
+      pendingValues.length = 0;
+      for (const c of consumers) {
+        c.reject(reason);
+      }
     },
   };
 }
@@ -213,6 +241,7 @@ export function Root(props: RootProps): React.ReactElement {
   const frame: InkTUIFrameProps = {
     transcriptItems: snap.transcriptItems,
     assistantDraft: snap.assistantDraft,
+    runningToolCards: snap.runningToolCards,
     composerText: snap.composerText,
     composerHint: props.hint,
     palette: snap.palette ?? undefined,

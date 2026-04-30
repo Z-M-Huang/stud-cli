@@ -29,8 +29,11 @@ import type {
   ProviderRequestFailedPayload,
   ProviderRequestStartedPayload,
   ProviderTokensStreamedPayload,
+  ToolInvocationCancelledPayload,
+  ToolInvocationFailedPayload,
   ToolInvocationProposedPayload,
   ToolInvocationStartedPayload,
+  ToolInvocationSucceededPayload,
 } from "../../../core/events/payloads.js";
 import type { RuntimeReader } from "../../../core/host/api/metrics.js";
 
@@ -39,7 +42,7 @@ import type { RuntimeReader } from "../../../core/host/api/metrics.js";
  * either render through Ink (TTY) or fall back to the imperative ANSI renderer
  * paired with the host-provided prompt (non-TTY / `TERM=dumb`).
  */
-export interface MountedTUI extends DefaultConsoleUI {
+export interface MountedTUI extends Omit<DefaultConsoleUI, "renderToolStart" | "renderToolEnd"> {
   /** Append a user message to the transcript before the LLM call. */
   appendUserMessage(text: string): void;
   /** Block until the user submits the next line. Returns the raw input string. */
@@ -52,6 +55,23 @@ export interface MountedTUI extends DefaultConsoleUI {
   clearPalette(): void;
   /** Ask the user whether a gated tool invocation may run. */
   requestApproval(request: ToolApprovalRequest): Promise<ApprovalDecision>;
+  /**
+   * Mark a tool invocation as started. The `toolCallId` is the matching
+   * key for a later `renderToolEnd`; `toolName` is the display label.
+   */
+  renderToolStart(toolCallId: string, toolName: string, argsSummary?: string): void;
+  /**
+   * Mark a tool invocation as terminated with a final status. Matched
+   * back to the running card by `toolCallId`. If no running card matches
+   * (e.g., the tool was rejected before `Started` fired) the card is
+   * appended directly with its terminal status.
+   */
+  renderToolEnd(
+    toolCallId: string,
+    toolName: string,
+    status: "completed" | "failed" | "cancelled",
+    summary?: string,
+  ): void;
 }
 
 export interface ToolApprovalRequest {
@@ -90,6 +110,10 @@ interface MountOptions {
 function fallbackMount(opts: MountOptions): MountedTUI {
   const ui = createDefaultConsoleUI({ stdout: opts.stdout });
   let promptLabel = "you";
+  const echoUserMessage = (text: string): void => {
+    const stamp = clockString(new Date());
+    opts.stdout.write(`\nyou  ${stamp}\n  ${text}\n`);
+  };
   return {
     renderSessionStart(session) {
       ui.renderSessionStart(session);
@@ -98,9 +122,7 @@ function fallbackMount(opts: MountOptions): MountedTUI {
       ui.renderHistory(messages);
     },
     appendUserMessage(text) {
-      // Mirror the styled "you" line through the ANSI fallback.
-      const stamp = clockString(new Date());
-      opts.stdout.write(`\nyou  ${stamp}\n  ${text}\n`);
+      echoUserMessage(text);
     },
     promptLabel() {
       promptLabel = ui.promptLabel();
@@ -121,8 +143,15 @@ function fallbackMount(opts: MountOptions): MountedTUI {
     endAssistant() {
       ui.endAssistant();
     },
-    renderToolStart(toolId, argsSummary) {
-      ui.renderToolStart(toolId, argsSummary);
+    renderToolStart(_toolCallId, toolName, argsSummary) {
+      // Fallback (non-Ink) terminals can't update an earlier line. The
+      // `toolCallId` is dropped when delegating to `DefaultConsoleUI`,
+      // which prints the running indicator on its own line. The
+      // companion `renderToolEnd` prints a separate completion line.
+      ui.renderToolStart(toolName, argsSummary);
+    },
+    renderToolEnd(_toolCallId, toolName, status, summary) {
+      ui.renderToolEnd(toolName, status, summary);
     },
     renderTurnError(message) {
       ui.renderTurnError(message);
@@ -146,7 +175,15 @@ function fallbackMount(opts: MountOptions): MountedTUI {
       );
     },
     async waitForInput() {
-      return opts.fallbackPrompt.input(promptLabel);
+      const text = await opts.fallbackPrompt.input(promptLabel);
+      // Echo on the same classification as the Ink composer (see
+      // `ink-composer.ts submit`): default-chat input is echoed; empty
+      // lines and slash commands pass through silently.
+      const trimmed = text.trim();
+      if (trimmed.length > 0 && !trimmed.startsWith("/")) {
+        echoUserMessage(text);
+      }
+      return text;
     },
     async unmount() {
       // The host caller closes the prompt; nothing to do here.
@@ -204,13 +241,18 @@ function inkMount(opts: MountOptions): MountedTUI {
     store: internals.store,
     isUnmounted: () => unmounted,
   });
+  // `actions` must be created before the composer because the composer
+  // echoes default-chat input through `actions.appendUserMessage` at submit
+  // time (so a message typed mid-turn appears immediately rather than only
+  // when the session-loop's next `waitForInput` resolves).
+  const actions = createInkMountActions(internals.store);
   const composer = createComposerController({
     store: internals.store,
     queue: internals.queue,
     approval,
+    appendUserMessage: (text) => actions.appendUserMessage(text),
     ...(opts.catalog !== undefined ? { catalog: opts.catalog } : {}),
   });
-  const actions = createInkMountActions(internals.store);
   internals.instance = startInkRender(opts, {
     store: internals.store,
     onComposerKey: (input, key) => composer.onKey(input, key),
@@ -268,7 +310,10 @@ function inkMountedTUI(args: {
     },
     appendThinkingDelta: (delta) => actions.appendThinkingDelta(delta),
     endAssistant: () => actions.endAssistant(),
-    renderToolStart: (toolId, argsSummary) => actions.renderToolStart(toolId, argsSummary),
+    renderToolStart: (toolCallId, toolName, argsSummary) =>
+      actions.renderToolStart(toolCallId, toolName, argsSummary),
+    renderToolEnd: (toolCallId, toolName, status, summary) =>
+      actions.renderToolEnd(toolCallId, toolName, status, summary),
     renderTurnError: (message) => actions.renderTurnError(message),
     renderStatusLine: (items) => actions.renderStatusLine(items),
     setPalette: (entries) => actions.setPalette(entries),
@@ -310,8 +355,11 @@ function tooLargeForInk(stdout: NodeJS.WriteStream): boolean {
  * lifecycle event mutates the same Ink (or console-fallback) state that the
  * imperative methods would. Tests that call the writer methods directly
  * still work — the bus is an alternative entry, not a replacement.
+ *
+ * Exported for tests (so they can verify event-to-method wiring without
+ * also spinning up an Ink renderer or readline prompt).
  */
-function subscribeRendererToBus(bus: EventBus, target: MountedTUI): void {
+export function subscribeRendererToBus(bus: EventBus, target: MountedTUI): void {
   bus.on(
     "ProviderRequestStarted",
     (_env: EventEnvelope<"ProviderRequestStarted", ProviderRequestStartedPayload>) => {
@@ -356,7 +404,35 @@ function subscribeRendererToBus(bus: EventBus, target: MountedTUI): void {
   bus.on(
     "ToolInvocationStarted",
     (env: EventEnvelope<"ToolInvocationStarted", ToolInvocationStartedPayload>) => {
-      target.renderToolStart(env.payload.toolName, env.payload.argsSummary);
+      target.renderToolStart(env.payload.toolCallId, env.payload.toolName, env.payload.argsSummary);
+    },
+  );
+  bus.on(
+    "ToolInvocationSucceeded",
+    (env: EventEnvelope<"ToolInvocationSucceeded", ToolInvocationSucceededPayload>) => {
+      target.renderToolEnd(env.payload.toolCallId, env.payload.toolName, "completed");
+    },
+  );
+  bus.on(
+    "ToolInvocationFailed",
+    (env: EventEnvelope<"ToolInvocationFailed", ToolInvocationFailedPayload>) => {
+      target.renderToolEnd(
+        env.payload.toolCallId,
+        env.payload.toolName,
+        "failed",
+        env.payload.message,
+      );
+    },
+  );
+  bus.on(
+    "ToolInvocationCancelled",
+    (env: EventEnvelope<"ToolInvocationCancelled", ToolInvocationCancelledPayload>) => {
+      target.renderToolEnd(
+        env.payload.toolCallId,
+        env.payload.toolName,
+        "cancelled",
+        env.payload.reason,
+      );
     },
   );
 }

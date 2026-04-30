@@ -107,6 +107,7 @@ const transcriptItems: readonly TranscriptItem[] = [
     id: "t-1",
     card: {
       id: "read_file",
+      toolCallId: "tc-snapshot-1",
       name: "read_file",
       status: "completed",
       summary: "path: src/server.ts\nlines: 1-120\n\n120 lines",
@@ -117,6 +118,7 @@ const transcriptItems: readonly TranscriptItem[] = [
 const instance = render(
   <InkTUIFrame
     transcriptItems={transcriptItems}
+    runningToolCards={[]}
     composerText="/"
     composerHint="Ask anything... (Enter to send, Ctrl+K to toggle)"
     palette={palette}

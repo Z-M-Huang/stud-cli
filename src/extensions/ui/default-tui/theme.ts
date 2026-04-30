@@ -18,6 +18,11 @@ export interface Theme {
   readonly text: string;
   /** Dim text for hints, secondary metadata, status-line labels. */
   readonly muted: string;
+  /**
+   * Reasoning blocks. Lighter than `muted` so the assistant's thinking
+   * remains legible without competing with the main transcript text.
+   */
+  readonly thinking: string;
   /** Primary accent — assistant labels, success badges, "online" dot. */
   readonly accent: string;
   /** Secondary accent — user labels, info, links. */
@@ -35,6 +40,7 @@ export interface Theme {
 const DARK_THEME: Theme = {
   text: "#E8DCC4",
   muted: "#6C7280",
+  thinking: "#9095A0",
   accent: "#7FBA72",
   info: "#4FC3DC",
   warn: "#E0B040",

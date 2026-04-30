@@ -54,9 +54,15 @@ export function resolveApprovalKeyAction(
 }
 
 export function ApprovalDialog(props: {
-  readonly dialog: ApprovalDialogView;
+  readonly dialog: ApprovalDialogView | null;
   readonly theme?: Theme | undefined;
 }): React.ReactElement {
+  // Empty case must keep the same component identity so Ink's `log-update`
+  // doesn't see an unmount/remount boundary — that's what leaks an orphan
+  // border row when the dialog closes. Mirrors `AssistantDraft`.
+  if (props.dialog === null) {
+    return <Box flexDirection="column" />;
+  }
   const approveSelected = props.dialog.selectedIndex === 0;
   const denySelected = props.dialog.selectedIndex === 1;
   return (

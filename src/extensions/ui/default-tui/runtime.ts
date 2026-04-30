@@ -26,6 +26,17 @@ export interface DefaultConsoleUI {
   endAssistant(): void;
   appendThinkingDelta(delta: string): void;
   renderToolStart(toolId: string, argsSummary?: string): void;
+  /**
+   * Print a tool's terminal status. Called after `renderToolStart` for any
+   * tool that finishes (or for a tool that was rejected before starting).
+   * Non-Ink terminals can't redraw an earlier line, so we append a separate
+   * status line instead of mutating the running indicator.
+   */
+  renderToolEnd(
+    toolId: string,
+    status: "completed" | "failed" | "cancelled",
+    summary?: string,
+  ): void;
   renderTurnError(message: string): void;
   renderStatusLine(items: readonly StatusLineItem[]): void;
 }
@@ -302,6 +313,32 @@ function writeHistoryBlock(args: {
   args.write(`${rule(args.width)}\n\n`);
 }
 
+function formatToolStartLine(
+  toolId: string,
+  argsSummary: string | undefined,
+  style: ConsoleStyler,
+): string {
+  const suffix =
+    argsSummary !== undefined && argsSummary.length > 0 ? ` ${style.dim(argsSummary)}` : "";
+  return `  ${style.tool("tool")} ${toolId}${suffix} ${style.dim("running")}\n`;
+}
+
+function formatToolEndLine(
+  toolId: string,
+  status: "completed" | "failed" | "cancelled",
+  summary: string | undefined,
+  style: ConsoleStyler,
+): string {
+  const badge =
+    status === "completed"
+      ? style.good("completed")
+      : status === "failed"
+        ? style.error("failed")
+        : style.dim("cancelled");
+  const detail = summary !== undefined && summary.length > 0 ? `: ${style.dim(summary)}` : "";
+  return `  ${style.tool("tool")} ${toolId} ${badge}${detail}\n`;
+}
+
 export function createDefaultConsoleUI(options: DefaultConsoleUIOptions): DefaultConsoleUI {
   let assistantOpen = false;
   let assistantHasOutput = false;
@@ -390,9 +427,12 @@ export function createDefaultConsoleUI(options: DefaultConsoleUIOptions): Defaul
 
     renderToolStart(toolId, argsSummary): void {
       closeThinkingBlock();
-      const suffix =
-        argsSummary !== undefined && argsSummary.length > 0 ? ` ${style.dim(argsSummary)}` : "";
-      write(`  ${style.tool("tool")} ${toolId}${suffix} ${style.dim("running")}\n`);
+      write(formatToolStartLine(toolId, argsSummary, style));
+    },
+
+    renderToolEnd(toolId, status, summary): void {
+      closeThinkingBlock();
+      write(formatToolEndLine(toolId, status, summary, style));
     },
 
     renderTurnError(message): void {

@@ -256,7 +256,10 @@ async function bootstrapSessionContext(
 
 async function runOneTurn(ctx: SessionContext, trimmed: string): Promise<void> {
   const { ui, history, collector, deps, session, auditBus } = ctx;
-  ui.appendUserMessage(trimmed);
+  // The UI echoes the user's message at submit time (so a message typed
+  // mid-turn appears immediately rather than only when the loop picks it
+  // up). The session-loop owns history persistence, not the echo. `ui` is
+  // still used below to render turn errors.
   history.push({ role: "user", content: trimmed });
   collector.beginTurn();
   const turnId = `turn-${randomUUID()}`;

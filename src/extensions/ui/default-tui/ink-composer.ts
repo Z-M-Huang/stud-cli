@@ -39,6 +39,12 @@ export function createComposerController(args: {
   readonly store: InkStore;
   readonly queue: InputQueue;
   readonly approval: ApprovalManager;
+  /**
+   * Echo a default-chat user message into the transcript at the moment it
+   * is submitted. The session-loop also receives the same value via the
+   * input queue, but no longer echoes it — see `submit` below.
+   */
+  readonly appendUserMessage: (text: string) => void;
   readonly catalog?: readonly PaletteEntry[];
 }): ComposerController {
   let buffer: ComposerBuffer = createComposerBuffer();
@@ -65,6 +71,16 @@ export function createComposerController(args: {
   const submit = (text: string): void => {
     buffer = createComposerBuffer();
     refreshDisplay();
+    // Echo to transcript only for default-chat input. Mirrors the
+    // session-loop classification at session-loop.ts processInputLine: empty
+    // input is ignored; "/foo" is dispatched as a slash command without
+    // appearing in the user transcript. Echoing here (instead of in the
+    // session-loop) means a message typed mid-turn shows up immediately
+    // even though the loop won't pick it up until the current turn ends.
+    const trimmed = text.trim();
+    if (trimmed.length > 0 && !trimmed.startsWith("/")) {
+      args.appendUserMessage(text);
+    }
     args.queue.resolveNext(text);
   };
 

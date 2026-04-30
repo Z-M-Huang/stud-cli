@@ -135,3 +135,36 @@ describe("default console UI runtime", () => {
     assert.equal(text.includes('path="src/index.ts"'), true);
   });
 });
+
+describe("default console UI tool-end lines", () => {
+  it("prints a completion line when a tool finishes successfully", () => {
+    const { ui, output } = captureUI();
+
+    ui.renderToolStart("read");
+    ui.renderToolEnd("read", "completed");
+
+    const text = output();
+    assert.equal(text.includes("tool read running"), true);
+    assert.equal(text.includes("tool read completed"), true);
+  });
+
+  it("prints a failure line with the message", () => {
+    const { ui, output } = captureUI();
+
+    ui.renderToolEnd("shell", "failed", "tool 'shell' arguments failed schema validation");
+
+    const text = output();
+    assert.equal(text.includes("tool shell failed"), true);
+    assert.equal(text.includes("schema validation"), true);
+  });
+
+  it("prints a cancelled line with the reason", () => {
+    const { ui, output } = captureUI();
+
+    ui.renderToolEnd("bash", "cancelled", "approval-denied");
+
+    const text = output();
+    assert.equal(text.includes("tool bash cancelled"), true);
+    assert.equal(text.includes("approval-denied"), true);
+  });
+});

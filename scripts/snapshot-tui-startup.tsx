@@ -79,6 +79,7 @@ const transcriptItems: readonly TranscriptItem[] = [
 const instance = render(
   <InkTUIFrame
     transcriptItems={transcriptItems}
+    runningToolCards={[]}
     composerText=""
     composerHint="Ask anything... (Enter to send, Ctrl+K to toggle)"
     statusItems={statusItems}

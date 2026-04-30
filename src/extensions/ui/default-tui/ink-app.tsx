@@ -16,9 +16,15 @@ import type { ProviderMessage } from "../../../contracts/providers.js";
 import type { SecurityMode } from "../../../contracts/settings-shape.js";
 
 export interface ToolCardView {
+  /** React key for the transcript / live-frame slot. */
   readonly id: string;
+  /**
+   * Stable identifier for matching lifecycle events back to a card. Set
+   * to the LLM-provided `toolCallId` from the `ToolInvocation*` payloads.
+   */
+  readonly toolCallId: string;
   readonly name: string;
-  readonly status: "running" | "completed" | "failed";
+  readonly status: "running" | "completed" | "failed" | "cancelled";
   readonly args?: string | undefined;
   readonly summary?: string | undefined;
 }
@@ -60,6 +66,14 @@ export interface PaletteEntry {
 export interface InkTUIFrameProps {
   readonly transcriptItems: readonly TranscriptItem[];
   readonly assistantDraft?: string | undefined;
+  /**
+   * Tool cards for in-flight invocations. Rendered in the live frame so
+   * their `… running` status is visible while the tool is executing; on
+   * completion, each card moves to `transcriptItems` (Ink `<Static>`) with
+   * its final status — Static is by-design immutable so the running cards
+   * cannot live there.
+   */
+  readonly runningToolCards: readonly ToolCardView[];
   readonly composerText: string;
   readonly composerHint: string;
   readonly palette?: readonly PaletteEntry[] | undefined;
@@ -304,12 +318,32 @@ export function InkTUIFrame(props: InkTUIFrameProps): React.ReactElement {
       </Static>
 
       <Box flexDirection="column" paddingX={1} width={process.stdout.columns ?? 80}>
+        {/*
+         * Always-blank spacer at row 0 of the live frame.
+         *
+         * Ink's `log-update` has an off-by-one when the live frame's height
+         * changes: it under-clears by one row at the top of the previous
+         * frame, leaving that row visible as an orphan in the static stream.
+         * The naked symptom is a `╭───╮` row left behind between transcript
+         * items (it was the previous frame's top row — typically a Composer
+         * or running ToolCard top border).
+         *
+         * A 1-row blank placeholder here makes the previous frame's top row
+         * always invisible whitespace, so the leftover row is invisible
+         * regardless. Removing this row will reintroduce the orphan-divider
+         * symptom; do not delete without first replacing the underlying
+         * Ink/log-update behavior.
+         */}
+        <Box height={1} />
+
         <AssistantDraft draft={props.assistantDraft ?? ""} theme={props.theme} />
 
+        {props.runningToolCards.map((card) => (
+          <ToolCard key={card.id} card={card} theme={props.theme} />
+        ))}
+
         <Box flexDirection="column">
-          {props.approvalDialog !== undefined ? (
-            <ApprovalDialog dialog={props.approvalDialog} theme={props.theme} />
-          ) : null}
+          <ApprovalDialog dialog={props.approvalDialog ?? null} theme={props.theme} />
         </Box>
 
         {/* Always render a palette slot; empty when no palette is open. Stable

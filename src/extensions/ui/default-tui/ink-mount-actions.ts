@@ -12,7 +12,7 @@ import {
   type InkStore,
 } from "./ink-store.js";
 
-import type { PaletteEntry, TranscriptItem } from "./ink-app.js";
+import type { PaletteEntry, ToolCardView, TranscriptItem } from "./ink-app.js";
 import type { ConsoleSessionView } from "./runtime.js";
 import type { StatusLineItem } from "./status-line.js";
 import type { ProviderMessage } from "../../../contracts/providers.js";
@@ -25,7 +25,25 @@ export interface InkMountActions {
   appendAssistantDelta(delta: string): void;
   appendThinkingDelta(delta: string): void;
   endAssistant(): void;
-  renderToolStart(toolId: string, argsSummary?: string): void;
+  /**
+   * Push a running tool card into the live frame. The card stays there
+   * until a matching `renderToolEnd` (by `toolCallId`) commits it to the
+   * static transcript with its terminal status.
+   */
+  renderToolStart(toolCallId: string, toolName: string, argsSummary?: string): void;
+  /**
+   * Commit a tool card with its terminal status to the static transcript.
+   * If a running card with the given `toolCallId` exists, it is removed
+   * from the live frame and committed; if not (e.g., a tool was rejected
+   * at validation/approval before `Started` fired), a fresh card is
+   * appended directly.
+   */
+  renderToolEnd(
+    toolCallId: string,
+    toolName: string,
+    status: "completed" | "failed" | "cancelled",
+    summary?: string,
+  ): void;
   renderTurnError(message: string): void;
   renderStatusLine(items: readonly StatusLineItem[]): void;
   setPalette(entries: readonly PaletteEntry[]): void;
@@ -90,21 +108,11 @@ export function createInkMountActions(store: InkStore): InkMountActions {
       const stamp = clockString(new Date());
       store.setState((state) => commitAssistantDraft(state, stamp));
     },
-    renderToolStart(toolId, argsSummary) {
-      const item: TranscriptItem = {
-        kind: "tool",
-        id: nextId("t"),
-        card: {
-          id: toolId,
-          name: toolId,
-          status: "running",
-          ...(argsSummary !== undefined && argsSummary.length > 0 ? { args: argsSummary } : {}),
-        },
-      };
-      store.setState((state) => ({
-        ...flushThinkingDraft(state),
-        transcriptItems: [...state.transcriptItems, item],
-      }));
+    renderToolStart(toolCallId, toolName, argsSummary) {
+      store.setState((state) => pushRunningToolCard(state, toolCallId, toolName, argsSummary));
+    },
+    renderToolEnd(toolCallId, toolName, status, summary) {
+      store.setState((state) => commitToolCard(state, toolCallId, toolName, status, summary));
     },
     renderTurnError(message) {
       const item: TranscriptItem = { kind: "error", id: nextId("e"), message };
@@ -126,6 +134,49 @@ export function createInkMountActions(store: InkStore): InkMountActions {
     clearPalette() {
       store.setState((state) => ({ ...state, palette: null, paletteSelectedIndex: 0 }));
     },
+  };
+}
+
+function pushRunningToolCard(
+  state: InkState,
+  toolCallId: string,
+  toolName: string,
+  argsSummary: string | undefined,
+): InkState {
+  const card: ToolCardView = {
+    id: nextId("t"),
+    toolCallId,
+    name: toolName,
+    status: "running",
+    ...(argsSummary !== undefined && argsSummary.length > 0 ? { args: argsSummary } : {}),
+  };
+  return {
+    ...flushThinkingDraft(state),
+    runningToolCards: [...state.runningToolCards, card],
+  };
+}
+
+function commitToolCard(
+  state: InkState,
+  toolCallId: string,
+  toolName: string,
+  status: "completed" | "failed" | "cancelled",
+  summary: string | undefined,
+): InkState {
+  const existing = state.runningToolCards.find((c) => c.toolCallId === toolCallId);
+  const summaryFields = summary !== undefined && summary.length > 0 ? { summary } : {};
+  const finished: ToolCardView =
+    existing !== undefined
+      ? { ...existing, status, ...summaryFields }
+      : { id: nextId("t"), toolCallId, name: toolName, status, ...summaryFields };
+  const transcriptItem: TranscriptItem = { kind: "tool", id: nextId("t"), card: finished };
+  return {
+    ...state,
+    runningToolCards:
+      existing !== undefined
+        ? state.runningToolCards.filter((c) => c.toolCallId !== toolCallId)
+        : state.runningToolCards,
+    transcriptItems: [...state.transcriptItems, transcriptItem],
   };
 }
 

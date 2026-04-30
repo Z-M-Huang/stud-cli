@@ -119,11 +119,11 @@ export function ThinkingRow({
   const lines = text.split(/\r?\n/u);
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Text {...c(theme?.muted)} dimColor bold>
+      <Text {...c(theme?.thinking)} dimColor bold>
         stud-cli[thinking]
       </Text>
       {lines.map((line, idx) => (
-        <Text key={`th-${idx.toString()}`} {...c(theme?.muted)} dimColor>
+        <Text key={`th-${idx.toString()}`} {...c(theme?.thinking)} dimColor>
           {line.length === 0 ? " " : line}
         </Text>
       ))}
@@ -143,13 +143,17 @@ export function ToolCard({
       ? theme?.accent
       : card.status === "failed"
         ? theme?.bad
-        : theme?.warn;
+        : card.status === "cancelled"
+          ? theme?.muted
+          : theme?.warn;
   const badgeLabel =
     card.status === "completed"
       ? "✓ completed"
       : card.status === "failed"
         ? "✗ failed"
-        : "… running";
+        : card.status === "cancelled"
+          ? "⊘ cancelled"
+          : "… running";
   return (
     <Box
       flexDirection="column"
