@@ -56,6 +56,27 @@ export interface ProviderRequestFailedPayload {
 }
 
 // ---------------------------------------------------------------------------
+// Prompt-cache observability (non-authoritative; per wiki/context/Prompt-Caching.md)
+// ---------------------------------------------------------------------------
+
+export interface CacheHitPayload {
+  readonly providerId: string;
+  readonly modelId: string;
+  readonly cachedInputTokens: number;
+}
+
+export interface CacheMissPayload {
+  readonly providerId: string;
+  readonly modelId: string;
+}
+
+export interface CacheMarkerIgnoredPayload {
+  readonly providerId: string;
+  readonly modelId: string;
+  readonly reason: string;
+}
+
+// ---------------------------------------------------------------------------
 // Tool invocation lifecycle
 // ---------------------------------------------------------------------------
 
@@ -119,6 +140,12 @@ export type ProviderRequestCompletedEnvelope = EventEnvelope<
 export type ProviderRequestFailedEnvelope = EventEnvelope<
   "ProviderRequestFailed",
   ProviderRequestFailedPayload
+>;
+export type CacheHitEnvelope = EventEnvelope<"CacheHit", CacheHitPayload>;
+export type CacheMissEnvelope = EventEnvelope<"CacheMiss", CacheMissPayload>;
+export type CacheMarkerIgnoredEnvelope = EventEnvelope<
+  "CacheMarkerIgnored",
+  CacheMarkerIgnoredPayload
 >;
 export type ToolInvocationProposedEnvelope = EventEnvelope<
   "ToolInvocationProposed",

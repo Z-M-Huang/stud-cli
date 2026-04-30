@@ -72,6 +72,12 @@ function toGeminiRole(role: ProviderMessage["role"]): "user" | "model" {
 }
 
 function requestBody(args: ProtocolRequestArgs, config: GeminiConfig): string {
+  const inlineSystemParts = args.messages
+    .filter((message) => message.role === "system")
+    .map((message) => ({ text: textFromContent(message.content) }));
+  const topLevelSystemParts =
+    typeof args.system === "string" && args.system.length > 0 ? [{ text: args.system }] : [];
+  const systemParts = [...topLevelSystemParts, ...inlineSystemParts];
   return JSON.stringify({
     ...config.defaultParams,
     contents: args.messages
@@ -80,11 +86,7 @@ function requestBody(args: ProtocolRequestArgs, config: GeminiConfig): string {
         role: toGeminiRole(message.role),
         parts: [{ text: textFromContent(message.content) }],
       })),
-    systemInstruction: {
-      parts: args.messages
-        .filter((message) => message.role === "system")
-        .map((message) => ({ text: textFromContent(message.content) })),
-    },
+    ...(systemParts.length > 0 ? { systemInstruction: { parts: systemParts } } : {}),
     tools: args.tools.length === 0 ? undefined : [{ functionDeclarations: args.tools }],
     generationConfig: {
       maxOutputTokens: args.params["maxTokens"],

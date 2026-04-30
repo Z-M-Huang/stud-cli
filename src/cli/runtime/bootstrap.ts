@@ -17,6 +17,7 @@ import { readLatestSessionManifest } from "./session-store.js";
 import {
   appendAudit,
   atomicWriteJson,
+  ensureSystemPromptScaffold,
   isDirectory,
   loadSettingsFile,
   nowIso,
@@ -439,6 +440,15 @@ export async function bootstrapSession(
   const globalSettingsPath = join(globalRoot, "settings.json");
   const secretsPath = join(globalRoot, "secrets.json");
   const loadedGlobalSettings = (await loadSettingsFile(globalSettingsPath)) ?? {};
+
+  if (await ensureSystemPromptScaffold(globalRoot)) {
+    await appendAudit(globalRoot, {
+      type: "SystemPromptScaffolded",
+      at: nowIso(deps),
+      path: join(globalRoot, "system.md"),
+    });
+  }
+
   if (args.continue) {
     return bootstrapResumedSession({
       prompt,

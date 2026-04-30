@@ -39,6 +39,34 @@ export function studHome(rootHome: string): string {
   return join(rootHome, ".stud");
 }
 
+const DEFAULT_SYSTEM_PROMPT = `# stud-cli system prompt
+
+You are an assistant operating inside stud-cli. Edit this file to set the
+system prompt the model sees on every turn. The file lives at
+\`~/.stud/system.md\` and is read by the bundled system-prompt-file
+context provider.
+`;
+
+/**
+ * Ensure `~/.stud/system.md` exists on first global-config-dir use.
+ * Idempotent: writes only when the file is absent. Returns `true` when a
+ * scaffold was written so the caller can audit `SystemPromptScaffolded`.
+ */
+export async function ensureSystemPromptScaffold(globalRoot: string): Promise<boolean> {
+  const path = join(globalRoot, "system.md");
+  try {
+    await stat(path);
+    return false;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+  await mkdir(globalRoot, { recursive: true });
+  await writeFile(path, DEFAULT_SYSTEM_PROMPT, { encoding: "utf8", flag: "wx" });
+  return true;
+}
+
 export async function isDirectory(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isDirectory();

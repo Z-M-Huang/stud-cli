@@ -34,6 +34,9 @@ export type EventName =
   | "ProviderReasoningStreamed"
   | "ProviderRequestCompleted"
   | "ProviderRequestFailed"
+  | "CacheHit"
+  | "CacheMiss"
+  | "CacheMarkerIgnored"
   | "ToolInvocationProposed"
   | "ToolInvocationStarted"
   | "ToolInvocationSucceeded"
@@ -54,6 +57,7 @@ export interface EventTypeDescriptor<TName extends EventName, _TPayload> {
     | "env"
     | "interaction"
     | "provider"
+    | "cache"
     | "tool";
 }
 
@@ -89,6 +93,9 @@ export const EVENT_TYPES: EventTypeRegistry = Object.freeze({
   ProviderReasoningStreamed: makeDescriptor("ProviderReasoningStreamed", "provider"),
   ProviderRequestCompleted: makeDescriptor("ProviderRequestCompleted", "provider"),
   ProviderRequestFailed: makeDescriptor("ProviderRequestFailed", "provider"),
+  CacheHit: makeDescriptor("CacheHit", "cache"),
+  CacheMiss: makeDescriptor("CacheMiss", "cache"),
+  CacheMarkerIgnored: makeDescriptor("CacheMarkerIgnored", "cache"),
   ToolInvocationProposed: makeDescriptor("ToolInvocationProposed", "tool"),
   ToolInvocationStarted: makeDescriptor("ToolInvocationStarted", "tool"),
   ToolInvocationSucceeded: makeDescriptor("ToolInvocationSucceeded", "tool"),

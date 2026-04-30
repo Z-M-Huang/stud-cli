@@ -24,21 +24,24 @@ function assertValidationCode(error: unknown, code: string): true {
 }
 
 function registerEnumerationAndValidationTests(): void {
-  it("enumerates exactly the ten documented classes plus SuppressedError", () => {
+  it("enumerates the 13 wiki-documented classes plus SuppressedError", () => {
     const classes = listAuditClasses();
 
-    assert.equal(classes.length, 11);
+    assert.equal(classes.length, 14);
     assert.deepEqual(classes, [
       "Approval",
       "Compaction",
       "StageExecution",
       "ModelSwitch",
       "ProviderSwitch",
-      "ExtensionSetRevision",
+      "ExtensionsReloaded",
       "TrustDecision",
       "SMTransition",
       "Integrity",
       "SessionLifecycle",
+      "Turn",
+      "ProviderExchange",
+      "ToolInvocation",
       "SuppressedError",
     ]);
   });
@@ -64,7 +67,7 @@ function registerEnumerationAndValidationTests(): void {
   it("every class has a typed payload shape", () => {
     const _: Parameters<typeof writeAudit> = ["SessionLifecycle", { event: "start" }];
     assert.deepEqual(_, ["SessionLifecycle", { event: "start" }]);
-    assert.equal(listAuditClasses().length, 11);
+    assert.equal(listAuditClasses().length, 14);
   });
 }
 
@@ -84,22 +87,80 @@ function registerEmissionTests(): void {
     assert.ok(rec.timestamp > 0);
   });
 
-  it("emits ExtensionSetRevision when the Validation Pipeline reports a new set", async () => {
+  it("emits ExtensionsReloaded when the Validation Pipeline reports a new set", async () => {
     const captured: { kind: string; payload: { revisionId?: string } }[] = [];
     spyOnBus(captured);
 
     await withCorrelation("c-3", async () => {
       await Promise.resolve();
-      writeAudit("ExtensionSetRevision", {
+      writeAudit("ExtensionsReloaded", {
         loaded: ["a", "b"],
         disabled: ["c"],
         revisionId: "rev-1",
       });
     });
 
-    const rec = captured.find((record) => record.kind === "ExtensionSetRevision");
+    const rec = captured.find((record) => record.kind === "ExtensionsReloaded");
     assert.ok(rec);
     assert.equal(rec.payload.revisionId, "rev-1");
+  });
+
+  it("emits a typed Turn record with TurnStarted kind", async () => {
+    const captured: { kind: string; payload: { kind?: string; turnId?: string } }[] = [];
+    spyOnBus(captured);
+
+    await withCorrelation("c-turn", async () => {
+      await Promise.resolve();
+      writeAudit("Turn", {
+        kind: "TurnStarted",
+        turnId: "t-1",
+        userInput: "hello",
+        historyLength: 1,
+      });
+    });
+
+    const rec = captured.find((record) => record.kind === "Turn");
+    assert.ok(rec);
+    assert.equal(rec.payload.kind, "TurnStarted");
+    assert.equal(rec.payload.turnId, "t-1");
+  });
+
+  it("emits a typed ProviderExchange record for ProviderRequest", async () => {
+    const captured: { kind: string; payload: { kind?: string; providerId?: string } }[] = [];
+    spyOnBus(captured);
+
+    await withCorrelation("c-prov", async () => {
+      await Promise.resolve();
+      writeAudit("ProviderExchange", {
+        kind: "ProviderRequest",
+        providerId: "anthropic",
+        modelId: "claude-opus-4-7",
+      });
+    });
+
+    const rec = captured.find((record) => record.kind === "ProviderExchange");
+    assert.ok(rec);
+    assert.equal(rec.payload.kind, "ProviderRequest");
+    assert.equal(rec.payload.providerId, "anthropic");
+  });
+
+  it("emits a typed ToolInvocation record for ToolCallStarted", async () => {
+    const captured: { kind: string; payload: { kind?: string; toolName?: string } }[] = [];
+    spyOnBus(captured);
+
+    await withCorrelation("c-tool", async () => {
+      await Promise.resolve();
+      writeAudit("ToolInvocation", {
+        kind: "ToolCallStarted",
+        toolCallId: "tc-1",
+        toolName: "fs.read",
+      });
+    });
+
+    const rec = captured.find((record) => record.kind === "ToolInvocation");
+    assert.ok(rec);
+    assert.equal(rec.payload.kind, "ToolCallStarted");
+    assert.equal(rec.payload.toolName, "fs.read");
   });
 }
 
@@ -161,8 +222,44 @@ function registerSecretScrubbingTests(): void {
   });
 }
 
+function registerTruncationTests(): void {
+  it("truncates string fields exceeding 64 KiB and emits the byte-count sentinel", async () => {
+    const captured: { kind: string; payload: unknown }[] = [];
+    spyOnBus(captured);
+
+    const oversized = "x".repeat(80_000);
+    await withCorrelation("c-trunc", async () => {
+      await Promise.resolve();
+      writeAudit("SuppressedError", { reason: "stress test", cause: oversized });
+    });
+
+    const rec = captured.find((record) => record.kind === "SuppressedError");
+    assert.ok(rec);
+    const payload = rec.payload as { cause: string };
+    assert.match(payload.cause, /…\[truncated \d+ bytes of 80000\]$/u);
+    assert.ok(Buffer.byteLength(payload.cause, "utf8") <= 65_536 + 64);
+  });
+
+  it("leaves string fields under 64 KiB untouched", async () => {
+    const captured: { kind: string; payload: unknown }[] = [];
+    spyOnBus(captured);
+
+    await withCorrelation("c-small", async () => {
+      await Promise.resolve();
+      writeAudit("SuppressedError", { reason: "ok", cause: "y".repeat(1000) });
+    });
+
+    const rec = captured.find((record) => record.kind === "SuppressedError");
+    assert.ok(rec);
+    const payload = rec.payload as { cause: string };
+    assert.equal(payload.cause.length, 1000);
+    assert.doesNotMatch(payload.cause, /truncated/u);
+  });
+}
+
 describe("Audit Trail", () => {
   registerEnumerationAndValidationTests();
   registerEmissionTests();
   registerSecretScrubbingTests();
+  registerTruncationTests();
 });

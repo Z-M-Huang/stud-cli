@@ -269,6 +269,32 @@ describe("Anthropic adapter — request body", () => {
     assert.equal(tools[0]?.["parameters"], undefined);
   });
 
+  it("renders top-level system as a single content block with ephemeral cache_control", async () => {
+    const { body } = await runAdapter({
+      responseBody: SAMPLE_TEXT_STREAM,
+      args: { system: "You are a focused agent." },
+    });
+
+    const system = body["system"] as readonly Record<string, unknown>[] | undefined;
+    assert.ok(Array.isArray(system));
+    assert.equal(system.length, 1);
+    assert.equal(system[0]?.type, "text");
+    assert.equal(system[0]?.text, "You are a focused agent.");
+    const cacheControl = system[0]?.cache_control as Record<string, unknown> | undefined;
+    assert.deepEqual(cacheControl, { type: "ephemeral" });
+  });
+
+  it("omits system field entirely when args.system is absent or empty", async () => {
+    const { body: bodyAbsent } = await runAdapter({ responseBody: SAMPLE_TEXT_STREAM });
+    assert.equal(bodyAbsent["system"], undefined);
+
+    const { body: bodyEmpty } = await runAdapter({
+      responseBody: SAMPLE_TEXT_STREAM,
+      args: { system: "" },
+    });
+    assert.equal(bodyEmpty["system"], undefined);
+  });
+
   it("maps stud `tool` role messages to Anthropic user message with tool_result blocks", async () => {
     const { body } = await runAdapter({
       responseBody: SAMPLE_TEXT_STREAM,

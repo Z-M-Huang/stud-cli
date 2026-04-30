@@ -55,6 +55,10 @@ describe("EVENT_TYPES — declared names", () => {
       "ProviderReasoningStreamed",
       "ProviderRequestCompleted",
       "ProviderRequestFailed",
+      // prompt-cache observability (wiki context/Prompt-Caching.md)
+      "CacheHit",
+      "CacheMiss",
+      "CacheMarkerIgnored",
       // tool invocation lifecycle (wiki Event-Bus.md § Event kinds)
       "ToolInvocationProposed",
       "ToolInvocationStarted",

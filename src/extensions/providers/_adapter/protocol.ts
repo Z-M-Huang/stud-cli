@@ -13,9 +13,24 @@ export interface Usage {
   readonly inputTokens?: number;
   readonly outputTokens?: number;
   readonly totalTokens?: number;
+  /** Tokens written to the cache on this turn (Anthropic `cache_creation_input_tokens`). */
+  readonly cacheCreationInputTokens?: number;
+  /** Tokens served from the cache on this turn (Anthropic `cache_read_input_tokens`,
+   *  OpenAI `usage.prompt_tokens_details.cached_tokens`,
+   *  Gemini `usageMetadata.cachedContentTokenCount`). */
+  readonly cacheReadInputTokens?: number;
 }
 
+/**
+ * The static-cache anchor of every request.
+ *
+ * Top-level `system` (separate from `messages`) carries the merged
+ * system-prompt layer to the adapter; the adapter renders it per wire
+ * shape and places the cache breakpoint at the system seam per
+ * `wiki/contracts/Providers.md` and `wiki/context/Prompt-Caching.md`.
+ */
 export interface ProtocolRequestArgs {
+  readonly system?: string;
   readonly messages: readonly Message[];
   readonly tools: readonly ToolDef[];
   readonly params: Readonly<Record<string, unknown>>;

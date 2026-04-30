@@ -8,7 +8,12 @@ import type {
   ProviderToolDefinition,
 } from "../../../contracts/providers.js";
 import type { HostAPI } from "../../../core/host/host-api.js";
-import type { ProtocolAdapter, ProtocolRequestArgs, StreamEvent } from "../_adapter/protocol.js";
+import type {
+  ProtocolAdapter,
+  ProtocolRequestArgs,
+  StreamEvent,
+  Usage,
+} from "../_adapter/protocol.js";
 
 type SecretRef = AnthropicConfig["apiKeyRef"];
 
@@ -149,6 +154,11 @@ function requestBody(args: ProtocolRequestArgs, config: AnthropicConfig): string
     messages: toAnthropicMessages(args.messages),
     max_tokens: maxTokens,
   };
+  if (typeof args.system === "string" && args.system.length > 0) {
+    // One ephemeral cache_control marker on the (only) system block anchors
+    // the static cache prefix per wiki/context/Prompt-Caching.md § Per-provider mapping.
+    body["system"] = [{ type: "text", text: args.system, cache_control: { type: "ephemeral" } }];
+  }
   if (typeof args.params["temperature"] === "number") {
     body["temperature"] = args.params["temperature"];
   }
@@ -172,6 +182,10 @@ interface ParseState {
   /** Open content blocks indexed by Anthropic's `index` field. */
   readonly blocks: Map<number, BlockState>;
   rawStopReason: string | null;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
 }
 
 function getString(record: Readonly<Record<string, unknown>>, key: string): string | undefined {
@@ -196,6 +210,38 @@ function safeParseJson(input: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+function mergeUsage(state: ParseState, usage: Readonly<Record<string, unknown>>): void {
+  const inputTokens = getNumber(usage, "input_tokens");
+  if (inputTokens !== undefined) state.inputTokens = inputTokens;
+  const outputTokens = getNumber(usage, "output_tokens");
+  if (outputTokens !== undefined) state.outputTokens = outputTokens;
+  const cacheCreate = getNumber(usage, "cache_creation_input_tokens");
+  if (cacheCreate !== undefined) state.cacheCreationInputTokens = cacheCreate;
+  const cacheRead = getNumber(usage, "cache_read_input_tokens");
+  if (cacheRead !== undefined) state.cacheReadInputTokens = cacheRead;
+}
+
+function collectUsage(state: ParseState): Usage | undefined {
+  if (
+    state.inputTokens === undefined &&
+    state.outputTokens === undefined &&
+    state.cacheCreationInputTokens === undefined &&
+    state.cacheReadInputTokens === undefined
+  ) {
+    return undefined;
+  }
+  return {
+    ...(state.inputTokens !== undefined ? { inputTokens: state.inputTokens } : {}),
+    ...(state.outputTokens !== undefined ? { outputTokens: state.outputTokens } : {}),
+    ...(state.cacheCreationInputTokens !== undefined
+      ? { cacheCreationInputTokens: state.cacheCreationInputTokens }
+      : {}),
+    ...(state.cacheReadInputTokens !== undefined
+      ? { cacheReadInputTokens: state.cacheReadInputTokens }
+      : {}),
+  };
 }
 
 function eventsFromMessageEvent(
@@ -257,11 +303,24 @@ function eventsFromMessageEvent(
     return [];
   }
 
+  if (type === "message_start") {
+    const message = getObject(payload["message"]);
+    const usage = message === undefined ? undefined : getObject(message["usage"]);
+    if (usage !== undefined) {
+      mergeUsage(state, usage);
+    }
+    return [];
+  }
+
   if (type === "message_delta") {
     const delta = getObject(payload["delta"]);
     const reason = delta === undefined ? undefined : getString(delta, "stop_reason");
     if (reason !== undefined) {
       state.rawStopReason = reason;
+    }
+    const usage = getObject(payload["usage"]);
+    if (usage !== undefined) {
+      mergeUsage(state, usage);
     }
     return [];
   }
@@ -279,7 +338,8 @@ function eventsFromMessageEvent(
           : raw === "tool_use"
             ? "tool_calls"
             : raw;
-    return [{ kind: "finish", rawReason: normalized }];
+    const usage = collectUsage(state);
+    return [{ kind: "finish", rawReason: normalized, ...(usage !== undefined ? { usage } : {}) }];
   }
 
   if (type === "error") {

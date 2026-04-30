@@ -146,13 +146,16 @@ export interface ProviderToolDefinition {
  * Full argument set passed to `ProviderRequestSurface.request()` on every
  * `SEND_REQUEST` stage invocation.
  *
- * `messages`   — complete conversation history assembled by `COMPOSE_REQUEST`.
+ * `system`     — system-prompt blocks lifted out of `messages` by COMPOSE_REQUEST;
+ *                anchors the static cache layer per `wiki/context/Prompt-Caching.md`.
+ * `messages`   — conversation history (user / assistant / tool) assembled by COMPOSE_REQUEST.
  * `tools`      — tool definitions; empty array when the tool manifest is empty.
  * `modelId`    — the model identifier the session currently targets.
  * `maxTokens`  — optional output-token budget; undefined means provider default.
  * `temperature`— optional sampling temperature; undefined means provider default.
  */
 export interface ProviderRequestArgs {
+  readonly system?: string;
   readonly messages: readonly ProviderMessage[];
   readonly tools: readonly ProviderToolDefinition[];
   readonly modelId: string;

@@ -41,6 +41,7 @@ export const contract: ProviderContract<CLIWrapperConfig> = {
         arg
           .replaceAll("{seed}", config.seed ?? "")
           .replaceAll("{modelId}", args.modelId)
+          .replaceAll("{system}", args.system ?? "")
           .replaceAll("{messages}", JSON.stringify(args.messages)),
       );
 

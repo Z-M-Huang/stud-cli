@@ -54,6 +54,7 @@ export const contract: ProviderContract<AnthropicConfig> = {
 
       for await (const event of adapter.request(
         {
+          ...(args.system !== undefined ? { system: args.system } : {}),
           messages: args.messages,
           tools: args.tools,
           params: {
@@ -90,6 +91,19 @@ export const contract: ProviderContract<AnthropicConfig> = {
         }
 
         if (event.kind === "finish") {
+          const cacheRead = event.usage?.cacheReadInputTokens ?? 0;
+          if (cacheRead > 0) {
+            host.events.emit("CacheHit", {
+              providerId: "anthropic",
+              modelId: args.modelId,
+              cachedInputTokens: cacheRead,
+            });
+          } else if (event.usage?.cacheCreationInputTokens !== undefined) {
+            host.events.emit("CacheMiss", {
+              providerId: "anthropic",
+              modelId: args.modelId,
+            });
+          }
           yield {
             type: "finish",
             reason:

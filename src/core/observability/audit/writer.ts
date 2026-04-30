@@ -16,7 +16,13 @@ export type { AuditClass, AuditPayloads, AuditRecord } from "./classes.js";
 
 const AUDIT_CLASS_SET: ReadonlySet<string> = new Set(AUDIT_CLASSES);
 const SECRET_REFERENCE_KINDS: ReadonlySet<string> = new Set(["env", "keyring", "file"]);
-const SECRET_PATTERNS = [/\bsk-[\w-]+\b/u, /\bghp_\w+\b/u, /\bAIza[\w-]{20,}\b/u];
+const SECRET_PATTERNS = [
+  /\bsk-ant-[\w-]+\b/u,
+  /\bsk-[\w-]+\b/u,
+  /\bghp_\w+\b/u,
+  /\bAIza[\w-]{20,}\b/u,
+];
+const MAX_FIELD_BYTES = 65_536;
 
 export function writeAudit<K extends AuditClass>(cls: K, payload: AuditPayloads[K]): void {
   if (!AUDIT_CLASS_SET.has(cls)) {
@@ -52,7 +58,36 @@ export function writeAudit<K extends AuditClass>(cls: K, payload: AuditPayloads[
 
 function scrubPayload(payload: unknown): unknown {
   const redacted = auditRedact(payload, collectSecretLikeStrings(payload));
-  return rewriteSecretReferences(redacted);
+  const refRewritten = rewriteSecretReferences(redacted);
+  return truncateLargeStrings(refRewritten);
+}
+
+function truncateLargeStrings(value: unknown): unknown {
+  if (typeof value === "string") {
+    return truncateField(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => truncateLargeStrings(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      result[key] = truncateLargeStrings(entry);
+    }
+    return result;
+  }
+  return value;
+}
+
+function truncateField(value: string): string {
+  const totalBytes = Buffer.byteLength(value, "utf8");
+  if (totalBytes <= MAX_FIELD_BYTES) {
+    return value;
+  }
+  const headBytes = MAX_FIELD_BYTES - 4;
+  const head = Buffer.from(value, "utf8").subarray(0, headBytes).toString("utf8");
+  const cutBytes = totalBytes - headBytes;
+  return `${head}…[truncated ${cutBytes} bytes of ${totalBytes}]`;
 }
 
 function collectSecretLikeStrings(value: unknown): string[] {

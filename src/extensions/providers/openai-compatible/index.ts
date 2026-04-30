@@ -46,6 +46,7 @@ export const contract: ProviderContract<OpenAICompatibleConfig> = {
 
       for await (const event of adapter.request(
         {
+          ...(args.system !== undefined ? { system: args.system } : {}),
           messages: args.messages,
           tools: args.tools,
           params: {

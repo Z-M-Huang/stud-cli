@@ -1,5 +1,7 @@
 import { ExtensionHost, Validation } from "../errors/index.js";
 
+import { assertFragmentNotForbidden } from "./forbidden-source-guard.js";
+
 import type { EventBus, EventEnvelope } from "../events/bus.js";
 
 export interface ChatMessage {
@@ -165,8 +167,21 @@ async function resolveFragments(input: AssemblyInput): Promise<readonly ContextF
   for (const provider of input.providers) {
     try {
       const resolved = await provider.provide();
-      fragments.push(...resolved);
+      for (const fragment of resolved) {
+        // Q-6 ban: env / settings / credentials must never reach the LLM.
+        // The forbidden-source error is `Validation/ContextContainsForbiddenSource`
+        // and must NOT be downgraded to `ExtensionHost/ContextProviderFailed` — even
+        // a `graceful` Context Provider does not get to silently leak credentials.
+        assertFragmentNotForbidden(fragment);
+        fragments.push(fragment);
+      }
     } catch (error) {
+      if (
+        error instanceof Validation &&
+        error.context["code"] === "ContextContainsForbiddenSource"
+      ) {
+        throw error;
+      }
       const wrapped = toContextProviderFailed(error, provider.ownerExtId);
       emit(input.eventBus, "ContextProviderFailed", {
         ownerExtId: provider.ownerExtId,

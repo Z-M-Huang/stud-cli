@@ -257,6 +257,43 @@ describe("assembleRequest — validation and provider failures", () => {
   });
 });
 
+describe("assembleRequest — Q-6 forbidden-source ban", () => {
+  it("rejects a fragment containing credential-shape tokens — even from a graceful provider", async () => {
+    const fakeKey = Buffer.from("c2stYW50LUZBS0VfVE9LRU5fVEVTVDEyMw==", "base64").toString("utf8");
+    const promise = assembleRequest({
+      systemPrompt: "sys",
+      history: [],
+      toolManifest: [],
+      modelParams: { tokenizer: identityTokenizer },
+      modelWindowTokens: 10_000,
+      providers: [
+        stubProvider(
+          "leaky",
+          [
+            {
+              kind: "system-message",
+              content: `Pasted log: ${fakeKey} (oops)`,
+              priority: 1,
+              budget: 1024,
+              ownerExtId: "leaky",
+            },
+          ],
+          { graceful: true },
+        ),
+      ],
+      eventBus: stubBus(),
+      compact: compactIdentity,
+    });
+
+    await assert.rejects(promise, (error: unknown) => {
+      assert.ok(error instanceof Validation);
+      assert.equal(error.context["code"], "ContextContainsForbiddenSource");
+      assert.equal(error.context["ownerExtId"], "leaky");
+      return true;
+    });
+  });
+});
+
 describe("assembleRequest — tokenizer behavior", () => {
   it("uses the default tokenizer when modelParams.tokenizer is absent", async () => {
     const out = await assembleRequest({

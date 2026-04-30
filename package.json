@@ -1,6 +1,6 @@
 {
   "name": "stud-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A bare-bones, 100% customizable and extensible coding CLI tool. Placeholder release — architecture in progress.",
   "bin": {
     "stud-cli": "bin/stud-cli.js"
@@ -52,12 +52,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
-    "agentool": "^1.3.0",
+    "agentool": "1.3.0",
     "ai": "6.0.168",
     "ink": "7.0.1",
     "react": "19.2.5",
     "react-devtools-core": "6.1.2",
-    "zod": "^3.25.0"
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
