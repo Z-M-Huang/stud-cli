@@ -142,3 +142,43 @@ describe("settingsSchema — invalid inputs", () => {
     assert.equal(result, true);
   });
 });
+
+describe("settingsSchema — id-keyed providers (1.0.1)", () => {
+  it("accepts active.model alongside active.provider", () => {
+    const result = validate({
+      active: { provider: "bailian", model: "qwen3.6-plus" },
+    });
+    assert.equal(result, true);
+  });
+
+  it("rejects an empty active.model string", () => {
+    const result = validate({ active: { provider: "x", model: "" } });
+    assert.equal(result, false);
+  });
+
+  it("rejects the stale active.interactor key", () => {
+    const result = validate({ active: { interactor: "ui.tui" } });
+    assert.equal(result, false);
+  });
+
+  it("accepts id-keyed providers with two same-protocol entries", () => {
+    const result = validate({
+      providers: {
+        bailian: {
+          protocol: "openai-compatible",
+          apiKeyRef: { kind: "keyring", name: "bailian-api-key" },
+          baseURL: "http://192.168.1.253:8317/v1",
+          models: ["qwen3.6-plus", "glm-5"],
+        },
+        "openai-prod": {
+          protocol: "openai-compatible",
+          apiKeyRef: { kind: "env", name: "OPENAI_API_KEY" },
+          baseURL: "https://api.openai.com/v1",
+          models: ["gpt-4o", "gpt-4o-mini"],
+        },
+      },
+      active: { provider: "bailian", model: "qwen3.6-plus" },
+    });
+    assert.equal(result, true);
+  });
+});

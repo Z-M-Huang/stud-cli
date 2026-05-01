@@ -1,4 +1,5 @@
 {
+  "protocol": "gemini",
   "apiKeyRef": { "kind": "env", "name": "GEMINI_API_KEY" },
-  "model": "gemini-2.0-flash"
+  "models": ["gemini-2.0-flash"]
 }

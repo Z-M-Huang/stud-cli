@@ -35,7 +35,7 @@ describe("validateSettings — accept valid shapes", () => {
       logging: {},
       active: {
         provider: "openai-compatible",
-        interactor: "ui.tui",
+        model: "gpt-4o",
         sessionStore: "fs.reference",
         attachedSM: "ralph",
       },
@@ -43,7 +43,7 @@ describe("validateSettings — accept valid shapes", () => {
 
     assert.equal(s.env?.["MY_KEY"], "x");
     assert.equal(s.active?.provider, "openai-compatible");
-    assert.equal(s.active?.interactor, "ui.tui");
+    assert.equal(s.active?.model, "gpt-4o");
     assert.equal(s.active?.sessionStore, "fs.reference");
     assert.equal(s.active?.attachedSM, "ralph");
     assert.equal(s.securityMode?.mode, "ask");
@@ -210,11 +210,11 @@ describe("mergeSettings — per-category map project override", () => {
 
   it("merges active selectors with project winning", () => {
     const merged = mergeSettings(
-      { active: { interactor: "ui.a", sessionStore: "fs.a" } },
-      { active: { interactor: "ui.b" } },
+      { active: { provider: "p.a", sessionStore: "fs.a" } },
+      { active: { provider: "p.b" } },
       { active: { sessionStore: "fs.b" } },
     );
-    assert.equal(merged.active?.interactor, "ui.b");
+    assert.equal(merged.active?.provider, "p.b");
     assert.equal(merged.active?.sessionStore, "fs.b");
   });
 

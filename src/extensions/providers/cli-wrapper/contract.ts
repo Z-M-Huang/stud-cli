@@ -1,4 +1,5 @@
 import { ExtensionHost } from "../../../core/errors/extension-host.js";
+import { ProviderCapability } from "../../../core/errors/provider-capability.js";
 
 import { cliWrapperConfigSchema, type CLIWrapperConfig } from "./config.schema.js";
 import { configForHost, activate, deactivate, dispose, init } from "./lifecycle.js";
@@ -9,7 +10,7 @@ import type { ProviderContract } from "../../../contracts/providers.js";
 
 export const contract: ProviderContract<CLIWrapperConfig> = {
   kind: "Provider",
-  contractVersion: "1.0.0",
+  contractVersion: "1.0.1",
   requiredCoreVersion: ">=1.0.0 <2.0.0",
   lifecycle: { init, activate, deactivate, dispose },
   configSchema: cliWrapperConfigSchema,
@@ -35,6 +36,18 @@ export const contract: ProviderContract<CLIWrapperConfig> = {
         throw new ExtensionHost("CLI wrapper provider has not been initialized.", undefined, {
           code: "LifecycleFailure",
         });
+      }
+
+      if (!config.models.includes(args.modelId)) {
+        throw new ProviderCapability(
+          `model '${args.modelId}' is not declared in this CLI-wrapper provider entry`,
+          undefined,
+          {
+            code: "ModelNotInProvider",
+            modelId: args.modelId,
+            models: config.models,
+          },
+        );
       }
 
       const seededArgs = config.argsTemplate.map((arg) =>

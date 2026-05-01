@@ -38,8 +38,10 @@ describe("cli-wrapper provider", () => {
     const validate = createAjvValidator();
     assert.equal(
       validate({
+        protocol: "cli-wrapper",
         cliRef: { kind: "executable", path: "/usr/bin/echo" },
         argsTemplate: ["deterministic"],
+        models: ["reference-model"],
         timeoutMs: 1000,
         seed: "abc",
       }),
@@ -51,19 +53,37 @@ describe("cli-wrapper provider", () => {
     const validate = createAjvValidator();
     assert.equal(
       validate({
+        protocol: "cli-wrapper",
         cliRef: { kind: "executable", path: "/usr/bin/echo" },
         argsTemplate: [],
+        models: ["reference-model"],
         timeoutMs: -1,
       }),
       false,
     );
   });
 
+  it("rejects a config missing the models[] array", () => {
+    const validate = createAjvValidator();
+    assert.equal(
+      validate({
+        protocol: "cli-wrapper",
+        cliRef: { kind: "executable", path: "/usr/bin/echo" },
+        argsTemplate: [],
+      }),
+      false,
+    );
+  });
+});
+
+describe("cli-wrapper provider — runtime", () => {
   it("produces deterministic output for identical input + seed", async () => {
     const { host } = mockHost({ extId: "cli-wrapper" });
     await contract.lifecycle.init?.(host, {
+      protocol: "cli-wrapper",
       cliRef: { kind: "executable", path: "/usr/bin/echo" },
       argsTemplate: ["deterministic", "{seed}", "{messages}"],
+      models: ["reference-model"],
       seed: "abc",
     });
 
@@ -86,15 +106,17 @@ describe("cli-wrapper provider", () => {
   it("throws ProviderTransient/NetworkTimeout on CLI timeout", async () => {
     const { host } = mockHost({ extId: "cli-wrapper" });
     await contract.lifecycle.init?.(host, {
+      protocol: "cli-wrapper",
       cliRef: { kind: "executable", path: "/usr/bin/sleep" },
       argsTemplate: ["60"],
+      models: ["reference-model"],
       timeoutMs: 5,
     });
 
     await assert.rejects(
       collectDeltas(
         contract.surface.request(
-          { messages: [], tools: [], modelId: "x" },
+          { messages: [], tools: [], modelId: "reference-model" },
           host,
           new AbortController().signal,
         ),
@@ -112,8 +134,10 @@ describe("cli-wrapper provider", () => {
     await assert.rejects(
       () =>
         contract.lifecycle.init!(host, {
+          protocol: "cli-wrapper",
           cliRef: { kind: "executable", path: "/nonexistent-binary" },
           argsTemplate: [],
+          models: ["reference-model"],
         }),
       {
         class: "Validation",

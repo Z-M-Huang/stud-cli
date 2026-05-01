@@ -91,13 +91,17 @@ describe("anthropicConfigSchema fixtures", () => {
 
   it("accepts a valid env-backed apiKeyRef", () => {
     assert.equal(
-      validate({ apiKeyRef: { kind: "env", name: "ANTHROPIC_API_KEY" }, model: "claude-opus-4-7" }),
+      validate({
+        protocol: "anthropic",
+        apiKeyRef: { kind: "env", name: "ANTHROPIC_API_KEY" },
+        models: ["claude-opus-4-7"],
+      }),
       true,
     );
   });
 
   it("rejects a plaintext api key with a path", () => {
-    assert.equal(validate({ apiKeyRef: "sk-xxx", model: "x" }), false);
+    assert.equal(validate({ protocol: "anthropic", apiKeyRef: "sk-xxx", models: ["x"] }), false);
     const firstError = validate.errors?.[0];
     assert.ok(firstError != null, "Expected at least one AJV error");
     const path = (firstError as { dataPath?: string }).dataPath ?? firstError.schemaPath ?? "";
@@ -106,12 +110,35 @@ describe("anthropicConfigSchema fixtures", () => {
 
   it("rejects worst-plausible input without crashing", () => {
     const worst = {
+      protocol: "anthropic",
       apiKeyRef: { kind: "env", name: "X" },
-      model: "x",
+      models: ["x"],
       __proto__: { polluted: true },
       extra: "x".repeat(1_000_000),
     };
     assert.equal(validate(worst), false);
+  });
+
+  it("rejects entries missing the protocol field", () => {
+    assert.equal(validate({ apiKeyRef: { kind: "env", name: "X" }, models: ["x"] }), false);
+  });
+
+  it("rejects entries with an empty models array", () => {
+    assert.equal(
+      validate({ protocol: "anthropic", apiKeyRef: { kind: "env", name: "X" }, models: [] }),
+      false,
+    );
+  });
+
+  it("rejects entries whose protocol does not match the schema's const", () => {
+    assert.equal(
+      validate({
+        protocol: "openai-compatible",
+        apiKeyRef: { kind: "env", name: "X" },
+        models: ["x"],
+      }),
+      false,
+    );
   });
 });
 
@@ -132,7 +159,10 @@ describe("Anthropic secrets hygiene (invariant #6)", () => {
     };
 
     const adapter = createAnthropicAdapter(
-      { apiKeyRef: { kind: "env", name: "ANTHROPIC_API_KEY" }, model: "claude-opus-4-7" },
+      {
+        apiKeyRef: { kind: "env", name: "ANTHROPIC_API_KEY" },
+        model: "claude-opus-4-7",
+      },
       hostWithSecrets,
     );
 
@@ -159,7 +189,10 @@ describe("Anthropic secrets hygiene (invariant #6)", () => {
     };
 
     const adapter = createAnthropicAdapter(
-      { apiKeyRef: { kind: "env", name: "ANTHROPIC_API_KEY" }, model: "claude-opus-4-7" },
+      {
+        apiKeyRef: { kind: "env", name: "ANTHROPIC_API_KEY" },
+        model: "claude-opus-4-7",
+      },
       hostWithSecrets,
     );
 

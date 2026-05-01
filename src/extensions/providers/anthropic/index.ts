@@ -2,20 +2,15 @@ import { ExtensionHost } from "../../../core/errors/extension-host.js";
 import { ProviderCapability } from "../../../core/errors/provider-capability.js";
 import { ProviderTransient } from "../../../core/errors/provider-transient.js";
 
-import { createAnthropicAdapter } from "./adapter.js";
+import { createAnthropicAdapter, type AnthropicAdapterConfig } from "./adapter.js";
 import { anthropicConfigSchema, type AnthropicConfig } from "./config.schema.js";
 import { activate, configForHost, deactivate, dispose, init } from "./lifecycle.js";
 
 import type { ProviderContract, ProviderStreamEvent } from "../../../contracts/providers.js";
 
-const defaultConfig: AnthropicConfig = {
-  apiKeyRef: { kind: "env", name: "ANTHROPIC_API_KEY" },
-  model: "claude-opus-4-7",
-};
-
 export const contract: ProviderContract<AnthropicConfig> = {
   kind: "Provider",
-  contractVersion: "1.0.0",
+  contractVersion: "1.0.1",
   requiredCoreVersion: ">=1.0.0 <2.0.0",
   lifecycle: { init, activate, deactivate, dispose },
   configSchema: anthropicConfigSchema,
@@ -43,14 +38,29 @@ export const contract: ProviderContract<AnthropicConfig> = {
         });
       }
 
-      const adapter = createAnthropicAdapter(
-        {
-          ...defaultConfig,
-          ...loadedConfig,
-          model: args.modelId,
-        },
-        host,
-      );
+      if (!loadedConfig.models.includes(args.modelId)) {
+        throw new ProviderCapability(
+          `model '${args.modelId}' is not declared in this Anthropic provider entry`,
+          undefined,
+          {
+            code: "ModelNotInProvider",
+            modelId: args.modelId,
+            models: loadedConfig.models,
+          },
+        );
+      }
+
+      const adapterConfig: AnthropicAdapterConfig = {
+        apiKeyRef: loadedConfig.apiKeyRef,
+        model: args.modelId,
+        ...(loadedConfig.baseURL !== undefined ? { baseURL: loadedConfig.baseURL } : {}),
+        ...(loadedConfig.timeoutMs !== undefined ? { timeoutMs: loadedConfig.timeoutMs } : {}),
+        ...(loadedConfig.defaultParams !== undefined
+          ? { defaultParams: loadedConfig.defaultParams }
+          : {}),
+      };
+
+      const adapter = createAnthropicAdapter(adapterConfig, host);
 
       for await (const event of adapter.request(
         {

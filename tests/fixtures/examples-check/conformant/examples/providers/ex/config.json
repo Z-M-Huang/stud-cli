@@ -1,1 +1,5 @@
-{ "apiKeyRef": { "kind": "env", "name": "X" }, "model": "m" }
+{
+  "protocol": "openai-compatible",
+  "apiKeyRef": { "kind": "env", "name": "X" },
+  "models": ["m"]
+}

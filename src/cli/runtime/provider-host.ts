@@ -2,6 +2,7 @@ import { ExtensionHost, ToolTerminal, Validation } from "../../core/errors/index
 import { createRuntimeCollector } from "../../core/host/internal/runtime-collector.js";
 
 import { completeSlashCommand, runtimeCommandCatalog } from "./command-catalog.js";
+import { buildInteractionAPI } from "./host-interaction.js";
 import { resolveKeyringSecret } from "./storage.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
@@ -191,9 +192,13 @@ export function createProviderHost(
     },
     audit: buildAuditAPI(getAuditBus),
     observability: buildObservabilityAPI(getAuditBus),
-    interaction: {
-      raise: () => notImplemented("Interaction requests are not available during provider runtime"),
-    },
+    interaction:
+      eventBus !== undefined
+        ? buildInteractionAPI(events)
+        : {
+            raise: () =>
+              notImplemented("Interaction requests are not available without an active event bus"),
+          },
     commands: buildCommandsAPI(loadedTools),
     metrics: collector.reader,
     secrets: {

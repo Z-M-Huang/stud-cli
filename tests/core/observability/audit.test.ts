@@ -24,16 +24,18 @@ function assertValidationCode(error: unknown, code: string): true {
 }
 
 function registerEnumerationAndValidationTests(): void {
-  it("enumerates the 13 wiki-documented classes plus SuppressedError", () => {
+  it("enumerates the 13 wiki-documented classes plus SuppressedError, including rejected variants", () => {
     const classes = listAuditClasses();
 
-    assert.equal(classes.length, 14);
+    assert.equal(classes.length, 16);
     assert.deepEqual(classes, [
       "Approval",
       "Compaction",
       "StageExecution",
       "ModelSwitch",
+      "ModelSwitchRejected",
       "ProviderSwitch",
+      "ProviderSwitchRejected",
       "ExtensionsReloaded",
       "TrustDecision",
       "SMTransition",
@@ -67,7 +69,7 @@ function registerEnumerationAndValidationTests(): void {
   it("every class has a typed payload shape", () => {
     const _: Parameters<typeof writeAudit> = ["SessionLifecycle", { event: "start" }];
     assert.deepEqual(_, ["SessionLifecycle", { event: "start" }]);
-    assert.equal(listAuditClasses().length, 14);
+    assert.equal(listAuditClasses().length, 16);
   });
 }
 

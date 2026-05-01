@@ -38,6 +38,8 @@ export default tseslint.config(
             "tests/scripts/*.ts",
             "tests/ci/*.ts",
             "tests/cli/*.ts",
+            // tests/cli/runtime/*.ts — bootstrap, swap, holder unit tests.
+            "tests/cli/runtime/*.ts",
             // tests/core/<category>/*.ts — added as new test directories land.
             "tests/core/errors/*.ts",
             // tests/core/env/*.ts — Env Provider tests.
@@ -140,6 +142,7 @@ export default tseslint.config(
             "tests/extensions/session-stores/filesystem/*.ts",
             // tests/extensions/ui/default-tui/*.ts — Default TUI tests.
             "tests/extensions/ui/default-tui/*.ts",
+            "tests/extensions/ui/default-tui/dialogs/*.ts",
             // tests/extensions/loggers/file/*.ts — file logger tests.
             "tests/extensions/loggers/file/*.ts",
             // tests/extensions/context-providers/system-prompt-file/*.ts — system-prompt-file context provider tests.

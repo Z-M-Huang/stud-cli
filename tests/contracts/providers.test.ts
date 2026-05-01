@@ -73,11 +73,16 @@ function makeReferenceProvider(): ProviderContract<ProviderConfig> {
 }
 
 const providerFixtures = {
-  valid: { apiKeyRef: { kind: "env" as const, name: "OPENAI_API_KEY" }, model: "gpt-4o" },
-  invalid: { apiKeyRef: "plaintext-secret", model: 42 },
+  valid: {
+    protocol: "openai-compatible" as const,
+    apiKeyRef: { kind: "env" as const, name: "OPENAI_API_KEY" },
+    models: ["gpt-4o"] as readonly [string, ...string[]],
+  },
+  invalid: { protocol: "openai-compatible", apiKeyRef: "plaintext-secret", models: 42 },
   worstPlausible: {
+    protocol: "openai-compatible" as const,
     apiKeyRef: { kind: "env", name: "X" },
-    model: "x",
+    models: ["x"] as readonly [string, ...string[]],
     __proto__: { polluted: true },
     extra: "x".repeat(1_000_000),
   },

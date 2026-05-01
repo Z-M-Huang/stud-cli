@@ -6,6 +6,12 @@ export interface ActiveDialog {
   readonly kind: string;
   readonly requestId: string;
   readonly prompt: string;
+  /**
+   * For `select` (and `confirm`, where the renderer supplies defaults), the
+   * list of option labels exactly as advertised on the bus. The composer
+   * resolves the picked option by index back into this array.
+   */
+  readonly options?: readonly string[];
 }
 
 export interface PendingInteraction {

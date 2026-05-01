@@ -6,10 +6,14 @@ import { createEventBus } from "../../core/events/bus.js";
 import { mountTUI } from "../../extensions/ui/default-tui/mount.js";
 
 import { startSessionAuditBus, type SessionAuditBus } from "./audit-bus.js";
-import { providerLabel } from "./bootstrap.js";
+import { protocolLabel } from "./bootstrap.js";
 import { runtimeCommandCatalog } from "./command-catalog.js";
 import { createProviderHost } from "./provider-host.js";
 import { runAssistantIteration } from "./provider-stream.js";
+import {
+  createRuntimeContextRegistry,
+  type RuntimeContextRegistry,
+} from "./runtime-context-registry.js";
 import { handleRuntimeCommand } from "./session-commands.js";
 import {
   errorToAuditPayload,
@@ -28,15 +32,21 @@ import {
   sessionWorkspaceRoot,
 } from "./tool-registry.js";
 import { resolveToolCallResult } from "./tool-resolver.js";
-import { PROVIDERS, TOOL_CALL_CONTINUATION_LIMIT } from "./types.js";
+import { PROTOCOLS, TOOL_CALL_CONTINUATION_LIMIT } from "./types.js";
 
-import type { LoadedTool, ProviderId, ResolvedShellDeps, SessionBootstrap } from "./types.js";
+import type {
+  LoadedTool,
+  ProviderProtocolId,
+  ResolvedShellDeps,
+  SessionBootstrap,
+} from "./types.js";
 import type {
   ProviderContract,
   ProviderMessage,
   ProviderToolDefinition,
 } from "../../contracts/providers.js";
 import type { SessionManifest } from "../../contracts/session-store.js";
+import type { InteractionAPI } from "../../core/host/api/interaction.js";
 import type { HostAPI } from "../../core/host/host-api.js";
 import type { RuntimeCollector } from "../../core/host/internal/runtime-collector.js";
 import type { MountedTUI } from "../../extensions/ui/default-tui/mount.js";
@@ -107,21 +117,22 @@ async function continueAssistantTurn(args: ContinueAssistantTurnArgs): Promise<v
 
 function seedRuntimeMetrics(
   collector: RuntimeCollector,
-  descriptor: (typeof PROVIDERS)[ProviderId],
+  descriptor: (typeof PROTOCOLS)[ProviderProtocolId],
   session: SessionBootstrap,
   loadedTools: readonly LoadedTool[],
 ): void {
+  const selection = session.selection.current();
   collector.setProvider(
     {
-      id: descriptor.id,
+      id: selection.entryId,
       label: descriptor.label,
-      modelId: session.provider.modelId,
+      modelId: selection.modelId,
       capabilities: { streaming: true, toolCalling: true, thinking: false },
     },
-    Object.values(PROVIDERS).map((d) => ({
-      id: d.id,
+    Object.values(PROTOCOLS).map((d) => ({
+      id: d.protocolId,
       label: d.label,
-      modelId: d.defaultModel,
+      modelId: d.defaultModels[0],
       capabilities: { streaming: true, toolCalling: true, thinking: false },
     })),
   );
@@ -161,10 +172,11 @@ function mountSessionUI(args: {
     catalog,
     eventBus: args.eventBus,
   });
+  const selection = args.session.selection.current();
   ui.renderSessionStart({
     sessionId: args.session.sessionId,
-    providerLabel: providerLabel(args.session.provider.providerId),
-    modelId: args.session.provider.modelId,
+    providerLabel: protocolLabel(selection.protocolId),
+    modelId: selection.modelId,
     mode: args.session.securityMode,
     projectTrust: args.session.projectTrusted ? "granted" : "global-only",
     cwd: args.workspaceRoot,
@@ -179,8 +191,8 @@ interface SessionContext {
   readonly session: SessionBootstrap;
   readonly deps: ResolvedShellDeps;
   readonly prompt: PromptIO;
-  readonly descriptor: (typeof PROVIDERS)[ProviderId];
-  readonly host: ReturnType<typeof createProviderHost>;
+  readonly interaction: InteractionAPI;
+  readonly registry: RuntimeContextRegistry;
   readonly collector: RuntimeCollector;
   readonly loadedTools: LoadedTool[];
   readonly auditBus: SessionAuditBus;
@@ -195,11 +207,11 @@ async function bootstrapSessionContext(
   deps: ResolvedShellDeps,
   prompt: PromptIO,
 ): Promise<SessionContext> {
-  const descriptor = PROVIDERS[session.provider.providerId];
+  const initialSelection = session.selection.current();
   const loadedTools: LoadedTool[] = [];
   let auditBus: SessionAuditBus | null = null;
   const eventBus = createEventBus({ monotonic: () => process.hrtime.bigint() });
-  const host = createProviderHost(
+  const baseHost = createProviderHost(
     session,
     deps,
     join(studHome(deps.homedir()), "secrets.json"),
@@ -208,9 +220,9 @@ async function bootstrapSessionContext(
     undefined,
     eventBus,
   );
-  const collector = host.collector;
+  const collector = baseHost.collector;
   auditBus = await startSessionAuditBus({
-    host,
+    host: baseHost,
     sessionId: session.sessionId,
     globalRoot: studHome(deps.homedir()),
   });
@@ -218,13 +230,27 @@ async function bootstrapSessionContext(
     storeId: "filesystem-session-store",
     projectRoot: session.projectRoot,
     mode: session.securityMode,
-    providerId: session.provider.providerId,
-    modelId: session.provider.modelId,
+    providerId: initialSelection.entryId,
+    modelId: initialSelection.modelId,
   });
-  await descriptor.contract.lifecycle.init?.(host, session.provider.config as never);
-  await descriptor.contract.lifecycle.activate?.(host);
+
+  const registry = createRuntimeContextRegistry({
+    session,
+    deps,
+    loadedTools,
+    getAuditBus: () => auditBus,
+    collector,
+    eventBus,
+  });
+  await registry.ensure({
+    entryId: initialSelection.entryId,
+    protocolId: initialSelection.protocolId,
+    config: initialSelection.config,
+  });
+
   loadedTools.push(...(await initializeBundledTools(session, deps, prompt)));
-  seedRuntimeMetrics(collector, descriptor, session, loadedTools);
+  const initialDescriptor = PROTOCOLS[initialSelection.protocolId];
+  seedRuntimeMetrics(collector, initialDescriptor, session, loadedTools);
   const manifest = await persistSessionManifest(session.manifest, deps);
   const history = providerMessagesFromManifest(manifest);
   const approvalCache = createApprovalCache(loadedTools);
@@ -238,12 +264,24 @@ async function bootstrapSessionContext(
     resumedHistory: history,
     eventBus,
   });
+
+  // Re-seed metrics whenever the active selection changes so the TUI header
+  // and metrics dashboard reflect the new entry/model immediately.
+  session.selection.onChange(() => {
+    seedRuntimeMetrics(
+      collector,
+      PROTOCOLS[session.selection.current().protocolId],
+      session,
+      loadedTools,
+    );
+  });
+
   return {
     session,
     deps,
     prompt,
-    descriptor,
-    host,
+    interaction: baseHost.interaction,
+    registry,
     collector,
     loadedTools,
     auditBus,
@@ -272,10 +310,12 @@ async function runOneTurn(ctx: SessionContext, trimmed: string): Promise<void> {
       historyLength: history.length,
     });
     try {
+      const currentEntry = ctx.session.selection.current();
+      const runtime = ctx.registry.get(currentEntry.entryId);
       await continueAssistantTurn({
         session,
-        provider: ctx.descriptor.contract,
-        host: ctx.host,
+        provider: runtime.contract,
+        host: runtime.host,
         history,
         tools: ctx.loadedTools,
         toolDefinitions: providerToolDefinitions(ctx.loadedTools),
@@ -336,6 +376,10 @@ async function processInputLine(
     manifest: ctx.manifest,
     history: ctx.history,
     deps: ctx.deps,
+    interaction: ctx.interaction,
+    registry: ctx.registry,
+    auditBus: ctx.auditBus,
+    notify: (text) => ctx.ui.renderNotice(text),
     metrics: ctx.collector.reader,
     persist: (currentManifest, currentHistory) =>
       persistHistorySnapshot({
@@ -354,8 +398,7 @@ async function teardownSession(ctx: SessionContext): Promise<void> {
   await ctx.ui.unmount();
   ctx.auditBus.emit("SessionClosed", { storeId: "filesystem-session-store" });
   await disposeBundledTools();
-  await ctx.descriptor.contract.lifecycle.deactivate?.(ctx.host);
-  await ctx.descriptor.contract.lifecycle.dispose?.(ctx.host);
+  await ctx.registry.disposeAll();
   await ctx.auditBus.close();
 }
 

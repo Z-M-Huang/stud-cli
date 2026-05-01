@@ -12,6 +12,8 @@
  *                        current choice for outgoing requests, toggled via
  *                        `/provider` or `/model`)
  *
+ * contractVersion: 1.0.1
+ *
  * Wiki: contracts/Providers.md, providers/Protocol-Adapters.md,
  *       contracts/Capability-Negotiation.md
  */
@@ -264,18 +266,29 @@ export interface SecretRef {
 }
 
 /**
- * The validated shape of a provider's per-instance configuration block.
+ * The validated shape of a provider's per-instance configuration block,
+ * as it appears at `settings.json.providers.<entryId>`.
  *
+ * Wiki: contracts/Providers.md (Configuration schema section)
+ *       — contractVersion 1.0.1.
+ *
+ * `protocol`   — selects the protocol adapter. The map key in
+ *                `settings.json.providers` is **not** used for adapter lookup;
+ *                two entries may share `protocol` (e.g., two
+ *                `openai-compatible` backends differing in `baseURL`).
  * `apiKeyRef`  — env-variable reference for the API key. Resolved at session
  *               start via `host.env.get(name)`. Never a literal string secret.
- * `model`      — model identifier this provider instance targets.
- * `baseUrl`    — optional base URL override (proxies, Azure endpoints, etc.).
+ * `models`     — non-empty list of model identifiers this provider entry
+ *                serves from one backend. Selectable via `/model` while this
+ *                provider is active.
+ * `baseURL`    — optional base URL override (proxies, Azure endpoints, etc.).
  * `maxTokens`  — optional default output-token cap applied to every request.
  */
 export interface ProviderConfig {
+  readonly protocol: ProviderProtocol;
   readonly apiKeyRef: SecretRef;
-  readonly model: string;
-  readonly baseUrl?: string;
+  readonly models: readonly [string, ...string[]];
+  readonly baseURL?: string;
   readonly maxTokens?: number;
 }
 
@@ -283,8 +296,8 @@ export interface ProviderConfig {
  * JSON-Schema (AJV-compilable) document that validates a `ProviderConfig` object.
  *
  * Three canonical fixtures:
- *   valid         — `{ apiKeyRef: { kind: 'env', name: 'OPENAI_API_KEY' }, model: 'gpt-4o' }`
- *   invalid       — `{ apiKeyRef: 'plaintext-secret', model: 42 }` → rejected at `.apiKeyRef`
+ *   valid         — `{ protocol: 'openai-compatible', apiKeyRef: { kind: 'env', name: 'OPENAI_API_KEY' }, models: ['gpt-4o'] }`
+ *   invalid       — `{ apiKeyRef: 'plaintext-secret', models: 42 }` → rejected at `.apiKeyRef` / `.models`
  *   worstPlausible — includes prototype-pollution probe + 1 MB string → rejected by
  *                    `additionalProperties: false` on the `extra` field
  *
@@ -294,8 +307,9 @@ export const providerConfigSchema: JSONSchemaObject = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
   type: "object",
   additionalProperties: false,
-  required: ["apiKeyRef", "model"],
+  required: ["protocol", "apiKeyRef", "models"],
   properties: {
+    protocol: { type: "string", minLength: 1 },
     apiKeyRef: {
       type: "object",
       additionalProperties: false,
@@ -305,8 +319,12 @@ export const providerConfigSchema: JSONSchemaObject = {
         name: { type: "string", minLength: 1 },
       },
     },
-    model: { type: "string", minLength: 1 },
-    baseUrl: { type: "string" },
+    models: {
+      type: "array",
+      minItems: 1,
+      items: { type: "string", minLength: 1 },
+    },
+    baseURL: { type: "string" },
     maxTokens: { type: "integer", minimum: 1 },
   },
 };

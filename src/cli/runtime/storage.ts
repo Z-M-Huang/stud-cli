@@ -17,7 +17,7 @@ import { validateSettings } from "../../core/settings/validator.js";
 import type {
   AuditRecord,
   AuthPath,
-  ProviderId,
+  ProviderEntryId,
   ResolvedShellDeps,
   SecretRefKeyring,
   SecretStoreDocument,
@@ -151,13 +151,13 @@ export async function writeSecretStore(path: string, document: SecretStoreDocume
 
 export async function storeSecret(
   path: string,
-  providerId: ProviderId,
+  entryId: ProviderEntryId,
   authPath: Exclude<AuthPath, "env-api-key" | "none">,
   secret: string,
   deps: ResolvedShellDeps,
 ): Promise<SecretRefKeyring> {
   const current = await loadSecretStore(path);
-  const name = `${providerId}:${authPath}:${deps.now().getTime()}`;
+  const name = `${entryId}:${authPath}:${deps.now().getTime()}`;
   await writeSecretStore(path, {
     entries: {
       ...current.entries,

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { Session } from "../../core/errors/index.js";
 import { openTrustStore } from "../../core/security/trust/store.js";
 
+import { createActiveSelectionHolder } from "./active-selection.js";
 import { createSessionManifest } from "./session-store.js";
 import { isDirectory, loadSettingsFile } from "./storage.js";
 
@@ -50,7 +51,7 @@ export function newSessionBootstrap(args: {
   const sessionId = args.deps.sessionIdFactory();
   return {
     sessionId,
-    provider: args.provider,
+    selection: createActiveSelectionHolder(args.provider),
     projectRoot: args.launchArgs.projectRoot,
     projectTrusted: args.projectTrusted,
     securityMode: args.securityMode,

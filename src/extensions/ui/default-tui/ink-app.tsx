@@ -2,6 +2,7 @@ import { Box, Static, Text, useInput } from "ink";
 import React, { useEffect, useState } from "react";
 
 import { ApprovalDialog, type ApprovalDialogView } from "./approval-dialog.js";
+import { SelectDialog, type SelectDialogView } from "./dialogs/select-dialog.js";
 import {
   AssistantDraft,
   ErrorBlock,
@@ -40,7 +41,8 @@ export type TranscriptItem =
     }
   | { readonly kind: "tool"; readonly id: string; readonly card: ToolCardView }
   | { readonly kind: "thinking"; readonly id: string; readonly text: string }
-  | { readonly kind: "error"; readonly id: string; readonly message: string };
+  | { readonly kind: "error"; readonly id: string; readonly message: string }
+  | { readonly kind: "notice"; readonly id: string; readonly text: string };
 
 export interface HeaderInfo {
   readonly version: string;
@@ -79,6 +81,7 @@ export interface InkTUIFrameProps {
   readonly palette?: readonly PaletteEntry[] | undefined;
   readonly paletteSelectedIndex?: number | undefined;
   readonly approvalDialog?: ApprovalDialogView | undefined;
+  readonly selectDialog?: SelectDialogView | undefined;
   readonly statusItems: readonly StatusLineItem[];
   readonly theme?: Theme | undefined;
   readonly onComposerKey: (input: string, key: ComposerKey) => void;
@@ -298,7 +301,33 @@ function renderTranscriptItem(
       return <ThinkingRow text={item.text} theme={theme} />;
     case "error":
       return <ErrorBlock message={item.message} theme={theme} />;
+    case "notice":
+      return <NoticeBlock text={item.text} theme={theme} />;
   }
+}
+
+function NoticeBlock(props: {
+  readonly text: string;
+  readonly theme: Theme | undefined;
+}): React.ReactElement {
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      {...(props.theme?.muted !== undefined ? { borderColor: props.theme.muted } : {})}
+      paddingX={1}
+      marginBottom={1}
+    >
+      {props.text.split("\n").map((line, index) => (
+        <Text
+          key={`notice-${index}`}
+          {...(props.theme?.muted !== undefined ? { color: props.theme.muted } : {})}
+        >
+          {line.length > 0 ? line : " "}
+        </Text>
+      ))}
+    </Box>
+  );
 }
 
 export function InkTUIFrame(props: InkTUIFrameProps): React.ReactElement {
@@ -342,8 +371,15 @@ export function InkTUIFrame(props: InkTUIFrameProps): React.ReactElement {
           <ToolCard key={card.id} card={card} theme={props.theme} />
         ))}
 
+        {/* Render BOTH dialog components unconditionally so the live frame's
+            child shape stays stable across open/close cycles — that's the
+            invariant that prevents `log-update` from leaking an orphan border
+            row. The trailing height-1 spacer absorbs the variable-height
+            difference of the SelectDialog's option list. */}
         <Box flexDirection="column">
           <ApprovalDialog dialog={props.approvalDialog ?? null} theme={props.theme} />
+          <SelectDialog dialog={props.selectDialog ?? null} theme={props.theme} />
+          <Box height={1} />
         </Box>
 
         {/* Always render a palette slot; empty when no palette is open. Stable

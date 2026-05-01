@@ -92,12 +92,13 @@ async function seedTrustedOpenAICompatibleProject(
   await writeFile(
     join(home, ".stud", "settings.json"),
     JSON.stringify({
-      active: { provider: "openai-compatible" },
+      active: { provider: "openai-compatible", model: "gpt-5.4" },
       providers: {
         "openai-compatible": {
+          protocol: "openai-compatible",
           apiKeyRef: { kind: "keyring", name: "test-key" },
           baseURL: "https://api.openai.com/v1",
-          model: "gpt-5.4",
+          models: ["gpt-5.4"],
           apiShape: "chat-completions",
         },
       },

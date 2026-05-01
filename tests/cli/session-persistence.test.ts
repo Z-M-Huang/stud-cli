@@ -70,11 +70,13 @@ async function seedCliWrapper(home: string, projectRoot: string): Promise<void> 
   await writeFile(
     join(home, ".stud", "settings.json"),
     JSON.stringify({
-      active: { provider: "cli-wrapper" },
+      active: { provider: "cli-wrapper", model: "reference-model" },
       providers: {
         "cli-wrapper": {
+          protocol: "cli-wrapper",
           cliRef: { kind: "executable", path: "/usr/bin/echo" },
           argsTemplate: ["reply:", "{messages}"],
+          models: ["reference-model"],
           timeoutMs: 10_000,
         },
       },

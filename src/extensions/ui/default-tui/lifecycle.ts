@@ -89,6 +89,24 @@ function emitSuppressedError(host: HostAPI, err: unknown, reason: string): void 
   host.observability.suppress(payload);
 }
 
+function isSupportedKind(kind: string): kind is "confirm" | "input" | "select" {
+  return kind === "confirm" || kind === "input" || kind === "select";
+}
+
+function normalizeOptions(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string" || entry.length === 0) {
+      return undefined;
+    }
+    out.push(entry);
+  }
+  return out;
+}
+
 function resolveRequestId(payload: { requestId?: string; correlationId?: string }): string {
   return payload.correlationId ?? payload.requestId ?? "";
 }
@@ -200,11 +218,30 @@ export function activate(host: HostAPI): Promise<void> {
           requestId?: string;
           correlationId?: string;
           prompt: string;
+          options?: unknown;
         };
+        if (!isSupportedKind(request.kind)) {
+          emitSuppressedError(
+            host,
+            new Error(`unknown interaction kind '${request.kind}'`),
+            "default-tui.interaction-raised.unknown-kind",
+          );
+          return;
+        }
+        const options = normalizeOptions(request.options);
+        if (request.kind === "select" && (options === undefined || options.length === 0)) {
+          emitSuppressedError(
+            host,
+            new Error("select interaction requires a non-empty options array"),
+            "default-tui.interaction-raised.empty-options",
+          );
+          return;
+        }
         state.dialogs = raiseDialog(state.dialogs, {
           kind: request.kind,
           requestId: resolveRequestId(request),
           prompt: request.prompt,
+          ...(options !== undefined ? { options } : {}),
         });
         writeRenderTarget(host, state);
       },

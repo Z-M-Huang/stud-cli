@@ -5,6 +5,8 @@
  * key dispatch, submit/backspace/typing) so `mount.tsx` only wires the pieces
  * together.
  */
+import { completeSlashCommand } from "../../../cli/runtime/command-catalog.js";
+
 import { resolveApprovalKeyAction } from "./approval-dialog.js";
 import {
   append as appendBuffer,
@@ -12,7 +14,9 @@ import {
   createComposerBuffer,
   type ComposerBuffer,
 } from "./composer-buffer.js";
+import { resolveSelectKeyAction } from "./dialogs/select-dialog.js";
 
+import type { SelectManager } from "./dialogs/select-manager.js";
 import type { ComposerKey, PaletteEntry } from "./ink-app.js";
 import type { ApprovalManager } from "./ink-approval.js";
 import type { InkState, InkStore, InputQueue } from "./ink-store.js";
@@ -35,10 +39,97 @@ function isControlKey(key: ComposerKey): boolean {
   );
 }
 
+function handleSelectDialog(
+  input: string,
+  key: ComposerKey,
+  state: InkState,
+  select: SelectManager | undefined,
+): void {
+  if (state.selectDialog === null || select === undefined) return;
+  const action = resolveSelectKeyAction(
+    input,
+    key,
+    state.selectDialog.selectedIndex,
+    state.selectDialog.options.length,
+  );
+  if (action.kind === "select") {
+    select.selectIndex(action.selectedIndex);
+  } else if (action.kind === "decide") {
+    select.resolveCurrent();
+  } else if (action.kind === "cancel") {
+    select.cancelCurrent();
+  }
+}
+
+function handleApprovalDispatch(
+  input: string,
+  key: ComposerKey,
+  state: InkState,
+  approval: ApprovalManager,
+): void {
+  if (state.approvalDialog === null) return;
+  const action = resolveApprovalKeyAction(input, key, state.approvalDialog.selectedIndex);
+  if (action.kind === "select") {
+    approval.selectIndex(action.selectedIndex);
+  } else if (action.kind === "decide") {
+    approval.resolve(action.decision);
+  }
+}
+
+function handlePaletteDispatch(
+  key: ComposerKey,
+  state: InkState,
+  store: InkStore,
+  submit: (text: string) => void,
+): "handled" | "submit" | "skip" {
+  if (state.palette === null || state.palette.length === 0) return "skip";
+  if (key.upArrow === true) {
+    store.setState((s) => ({
+      ...s,
+      paletteSelectedIndex: Math.max(0, s.paletteSelectedIndex - 1),
+    }));
+    return "handled";
+  }
+  if (key.downArrow === true) {
+    store.setState((s) => ({
+      ...s,
+      paletteSelectedIndex: Math.min((s.palette?.length ?? 1) - 1, s.paletteSelectedIndex + 1),
+    }));
+    return "handled";
+  }
+  if (key.return === true) {
+    const entry = state.palette[state.paletteSelectedIndex];
+    if (entry !== undefined) {
+      store.setState((s) => ({ ...s, palette: null, paletteSelectedIndex: 0 }));
+      submit(entry.name);
+      return "submit";
+    }
+  }
+  return "skip";
+}
+
+function tabCompletion(
+  text: string,
+  catalog: readonly PaletteEntry[],
+): readonly { readonly replacement: string }[] {
+  if (!text.startsWith("/")) return [];
+  return completeSlashCommand(
+    text,
+    catalog.map((entry) => ({
+      name: entry.name,
+      description: entry.description,
+      category: "system" as const,
+      source: "runtime" as const,
+      turnSafe: true,
+    })),
+  );
+}
+
 export function createComposerController(args: {
   readonly store: InkStore;
   readonly queue: InputQueue;
   readonly approval: ApprovalManager;
+  readonly select?: SelectManager;
   /**
    * Echo a default-chat user message into the transcript at the moment it
    * is submitted. The session-loop also receives the same value via the
@@ -84,48 +175,39 @@ export function createComposerController(args: {
     args.queue.resolveNext(text);
   };
 
-  const handleApprovalKey = (input: string, key: ComposerKey, state: InkState): void => {
-    if (state.approvalDialog === null) return;
-    const action = resolveApprovalKeyAction(input, key, state.approvalDialog.selectedIndex);
-    if (action.kind === "select") {
-      args.approval.selectIndex(action.selectedIndex);
-    } else if (action.kind === "decide") {
-      args.approval.resolve(action.decision);
+  const handleTab = (state: InkState): void => {
+    if (args.catalog === undefined) return;
+    const completions = tabCompletion(buffer.display, args.catalog);
+    if (completions.length === 0) {
+      args.store.setState((s) => ({ ...s, tabCycleIndex: 0 }));
+      return;
     }
+    const cycleIndex = state.tabCycleIndex % completions.length;
+    const next = completions[cycleIndex]?.replacement ?? buffer.display;
+    buffer = appendBuffer(createComposerBuffer(), next);
+    refreshDisplay();
+    args.store.setState((s) => ({ ...s, tabCycleIndex: s.tabCycleIndex + 1 }));
   };
 
-  const handlePaletteKey = (key: ComposerKey, state: InkState): "handled" | "submit" | "skip" => {
-    if (state.palette === null || state.palette.length === 0) return "skip";
-    if (key.upArrow === true) {
-      args.store.setState((s) => ({
-        ...s,
-        paletteSelectedIndex: Math.max(0, s.paletteSelectedIndex - 1),
-      }));
-      return "handled";
-    }
-    if (key.downArrow === true) {
-      args.store.setState((s) => ({
-        ...s,
-        paletteSelectedIndex: Math.min((s.palette?.length ?? 1) - 1, s.paletteSelectedIndex + 1),
-      }));
-      return "handled";
-    }
-    if (key.return === true) {
-      const entry = state.palette[state.paletteSelectedIndex];
-      if (entry !== undefined) {
-        args.store.setState((s) => ({ ...s, palette: null, paletteSelectedIndex: 0 }));
-        submit(entry.name);
-        return "submit";
-      }
-    }
-    return "skip";
-  };
+  const handlePaletteKey = (key: ComposerKey, state: InkState): "handled" | "submit" | "skip" =>
+    handlePaletteDispatch(key, state, args.store, submit);
 
   const onKey = (input: string, key: ComposerKey): void => {
     const state = args.store.getState();
-    if (state.approvalDialog !== null) {
-      handleApprovalKey(input, key, state);
+    if (state.selectDialog !== null) {
+      handleSelectDialog(input, key, state, args.select);
       return;
+    }
+    if (state.approvalDialog !== null) {
+      handleApprovalDispatch(input, key, state, args.approval);
+      return;
+    }
+    if (key.tab === true) {
+      handleTab(state);
+      return;
+    }
+    if (state.tabCycleIndex !== 0) {
+      args.store.setState((s) => ({ ...s, tabCycleIndex: 0 }));
     }
     const paletteOutcome = handlePaletteKey(key, state);
     if (paletteOutcome !== "skip") return;

@@ -9,7 +9,7 @@
  * Merge semantics across scope layers live in Configuration Scopes; this module
  * owns only the per-field type shapes and the validating JSON Schema.
  *
- * contractVersion: 1.0.0
+ * contractVersion: 1.0.1
  *
  * Wiki: contracts/Settings-Shape.md, runtime/Configuration-Scopes.md
  */
@@ -110,6 +110,11 @@ export interface LoggingSettings {
  * `sessionStore` (required) — the single active Session Store for the session.
  *   Resume always uses the same store that wrote the session.
  *
+ * `model` (optional) — the current model name within the active provider's
+ *   `models[]`. When omitted, the active model is the first entry of the
+ *   active provider's `models[]`. `/model` may swap mid-session, restricted
+ *   to the active provider's `models[]`.
+ *
  * There is **no** `interactor` selector. UI participation is controlled per
  * extension via `ui.<name>.disable` / `ui.<name>.enabled` configuration; every
  * enabled UI extension whose `roles` array includes `'interactor'` participates
@@ -119,7 +124,8 @@ export interface LoggingSettings {
  * Wiki: contracts/Settings-Shape.md § active, contracts/Cardinality-and-Activation.md
  */
 export interface ActiveSelectors {
-  readonly provider?: string; // extId — current Provider for composition
+  readonly provider?: string; // entryId — the user-keyed `settings.json.providers.<id>` entry
+  readonly model?: string; // model name within the active provider's `models[]`
   readonly sessionStore?: string; // extId — used for resume when configured
   readonly attachedSM?: string; // extId — the currently attached State Machine
 }
@@ -255,6 +261,7 @@ export const settingsSchema: JSONSchemaObject = {
       additionalProperties: false,
       properties: {
         provider: { type: "string", minLength: 1 },
+        model: { type: "string", minLength: 1 },
         sessionStore: { type: "string", minLength: 1 },
         attachedSM: { type: "string", minLength: 1 },
       },

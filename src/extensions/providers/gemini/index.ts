@@ -2,20 +2,15 @@ import { ExtensionHost } from "../../../core/errors/extension-host.js";
 import { ProviderCapability } from "../../../core/errors/provider-capability.js";
 import { ProviderTransient } from "../../../core/errors/provider-transient.js";
 
-import { createGeminiAdapter } from "./adapter.js";
+import { createGeminiAdapter, type GeminiAdapterConfig } from "./adapter.js";
 import { geminiConfigSchema, type GeminiConfig } from "./config.schema.js";
 import { activate, configForHost, deactivate, dispose, init } from "./lifecycle.js";
 
 import type { ProviderContract, ProviderStreamEvent } from "../../../contracts/providers.js";
 
-const defaultConfig: GeminiConfig = {
-  apiKeyRef: { kind: "env", name: "GEMINI_API_KEY" },
-  model: "gemini-2.0-flash",
-};
-
 export const contract: ProviderContract<GeminiConfig> = {
   kind: "Provider",
-  contractVersion: "1.0.0",
+  contractVersion: "1.0.1",
   requiredCoreVersion: ">=1.0.0 <2.0.0",
   lifecycle: { init, activate, deactivate, dispose },
   configSchema: geminiConfigSchema,
@@ -43,14 +38,29 @@ export const contract: ProviderContract<GeminiConfig> = {
         });
       }
 
-      const adapter = createGeminiAdapter(
-        {
-          ...defaultConfig,
-          ...loadedConfig,
-          model: args.modelId,
-        },
-        host,
-      );
+      if (!loadedConfig.models.includes(args.modelId)) {
+        throw new ProviderCapability(
+          `model '${args.modelId}' is not declared in this Gemini provider entry`,
+          undefined,
+          {
+            code: "ModelNotInProvider",
+            modelId: args.modelId,
+            models: loadedConfig.models,
+          },
+        );
+      }
+
+      const adapterConfig: GeminiAdapterConfig = {
+        apiKeyRef: loadedConfig.apiKeyRef,
+        model: args.modelId,
+        ...(loadedConfig.baseURL !== undefined ? { baseURL: loadedConfig.baseURL } : {}),
+        ...(loadedConfig.timeoutMs !== undefined ? { timeoutMs: loadedConfig.timeoutMs } : {}),
+        ...(loadedConfig.defaultParams !== undefined
+          ? { defaultParams: loadedConfig.defaultParams }
+          : {}),
+      };
+
+      const adapter = createGeminiAdapter(adapterConfig, host);
 
       for await (const event of adapter.request(
         {

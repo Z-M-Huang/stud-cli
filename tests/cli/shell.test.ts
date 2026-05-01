@@ -124,12 +124,13 @@ async function seedTrustedOpenAICompatibleProject(
   await writeFile(
     join(home, ".stud", "settings.json"),
     JSON.stringify({
-      active: { provider: "openai-compatible" },
+      active: { provider: "openai-compatible", model: "gpt-5.4" },
       providers: {
         "openai-compatible": {
+          protocol: "openai-compatible",
           apiKeyRef: { kind: "keyring", name: "test-key" },
           baseURL: "https://api.openai.com/v1",
-          model: "gpt-5.4",
+          models: ["gpt-5.4"],
           apiShape: "chat-completions",
         },
       },
@@ -247,24 +248,24 @@ describe("runShell (bootstrap setup)", () => {
     await withTempProject(async ({ home, projectRoot }) => {
       const prompt = new ScriptedPrompt({
         selectAnswers: ["cli-wrapper", "none", "trust"],
-        inputAnswers: ["/usr/bin/echo"],
+        inputAnswers: ["cli-wrapper", "/usr/bin/echo"],
       });
-      let started:
-        | {
-            readonly providerId: string;
-            readonly modelId: string;
-            readonly projectTrusted: boolean;
-          }
-        | undefined;
+      interface Started {
+        readonly providerId: string;
+        readonly modelId: string;
+        readonly projectTrusted: boolean;
+      }
+      let started: Started | undefined;
 
       const handle = await runShell(launchArgs({ headless: false, projectRoot }), {
         homedir: () => home,
         prompt,
         sessionIdFactory: () => "session-1",
         runSession: (session) => {
+          const selection = session.selection.current();
           started = {
-            providerId: session.provider.providerId,
-            modelId: session.provider.modelId,
+            providerId: selection.entryId,
+            modelId: selection.modelId,
             projectTrusted: session.projectTrusted,
           };
           return Promise.resolve();
@@ -298,7 +299,7 @@ describe("runShell (bootstrap setup)", () => {
     await withTempProject(async ({ home, projectRoot }) => {
       const prompt = new ScriptedPrompt({
         selectAnswers: ["cli-wrapper", "none", "decline"],
-        inputAnswers: ["/usr/bin/echo"],
+        inputAnswers: ["cli-wrapper", "/usr/bin/echo"],
       });
       let started = false;
       const handle = await runShell(launchArgs({ headless: false, projectRoot }), {
@@ -326,7 +327,7 @@ describe("runShell (bootstrap session)", () => {
     await withTempProject(async ({ home, projectRoot }) => {
       const prompt = new ScriptedPrompt({
         selectAnswers: ["cli-wrapper", "none", "trust"],
-        inputAnswers: ["/usr/bin/echo", "hi", "/exit"],
+        inputAnswers: ["cli-wrapper", "/usr/bin/echo", "hi", "/exit"],
       });
       const stdout = await captureStdout(async () => {
         await runShell(launchArgs({ headless: false, projectRoot }), {
@@ -366,21 +367,14 @@ describe("runShell (bootstrap session)", () => {
       fetchMock.restore();
     }
 
-    const firstRequestTools = (fetchMock.calls[0]?.body["tools"] ?? []) as readonly Record<
-      string,
-      unknown
-    >[];
+    type Bag = Readonly<Record<string, unknown>>;
+    const firstRequestTools = (fetchMock.calls[0]?.body["tools"] ?? []) as readonly Bag[];
     assert.equal(firstRequestTools.length > 0, true);
-    const toolNames = firstRequestTools.map(
-      (tool) => ((tool["function"] ?? {}) as Record<string, unknown>)["name"],
-    );
+    const toolNames = firstRequestTools.map((tool) => ((tool["function"] ?? {}) as Bag)["name"]);
     assert.equal(toolNames.includes("bash"), true);
     assert.equal(toolNames.includes("read"), true);
 
-    const secondRequestMessages = (fetchMock.calls[1]?.body["messages"] ?? []) as readonly Record<
-      string,
-      unknown
-    >[];
+    const secondRequestMessages = (fetchMock.calls[1]?.body["messages"] ?? []) as readonly Bag[];
     const toolMessage = secondRequestMessages.find((message) => message["role"] === "tool");
     assert.ok(toolMessage !== undefined);
     assert.equal(String(toolMessage["content"]).includes("Tool-enabled workspace"), true);
@@ -454,12 +448,13 @@ describe("runShell (provider error surfaces)", () => {
         await writeFile(
           join(home, ".stud", "settings.json"),
           JSON.stringify({
-            active: { provider: "openai-compatible" },
+            active: { provider: "openai-compatible", model: "gpt-5.4" },
             providers: {
               "openai-compatible": {
+                protocol: "openai-compatible",
                 apiKeyRef: { kind: "keyring", name: "test-key" },
                 baseURL: "http://127.0.0.1:8317",
-                model: "gpt-5.4",
+                models: ["gpt-5.4"],
                 apiShape: "chat-completions",
               },
             },

@@ -2,7 +2,7 @@ import { ExtensionHost } from "../../../core/errors/extension-host.js";
 import { ProviderCapability } from "../../../core/errors/provider-capability.js";
 import { ProviderTransient } from "../../../core/errors/provider-transient.js";
 
-import { createOpenAIAdapter } from "./adapter.js";
+import { createOpenAIAdapter, type OpenAICompatibleAdapterConfig } from "./adapter.js";
 import {
   openaiCompatibleConfigSchema,
   type OpenAIApiShape,
@@ -14,7 +14,7 @@ import type { ProviderContract, ProviderStreamEvent } from "../../../contracts/p
 
 export const contract: ProviderContract<OpenAICompatibleConfig> = {
   kind: "Provider",
-  contractVersion: "1.0.0",
+  contractVersion: "1.0.1",
   requiredCoreVersion: ">=1.0.0 <2.0.0",
   lifecycle: { init, activate, deactivate, dispose },
   configSchema: openaiCompatibleConfigSchema,
@@ -42,7 +42,30 @@ export const contract: ProviderContract<OpenAICompatibleConfig> = {
         });
       }
 
-      const adapter = createOpenAIAdapter({ ...loadedConfig, model: args.modelId }, host);
+      if (!loadedConfig.models.includes(args.modelId)) {
+        throw new ProviderCapability(
+          `model '${args.modelId}' is not declared in this OpenAI-compatible provider entry`,
+          undefined,
+          {
+            code: "ModelNotInProvider",
+            modelId: args.modelId,
+            models: loadedConfig.models,
+          },
+        );
+      }
+
+      const adapterConfig: OpenAICompatibleAdapterConfig = {
+        apiKeyRef: loadedConfig.apiKeyRef,
+        baseURL: loadedConfig.baseURL,
+        model: args.modelId,
+        ...(loadedConfig.apiShape !== undefined ? { apiShape: loadedConfig.apiShape } : {}),
+        ...(loadedConfig.timeoutMs !== undefined ? { timeoutMs: loadedConfig.timeoutMs } : {}),
+        ...(loadedConfig.defaultParams !== undefined
+          ? { defaultParams: loadedConfig.defaultParams }
+          : {}),
+      };
+
+      const adapter = createOpenAIAdapter(adapterConfig, host);
 
       for await (const event of adapter.request(
         {

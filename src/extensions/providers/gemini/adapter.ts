@@ -8,6 +8,19 @@ import type { ProviderContentPart, ProviderMessage } from "../../../contracts/pr
 import type { HostAPI } from "../../../core/host/host-api.js";
 import type { ProtocolAdapter, ProtocolRequestArgs, StreamEvent } from "../_adapter/protocol.js";
 
+/**
+ * Per-call resolved config the Gemini adapter consumes. The provider entry
+ * stores `models: [...]` (a list); the adapter only ever speaks to one of them
+ * at a time, so the orchestrator narrows it to a single `model: string` here.
+ */
+export interface GeminiAdapterConfig {
+  readonly apiKeyRef: GeminiConfig["apiKeyRef"];
+  readonly model: string;
+  readonly baseURL?: string;
+  readonly timeoutMs?: number;
+  readonly defaultParams?: Readonly<Record<string, unknown>>;
+}
+
 type SecretRef = GeminiConfig["apiKeyRef"];
 
 type SecretsHost = HostAPI & {
@@ -43,7 +56,7 @@ function createUnauthorizedError(): StreamEvent {
   };
 }
 
-function endpointFor(config: GeminiConfig): string {
+function endpointFor(config: GeminiAdapterConfig): string {
   const baseURL = (config.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/u, "");
   return `${baseURL}/models/${encodeURIComponent(config.model)}:streamGenerateContent?alt=sse`;
 }
@@ -71,7 +84,7 @@ function toGeminiRole(role: ProviderMessage["role"]): "user" | "model" {
   return role === "assistant" ? "model" : "user";
 }
 
-function requestBody(args: ProtocolRequestArgs, config: GeminiConfig): string {
+function requestBody(args: ProtocolRequestArgs, config: GeminiAdapterConfig): string {
   const inlineSystemParts = args.messages
     .filter((message) => message.role === "system")
     .map((message) => ({ text: textFromContent(message.content) }));
@@ -238,7 +251,7 @@ function errorStatus(error: unknown): number | undefined {
 async function* toWireEvents(
   args: ProtocolRequestArgs,
   apiKey: string,
-  config: GeminiConfig,
+  config: GeminiAdapterConfig,
 ): AsyncIterable<WireEvent> {
   if (args.signal.aborted) {
     return;
@@ -259,7 +272,7 @@ async function* toWireEvents(
   yield* parseSse(response.body);
 }
 
-export function createGeminiAdapter(config: GeminiConfig, _host: HostAPI): ProtocolAdapter {
+export function createGeminiAdapter(config: GeminiAdapterConfig, _host: HostAPI): ProtocolAdapter {
   return {
     async *request(args: ProtocolRequestArgs, host: HostAPI): AsyncGenerator<StreamEvent> {
       let apiKey: string;

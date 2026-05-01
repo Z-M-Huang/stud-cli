@@ -1,9 +1,10 @@
 {
+  "protocol": "openai-compatible",
   "apiKeyRef": {
     "kind": "env",
     "name": "OPENAI_API_KEY"
   },
   "baseURL": "https://api.openai.com/v1",
-  "model": "gpt-4o",
+  "models": ["gpt-4o"],
   "apiShape": "chat-completions"
 }

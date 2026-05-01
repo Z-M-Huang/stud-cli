@@ -130,19 +130,24 @@ describe("geminiConfigSchema fixtures", () => {
 
   it("accepts a valid config", () => {
     assert.equal(
-      validate({ apiKeyRef: { kind: "env", name: "GEMINI_API_KEY" }, model: "gemini-2.0-flash" }),
+      validate({
+        protocol: "gemini",
+        apiKeyRef: { kind: "env", name: "GEMINI_API_KEY" },
+        models: ["gemini-2.0-flash"],
+      }),
       true,
     );
   });
 
   it("rejects a plaintext api key", () => {
-    assert.equal(validate({ apiKeyRef: "AIza-xxx", model: "x" }), false);
+    assert.equal(validate({ protocol: "gemini", apiKeyRef: "AIza-xxx", models: ["x"] }), false);
   });
 
   it("rejects worst-plausible input without crashing", () => {
     const worst = {
+      protocol: "gemini",
       apiKeyRef: { kind: "env", name: "X" },
-      model: "x",
+      models: ["x"],
       __proto__: { polluted: true },
       extra: "x".repeat(1_000_000),
     };
@@ -198,8 +203,9 @@ describe("normalizeGeminiParts (content-parts handling)", () => {
 
 async function assertSurfaceThrowsProviderTransient(host: HostAPI): Promise<void> {
   await contract.lifecycle.init?.(host, {
+    protocol: "gemini",
     apiKeyRef: { kind: "env", name: "X" },
-    model: "gemini-2.0-flash",
+    models: ["gemini-2.0-flash"],
   });
   await assert.rejects(
     async () => {

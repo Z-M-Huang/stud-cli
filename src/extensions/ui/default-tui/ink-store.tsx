@@ -23,6 +23,7 @@ import {
 } from "./status-line.js";
 
 import type { ApprovalDialogView } from "./approval-dialog.js";
+import type { SelectDialogView } from "./dialogs/select-dialog.js";
 import type { ConsoleSessionView } from "./runtime.js";
 import type { Theme } from "./theme.js";
 import type { RuntimeReader } from "../../../core/host/api/metrics.js";
@@ -49,6 +50,8 @@ export interface InkState {
   readonly palette: readonly PaletteEntry[] | null;
   readonly paletteSelectedIndex: number;
   readonly approvalDialog: ApprovalDialogView | null;
+  readonly selectDialog: SelectDialogView | null;
+  readonly tabCycleIndex: number;
   readonly online: boolean;
   readonly startedAt: Date;
 }
@@ -99,6 +102,8 @@ export function initialState(): InkState {
     palette: null,
     paletteSelectedIndex: 0,
     approvalDialog: null,
+    selectDialog: null,
+    tabCycleIndex: 0,
     online: true,
     startedAt: new Date(),
   };
@@ -247,6 +252,7 @@ export function Root(props: RootProps): React.ReactElement {
     palette: snap.palette ?? undefined,
     paletteSelectedIndex: snap.paletteSelectedIndex,
     approvalDialog: snap.approvalDialog ?? undefined,
+    selectDialog: snap.selectDialog ?? undefined,
     statusItems: snap.statusItems.length > 0 ? snap.statusItems : liveStatusItems,
     theme: props.theme,
     onComposerKey: props.onComposerKey,

@@ -1,6 +1,7 @@
 import { render, type Instance } from "ink";
 import React from "react";
 
+import { createSelectManager } from "./dialogs/select-manager.js";
 import { DEFAULT_INK_FRAME_HINT, type ComposerKey, type PaletteEntry } from "./ink-app.js";
 import { createApprovalManager } from "./ink-approval.js";
 import { createComposerController } from "./ink-composer.js";
@@ -72,6 +73,13 @@ export interface MountedTUI extends Omit<DefaultConsoleUI, "renderToolStart" | "
     status: "completed" | "failed" | "cancelled",
     summary?: string,
   ): void;
+  /**
+   * Append a free-form notice to the transcript (e.g., the result of a
+   * `/model` swap, a `cancelled` confirmation). Rendered like a tool result
+   * so the user sees session-state changes inline rather than below the Ink
+   * frame.
+   */
+  renderNotice(text: string): void;
 }
 
 export interface ToolApprovalRequest {
@@ -155,6 +163,12 @@ function fallbackMount(opts: MountOptions): MountedTUI {
     },
     renderTurnError(message) {
       ui.renderTurnError(message);
+    },
+    renderNotice(text) {
+      // Fallback (non-Ink) console: print the notice on its own line. Mirrors
+      // the behavior of the imperative writer; tests that drive the fallback
+      // can assert on stdout.
+      opts.stdout.write(`${text}\n`);
     },
     renderStatusLine(items) {
       ui.renderStatusLine(items);
@@ -241,6 +255,14 @@ function inkMount(opts: MountOptions): MountedTUI {
     store: internals.store,
     isUnmounted: () => unmounted,
   });
+  const select =
+    opts.eventBus !== undefined
+      ? createSelectManager({
+          bus: opts.eventBus,
+          store: internals.store,
+          isUnmounted: () => unmounted,
+        })
+      : undefined;
   // `actions` must be created before the composer because the composer
   // echoes default-chat input through `actions.appendUserMessage` at submit
   // time (so a message typed mid-turn appears immediately rather than only
@@ -250,6 +272,7 @@ function inkMount(opts: MountOptions): MountedTUI {
     store: internals.store,
     queue: internals.queue,
     approval,
+    ...(select !== undefined ? { select } : {}),
     appendUserMessage: (text) => actions.appendUserMessage(text),
     ...(opts.catalog !== undefined ? { catalog: opts.catalog } : {}),
   });
@@ -261,6 +284,7 @@ function inkMount(opts: MountOptions): MountedTUI {
     opts,
     internals,
     approval,
+    ...(select !== undefined ? { select } : {}),
     actions,
     isUnmounted: () => unmounted,
     markUnmounted: () => {
@@ -282,11 +306,12 @@ function inkMountedTUI(args: {
   readonly opts: MountOptions;
   readonly internals: InkMountInternals;
   readonly approval: ReturnType<typeof createApprovalManager>;
+  readonly select?: ReturnType<typeof createSelectManager>;
   readonly actions: ReturnType<typeof createInkMountActions>;
   readonly isUnmounted: () => boolean;
   readonly markUnmounted: () => void;
 }): MountedTUI {
-  const { opts, internals, approval, actions, isUnmounted, markUnmounted } = args;
+  const { opts, internals, approval, select, actions, isUnmounted, markUnmounted } = args;
   return {
     renderSessionStart(session: ConsoleSessionView): void {
       actions.renderSessionStart(session, {
@@ -315,6 +340,7 @@ function inkMountedTUI(args: {
     renderToolEnd: (toolCallId, toolName, status, summary) =>
       actions.renderToolEnd(toolCallId, toolName, status, summary),
     renderTurnError: (message) => actions.renderTurnError(message),
+    renderNotice: (text) => actions.renderNotice(text),
     renderStatusLine: (items) => actions.renderStatusLine(items),
     setPalette: (entries) => actions.setPalette(entries),
     clearPalette: () => actions.clearPalette(),
@@ -325,6 +351,8 @@ function inkMountedTUI(args: {
       markUnmounted();
       internals.queue.rejectAll(new Error("ui unmounted"));
       approval.denyAll();
+      select?.cancelAll();
+      select?.dispose();
       try {
         internals.instance.unmount();
         await internals.instance.waitUntilExit().catch(() => {

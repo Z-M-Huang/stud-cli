@@ -20,7 +20,11 @@ const CATEGORIES = [
 
 // Minimum-conformant config per category meta-schema (src/contracts/*.ts).
 const CONFORMANT: Record<(typeof CATEGORIES)[number], unknown> = {
-  providers: { apiKeyRef: { kind: "env", name: "X" }, model: "m" },
+  providers: {
+    protocol: "openai-compatible",
+    apiKeyRef: { kind: "env", name: "X" },
+    models: ["m"],
+  },
   tools: { enabled: true },
   hooks: { enabled: true },
   ui: { enabled: true },

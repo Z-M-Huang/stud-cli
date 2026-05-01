@@ -26,9 +26,10 @@ export function renderTurnError(session: SessionBootstrap, error: unknown): stri
         : "Error";
   const lines = [`assistant error [${klass}/${code}]`];
 
-  if (session.provider.providerId === "openai-compatible" && code === "EndpointNotFound") {
+  const selection = session.selection.current();
+  if (selection.protocolId === "openai-compatible" && code === "EndpointNotFound") {
     try {
-      const config = session.provider.config as { baseURL: string };
+      const config = selection.config as { baseURL: string };
       const url = new URL(config.baseURL);
       if (url.pathname === "/" || url.pathname.length === 0) {
         lines.push(

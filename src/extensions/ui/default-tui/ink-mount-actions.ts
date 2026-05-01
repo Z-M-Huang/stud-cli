@@ -45,6 +45,12 @@ export interface InkMountActions {
     summary?: string,
   ): void;
   renderTurnError(message: string): void;
+  /**
+   * Append an informational notice to the transcript (e.g., the result of a
+   * `/model` or `/provider` swap, a `cancelled` notice). Rendered like a
+   * tool-result card but without status semantics — pure free-form text.
+   */
+  renderNotice(text: string): void;
   renderStatusLine(items: readonly StatusLineItem[]): void;
   setPalette(entries: readonly PaletteEntry[]): void;
   clearPalette(): void;
@@ -116,6 +122,13 @@ export function createInkMountActions(store: InkStore): InkMountActions {
     },
     renderTurnError(message) {
       const item: TranscriptItem = { kind: "error", id: nextId("e"), message };
+      store.setState((state) => ({
+        ...state,
+        transcriptItems: [...state.transcriptItems, item],
+      }));
+    },
+    renderNotice(text) {
+      const item: TranscriptItem = { kind: "notice", id: nextId("n"), text };
       store.setState((state) => ({
         ...state,
         transcriptItems: [...state.transcriptItems, item],

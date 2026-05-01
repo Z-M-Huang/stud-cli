@@ -3,7 +3,9 @@ export const AUDIT_CLASSES = [
   "Compaction",
   "StageExecution",
   "ModelSwitch",
+  "ModelSwitchRejected",
   "ProviderSwitch",
+  "ProviderSwitchRejected",
   "ExtensionsReloaded",
   "TrustDecision",
   "SMTransition",
@@ -99,7 +101,18 @@ export interface AuditPayloads {
     readonly capHit: boolean;
   };
   readonly ModelSwitch: { readonly from: string; readonly to: string; readonly providerId: string };
+  readonly ModelSwitchRejected: {
+    readonly from: string;
+    readonly to: string;
+    readonly providerId: string;
+    readonly reason: { readonly code: string; readonly message: string };
+  };
   readonly ProviderSwitch: { readonly from: string; readonly to: string };
+  readonly ProviderSwitchRejected: {
+    readonly from: string;
+    readonly to: string;
+    readonly reason: { readonly code: string; readonly message: string };
+  };
   readonly ExtensionsReloaded: {
     readonly loaded: readonly string[];
     readonly disabled: readonly string[];

@@ -13,9 +13,10 @@ export interface OpenAICompatibleSecretRefKeyring {
 }
 
 export interface OpenAICompatibleConfig {
+  readonly protocol: "openai-compatible";
   readonly apiKeyRef: OpenAICompatibleSecretRefEnv | OpenAICompatibleSecretRefKeyring;
   readonly baseURL: string;
-  readonly model: string;
+  readonly models: readonly [string, ...string[]];
   readonly apiShape?: OpenAIApiShape;
   readonly timeoutMs?: number;
   readonly defaultParams?: Readonly<Record<string, unknown>>;
@@ -48,11 +49,16 @@ export const openaiCompatibleConfigSchema: JSONSchemaObject = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
   type: "object",
   additionalProperties: false,
-  required: ["apiKeyRef", "baseURL", "model"],
+  required: ["protocol", "apiKeyRef", "baseURL", "models"],
   properties: {
+    protocol: { type: "string", const: "openai-compatible" },
     apiKeyRef: secretRefSchema,
     baseURL: { type: "string", pattern: "^https?://[^\\s]+$" },
-    model: { type: "string", minLength: 1 },
+    models: {
+      type: "array",
+      minItems: 1,
+      items: { type: "string", minLength: 1 },
+    },
     apiShape: { type: "string", enum: ["chat-completions", "responses"] },
     timeoutMs: { type: "integer", minimum: 1 },
     defaultParams: {

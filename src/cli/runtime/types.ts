@@ -3,6 +3,7 @@ import { contract as cliWrapperContract } from "../../extensions/providers/cli-w
 import { contract as geminiContract } from "../../extensions/providers/gemini/index.js";
 import { contract as openaiCompatibleContract } from "../../extensions/providers/openai-compatible/index.js";
 
+import type { ActiveSelectionHolder } from "./active-selection.js";
 import type { ProviderContract, ProviderToolDefinition } from "../../contracts/providers.js";
 import type { SessionManifest } from "../../contracts/session-store.js";
 import type { SecurityMode, Settings as ContractSettings } from "../../contracts/settings-shape.js";
@@ -17,7 +18,22 @@ import type { PromptIO } from "../prompt.js";
 import type { asSchema } from "ai";
 
 export type Settings = CoreSettings & ContractSettings;
-export type ProviderId = "anthropic" | "cli-wrapper" | "gemini" | "openai-compatible";
+
+/**
+ * The user-chosen map key for one entry under `settings.json.providers.<id>`.
+ * Open string — typically the backend's name (e.g., `"bailian"`, `"openai-prod"`).
+ * Two entries may share `protocol`; their entry ids are still distinct.
+ */
+export type ProviderEntryId = string;
+
+/**
+ * The closed set of bundled protocol adapters. Each provider entry's
+ * `protocol` field selects one of these. Third-party providers may add their
+ * own protocol keys via a custom Provider extension; this type covers the
+ * bundled four only.
+ */
+export type ProviderProtocolId = "anthropic" | "cli-wrapper" | "gemini" | "openai-compatible";
+
 export type AuthPath =
   | "none"
   | "env-api-key"
@@ -55,16 +71,17 @@ export interface SecretStoreDocument {
 }
 
 export interface ProviderDescriptor {
-  readonly id: ProviderId;
+  readonly protocolId: ProviderProtocolId;
   readonly label: string;
-  readonly defaultModel: string;
+  readonly defaultModels: readonly [string, ...string[]];
   readonly defaultEnvName?: string;
   readonly defaultBaseURL?: string;
   readonly contract: ProviderContract<unknown>;
 }
 
 export interface ProviderSelection {
-  readonly providerId: ProviderId;
+  readonly entryId: ProviderEntryId;
+  readonly protocolId: ProviderProtocolId;
   readonly config: AnyProviderConfig;
   readonly modelId: string;
 }
@@ -89,7 +106,7 @@ export interface LoadedTool {
 
 export interface SessionBootstrap {
   readonly sessionId: string;
-  readonly provider: ProviderSelection;
+  readonly selection: ActiveSelectionHolder;
   readonly projectRoot: string;
   readonly projectTrusted: boolean;
   readonly securityMode: SecurityMode;
@@ -139,33 +156,40 @@ export type SecretsHost = HostAPI & {
   };
 };
 
-export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
+/**
+ * The bundled protocol descriptors, keyed by `ProviderProtocolId`. Provider
+ * **entries** in `settings.json.providers` are user-keyed and may multiply
+ * (two `openai-compatible` entries differing in `baseURL`); this table indexes
+ * the closed set of *protocol adapters* the entries dispatch to via their
+ * `protocol` field.
+ */
+export const PROTOCOLS: Record<ProviderProtocolId, ProviderDescriptor> = {
   anthropic: {
-    id: "anthropic",
+    protocolId: "anthropic",
     label: "anthropic",
-    defaultModel: "claude-opus-4-7",
+    defaultModels: ["claude-opus-4-7"],
     defaultEnvName: "ANTHROPIC_API_KEY",
     defaultBaseURL: "https://api.anthropic.com",
     contract: anthropicContract as unknown as ProviderContract<unknown>,
   },
   "cli-wrapper": {
-    id: "cli-wrapper",
+    protocolId: "cli-wrapper",
     label: "cli-wrapper (local subscription/test double)",
-    defaultModel: "reference-model",
+    defaultModels: ["reference-model"],
     contract: cliWrapperContract as unknown as ProviderContract<unknown>,
   },
   gemini: {
-    id: "gemini",
+    protocolId: "gemini",
     label: "gemini",
-    defaultModel: "gemini-2.0-flash",
+    defaultModels: ["gemini-2.0-flash"],
     defaultEnvName: "GEMINI_API_KEY",
     defaultBaseURL: "https://generativelanguage.googleapis.com/v1beta",
     contract: geminiContract as unknown as ProviderContract<unknown>,
   },
   "openai-compatible": {
-    id: "openai-compatible",
+    protocolId: "openai-compatible",
     label: "openai-compatible",
-    defaultModel: "gpt-4o",
+    defaultModels: ["gpt-4o"],
     defaultEnvName: "OPENAI_API_KEY",
     defaultBaseURL: "https://api.openai.com/v1",
     contract: openaiCompatibleContract as unknown as ProviderContract<unknown>,

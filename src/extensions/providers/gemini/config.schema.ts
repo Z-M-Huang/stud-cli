@@ -11,8 +11,9 @@ export interface GeminiSecretRefKeyring {
 }
 
 export interface GeminiConfig {
+  readonly protocol: "gemini";
   readonly apiKeyRef: GeminiSecretRefEnv | GeminiSecretRefKeyring;
-  readonly model: string;
+  readonly models: readonly [string, ...string[]];
   readonly baseURL?: string;
   readonly timeoutMs?: number;
   readonly defaultParams?: Readonly<Record<string, unknown>>;
@@ -45,10 +46,15 @@ export const geminiConfigSchema: JSONSchemaObject = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
   type: "object",
   additionalProperties: false,
-  required: ["apiKeyRef", "model"],
+  required: ["protocol", "apiKeyRef", "models"],
   properties: {
+    protocol: { type: "string", const: "gemini" },
     apiKeyRef: secretRefSchema,
-    model: { type: "string", minLength: 1 },
+    models: {
+      type: "array",
+      minItems: 1,
+      items: { type: "string", minLength: 1 },
+    },
     baseURL: { type: "string", minLength: 1 },
     timeoutMs: { type: "integer", minimum: 1 },
     defaultParams: {

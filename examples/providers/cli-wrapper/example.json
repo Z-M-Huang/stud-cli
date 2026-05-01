@@ -1,9 +1,11 @@
 {
+  "protocol": "cli-wrapper",
   "cliRef": {
     "kind": "executable",
     "path": "/usr/bin/echo"
   },
   "argsTemplate": ["deterministic"],
+  "models": ["reference-model"],
   "timeoutMs": 1000,
   "seed": "ci-seed"
 }

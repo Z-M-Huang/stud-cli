@@ -130,8 +130,8 @@ function emitProviderCompletion(args: {
   readonly durationMs: number;
 }): void {
   args.auditBus.emit("ProviderResponse", {
-    providerId: args.session.provider.providerId,
-    modelId: args.session.provider.modelId,
+    providerId: args.session.selection.current().entryId,
+    modelId: args.session.selection.current().modelId,
     finishReason: args.providerError === undefined ? args.acc.finishReason : "error",
     assistantText: args.acc.assistantText,
     toolCalls: args.acc.toolCalls,
@@ -141,8 +141,8 @@ function emitProviderCompletion(args: {
   });
   if (args.providerError === undefined) {
     args.host.events.emit("ProviderRequestCompleted", {
-      providerId: args.session.provider.providerId,
-      modelId: args.session.provider.modelId,
+      providerId: args.session.selection.current().entryId,
+      modelId: args.session.selection.current().modelId,
       finishReason: args.acc.finishReason,
       assistantText: args.acc.assistantText,
       outputTokens: args.acc.outputTokens,
@@ -152,8 +152,8 @@ function emitProviderCompletion(args: {
   }
   const audit = errorToAuditPayload(args.providerError);
   args.host.events.emit("ProviderRequestFailed", {
-    providerId: args.session.provider.providerId,
-    modelId: args.session.provider.modelId,
+    providerId: args.session.selection.current().entryId,
+    modelId: args.session.selection.current().modelId,
     errorClass: typeof audit["class"] === "string" ? audit["class"] : "Unknown",
     ...(typeof audit["code"] === "string" ? { errorCode: audit["code"] } : {}),
     message: typeof audit["message"] === "string" ? audit["message"] : "provider request failed",
@@ -171,7 +171,7 @@ async function consumeProviderStream(
       {
         messages: args.history,
         tools: args.toolDefinitions,
-        modelId: args.session.provider.modelId,
+        modelId: args.session.selection.current().modelId,
       },
       args.host,
       new AbortController().signal,
@@ -193,15 +193,15 @@ export async function runAssistantIteration(
 
   const requestStartedAt = args.deps.now().getTime();
   args.auditBus.emit("ProviderRequest", {
-    providerId: args.session.provider.providerId,
-    modelId: args.session.provider.modelId,
+    providerId: args.session.selection.current().entryId,
+    modelId: args.session.selection.current().modelId,
     messages: args.history,
     tools: args.toolDefinitions,
     estimatedInputTokens: inputTokens,
   });
   args.host.events.emit("ProviderRequestStarted", {
-    providerId: args.session.provider.providerId,
-    modelId: args.session.provider.modelId,
+    providerId: args.session.selection.current().entryId,
+    modelId: args.session.selection.current().modelId,
     iteration: args.iteration,
   });
 

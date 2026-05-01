@@ -15,6 +15,15 @@ import type {
   Usage,
 } from "../_adapter/protocol.js";
 
+/** Per-call resolved config: `models[...]` narrowed to one `model`. */
+export interface AnthropicAdapterConfig {
+  readonly apiKeyRef: AnthropicConfig["apiKeyRef"];
+  readonly model: string;
+  readonly baseURL?: string;
+  readonly timeoutMs?: number;
+  readonly defaultParams?: Readonly<Record<string, unknown>>;
+}
+
 type SecretRef = AnthropicConfig["apiKeyRef"];
 
 type SecretsHost = HostAPI & {
@@ -56,7 +65,7 @@ function createUnauthorizedError(): StreamEvent {
   };
 }
 
-function endpointFor(config: AnthropicConfig): string {
+function endpointFor(config: AnthropicAdapterConfig): string {
   const trimmed = (config.baseURL ?? DEFAULT_BASE_URL).replace(/\/+$/u, "");
   return `${trimmed}/v1/messages`;
 }
@@ -144,7 +153,7 @@ function toAnthropicTool(tool: ProviderToolDefinition): Readonly<Record<string, 
   };
 }
 
-function requestBody(args: ProtocolRequestArgs, config: AnthropicConfig): string {
+function requestBody(args: ProtocolRequestArgs, config: AnthropicAdapterConfig): string {
   const rawMax = args.params["maxTokens"];
   const maxTokens = typeof rawMax === "number" ? rawMax : DEFAULT_MAX_TOKENS;
   const body: Record<string, unknown> = {
@@ -430,7 +439,7 @@ function errorEventForStatus(status: number): WireEvent {
 async function* toWireEvents(
   args: ProtocolRequestArgs,
   apiKey: string,
-  config: AnthropicConfig,
+  config: AnthropicAdapterConfig,
 ): AsyncIterable<WireEvent> {
   if (args.signal.aborted) return;
 
@@ -456,7 +465,10 @@ async function* toWireEvents(
   yield* parseSse(response.body);
 }
 
-export function createAnthropicAdapter(config: AnthropicConfig, _host: HostAPI): ProtocolAdapter {
+export function createAnthropicAdapter(
+  config: AnthropicAdapterConfig,
+  _host: HostAPI,
+): ProtocolAdapter {
   return {
     async *request(args: ProtocolRequestArgs, host: HostAPI): AsyncGenerator<StreamEvent> {
       let apiKey: string;

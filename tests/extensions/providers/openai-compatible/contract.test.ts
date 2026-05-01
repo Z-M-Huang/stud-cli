@@ -203,9 +203,10 @@ async function collectToolCallingEvents(
 
 async function assertSurfaceThrowsProviderTransient(host: HostAPI): Promise<void> {
   await contract.lifecycle.init?.(host, {
+    protocol: "openai-compatible",
     apiKeyRef: { kind: "env", name: "X" },
     baseURL: "https://x",
-    model: "y",
+    models: ["y"],
   });
 
   await assert.rejects(
@@ -250,47 +251,35 @@ describe("OpenAI-Compatible contract shape", () => {
 
 describe("openaiCompatibleConfigSchema fixtures", () => {
   const validate = createAjvValidator();
+  const baseValid = {
+    protocol: "openai-compatible",
+    apiKeyRef: { kind: "env", name: "OPENAI_API_KEY" },
+    baseURL: "https://api.openai.com/v1",
+    models: ["gpt-4o"],
+  };
 
   it("accepts a valid chat-completions config", () => {
-    assert.equal(
-      validate({
-        apiKeyRef: { kind: "env", name: "OPENAI_API_KEY" },
-        baseURL: "https://api.openai.com/v1",
-        model: "gpt-4o",
-        apiShape: "chat-completions",
-      }),
-      true,
-    );
+    assert.equal(validate({ ...baseValid, apiShape: "chat-completions" }), true);
   });
 
   it("accepts a valid responses-shape config", () => {
-    assert.equal(
-      validate({
-        apiKeyRef: { kind: "env", name: "OPENAI_API_KEY" },
-        baseURL: "https://api.openai.com/v1",
-        model: "o1",
-        apiShape: "responses",
-      }),
-      true,
-    );
+    assert.equal(validate({ ...baseValid, models: ["o1"], apiShape: "responses" }), true);
   });
 
   it("accepts a self-hosted baseURL", () => {
     assert.equal(
       validate({
+        ...baseValid,
         apiKeyRef: { kind: "env", name: "LLAMA_KEY" },
         baseURL: "https://llama.internal.corp/v1",
-        model: "llama-3-70b",
+        models: ["llama-3-70b"],
       }),
       true,
     );
   });
 
   it("rejects a malformed baseURL", () => {
-    assert.equal(
-      validate({ apiKeyRef: { kind: "env", name: "X" }, baseURL: "not-a-url", model: "x" }),
-      false,
-    );
+    assert.equal(validate({ ...baseValid, baseURL: "not-a-url" }), false);
     const firstError = validate.errors?.[0];
     assert.ok(firstError != null, "Expected at least one AJV error");
     const path = (firstError as { dataPath?: string }).dataPath ?? firstError.schemaPath ?? "";
@@ -298,26 +287,18 @@ describe("openaiCompatibleConfigSchema fixtures", () => {
   });
 
   it("rejects an out-of-set apiShape", () => {
-    assert.equal(
-      validate({
-        apiKeyRef: { kind: "env", name: "X" },
-        baseURL: "https://api.openai.com",
-        model: "gpt-4o",
-        apiShape: "mystery",
-      }),
-      false,
-    );
+    assert.equal(validate({ ...baseValid, apiShape: "mystery" }), false);
   });
 
   it("rejects worst-plausible input without crashing", () => {
-    const worst = {
-      apiKeyRef: { kind: "env", name: "X" },
-      baseURL: "https://x",
-      model: "y",
-      __proto__: { polluted: true },
-      extra: "x".repeat(1_000_000),
-    };
-    assert.equal(validate(worst), false);
+    assert.equal(
+      validate({
+        ...baseValid,
+        __proto__: { polluted: true },
+        extra: "x".repeat(1_000_000),
+      }),
+      false,
+    );
   });
 });
 
