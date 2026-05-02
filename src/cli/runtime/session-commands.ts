@@ -1,6 +1,7 @@
 import { Cancellation, ProviderCapability, Validation } from "../../core/errors/index.js";
 
 import { runtimeCommandCatalog } from "./command-catalog.js";
+import { dispatchParamsCommand } from "./params-command.js";
 import { dispatchModelCommand, dispatchProviderCommand } from "./swap-commands.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
@@ -10,6 +11,7 @@ import type { ProviderMessage } from "../../contracts/providers.js";
 import type { SessionManifest } from "../../contracts/session-store.js";
 import type { InteractionAPI } from "../../core/host/api/interaction.js";
 import type { RuntimeReader } from "../../core/host/api/metrics.js";
+import type { HostAPI } from "../../core/host/host-api.js";
 
 export type RuntimeCommandOutcome = "handled" | "exit" | "not-command";
 
@@ -23,6 +25,7 @@ export async function handleRuntimeCommand(args: {
   readonly interaction: InteractionAPI;
   readonly registry: RuntimeContextRegistry;
   readonly auditBus: SessionAuditBus;
+  readonly host?: HostAPI;
   readonly notify: (text: string) => void;
   readonly metrics?: RuntimeReader;
   readonly persist: (
@@ -77,6 +80,19 @@ export async function handleRuntimeCommand(args: {
     case "provider":
       await dispatchSwap(args, name, rest[0]);
       return "handled";
+    case "params": {
+      const result = dispatchParamsCommand({
+        session: args.session,
+        auditBus: args.auditBus,
+        ...(args.host !== undefined ? { host: args.host } : {}),
+        // No SM is attached in v1's session loop; activeStageStep is null. When
+        // SMs land, this is the gate point per `wiki/core/Event-and-Command-Ordering.md:44`.
+        activeStageStep: null,
+        tokens: rest,
+      });
+      args.notify(result.notify);
+      return "handled";
+    }
     case "sm":
       args.notify(`${name} command is not wired to runtime switching yet`);
       return "handled";

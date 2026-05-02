@@ -131,6 +131,11 @@ function renderPart(part: ProviderContentPart): string {
       return `[using ${part.toolName}]`;
     case "tool-result":
       return `[${part.toolName} result] ${truncate(part.content, MAX_TOOL_RESULT_LENGTH)}`;
+    case "thinking":
+      // Reasoning blocks persist for sendReasoning: true. The default TUI
+      // doesn't display them inline; the event-bus stream gate
+      // (passReasoningToLoop) governs whether they reach the UI in real time.
+      return `[thinking] ${truncate(part.text, MAX_TOOL_RESULT_LENGTH)}`;
   }
 }
 

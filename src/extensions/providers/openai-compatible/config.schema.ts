@@ -1,3 +1,5 @@
+import { commonBucketSchema } from "../../../contracts/provider-params.js";
+
 import type { JSONSchemaObject } from "../../../contracts/meta.js";
 
 export type OpenAIApiShape = "chat-completions" | "responses";
@@ -20,6 +22,14 @@ export interface OpenAICompatibleConfig {
   readonly apiShape?: OpenAIApiShape;
   readonly timeoutMs?: number;
   readonly defaultParams?: Readonly<Record<string, unknown>>;
+  /**
+   * Stream-gate block per `wiki/contracts/Provider-Params.md` § "Stream gates".
+   * Locked at provider config; not overridable by `/params` or `--param`.
+   */
+  readonly stream?: {
+    readonly passReasoningToLoop?: boolean;
+    readonly emitStepMarkers?: boolean;
+  };
 }
 
 const secretRefSchema = {
@@ -64,6 +74,15 @@ export const openaiCompatibleConfigSchema: JSONSchemaObject = {
     defaultParams: {
       type: "object",
       additionalProperties: true,
+      properties: commonBucketSchema as Readonly<Record<string, JSONSchemaObject>>,
+    },
+    stream: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        passReasoningToLoop: { type: "boolean" },
+        emitStepMarkers: { type: "boolean" },
+      },
     },
   },
 };

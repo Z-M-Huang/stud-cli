@@ -27,9 +27,26 @@ export interface CapabilityVector {
   readonly promptCaching: boolean | "probed";
 }
 
+/**
+ * Per-leaf-path entry surfaced when a value in the active params bag won't
+ * apply on the destination `(providerId, modelId)`. Mirrors
+ * `ParamsAffected` from `contracts/capability-negotiation.ts`. The negotiator
+ * itself doesn't compute this (it doesn't see the params bag); the swap path
+ * builds it via `validatePerProtocolParams` for the destination model and
+ * threads it onto the result before audit emission.
+ */
+export interface NegotiationParamsAffected {
+  readonly paramPath: readonly string[];
+  readonly reason: string;
+  readonly activeModelId: string;
+  readonly currentValue: unknown;
+  readonly sourceLayer: "defaultParams" | "launch" | "/params";
+}
+
 export interface NegotiationResult {
   readonly ok: true;
   readonly warnings: readonly { readonly name: CapabilityName; readonly reason: string }[];
+  readonly paramsAffected?: readonly NegotiationParamsAffected[];
 }
 
 function throwMissingCapability(name: CapabilityName): never {

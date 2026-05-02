@@ -15,6 +15,11 @@ export const AUDIT_CLASSES = [
   "ProviderExchange",
   "ToolInvocation",
   "SuppressedError",
+  // Wiki: operations/Audit-Trail.md (1.1.0) §
+  // "Audit records as redacted deltas". `/params` and `--param` mutations
+  // record a redacted delta per path; `RuntimeParamsNotResumed` is also a
+  // Params-class record emitted on resume.
+  "Params",
 ] as const;
 
 export type AuditClass = (typeof AUDIT_CLASSES)[number];
@@ -88,6 +93,28 @@ export type ToolInvocationPayload =
       readonly error?: Readonly<Record<string, unknown>>;
     };
 
+/**
+ * Payload variants for the `Params` audit class. Wiki:
+ * `operations/Audit-Trail.md` lines 66, 131-139, 212. The shape is a redacted
+ * delta — `paramPath`, `sourceLayer`, and a `redactedValue` shape-marker
+ * (`<redacted:string>`, `<redacted:integer>`, etc.) plus the verbatim value
+ * only when it passes the audit-redactor pipeline. `RuntimeParamsNotResumed`
+ * is a `kind: "RuntimeParamsNotResumed"` variant emitted on resume.
+ */
+export type ParamsPayload =
+  | {
+      readonly kind: "ParamsChanged";
+      readonly paramPath: readonly string[];
+      readonly sourceLayer: "defaultParams" | "launch" | "/params";
+      readonly redactedValue: unknown;
+    }
+  | {
+      readonly kind: "RuntimeParamsNotResumed";
+      readonly paramPath: readonly string[];
+      readonly sourceLayer: "launch" | "/params";
+      readonly redactedValue: unknown;
+    };
+
 export interface AuditPayloads {
   readonly Approval: { readonly decision: "approved" | "denied"; readonly toolId: string };
   readonly Compaction: {
@@ -95,6 +122,7 @@ export interface AuditPayloads {
     readonly beforeTokens: number;
     readonly afterTokens: number;
   };
+  readonly Params: ParamsPayload;
   readonly StageExecution: {
     readonly stageId: string;
     readonly outcome: "ok" | "failed" | "cancelled";

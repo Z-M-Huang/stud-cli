@@ -14,7 +14,7 @@ import type { ProviderContract, ProviderStreamEvent } from "../../../contracts/p
 
 export const contract: ProviderContract<OpenAICompatibleConfig> = {
   kind: "Provider",
-  contractVersion: "1.0.1",
+  contractVersion: "1.1.0",
   requiredCoreVersion: ">=1.0.0 <2.0.0",
   lifecycle: { init, activate, deactivate, dispose },
   configSchema: openaiCompatibleConfigSchema,
@@ -59,23 +59,22 @@ export const contract: ProviderContract<OpenAICompatibleConfig> = {
         baseURL: loadedConfig.baseURL,
         model: args.modelId,
         ...(loadedConfig.apiShape !== undefined ? { apiShape: loadedConfig.apiShape } : {}),
-        ...(loadedConfig.timeoutMs !== undefined ? { timeoutMs: loadedConfig.timeoutMs } : {}),
-        ...(loadedConfig.defaultParams !== undefined
-          ? { defaultParams: loadedConfig.defaultParams }
-          : {}),
+        ...(args.stream !== undefined ? { stream: args.stream } : {}),
       };
 
       const adapter = createOpenAIAdapter(adapterConfig, host);
+
+      const mergedParams: Record<string, unknown> = {
+        ...(loadedConfig.defaultParams ?? {}),
+        ...args.params,
+      };
 
       for await (const event of adapter.request(
         {
           ...(args.system !== undefined ? { system: args.system } : {}),
           messages: args.messages,
           tools: args.tools,
-          params: {
-            ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
-            ...(args.temperature !== undefined ? { temperature: args.temperature } : {}),
-          },
+          params: mergedParams,
           signal,
         },
         host,
@@ -97,6 +96,23 @@ export const contract: ProviderContract<OpenAICompatibleConfig> = {
             toolName: event.name,
             args: (event.args ?? {}) as Readonly<Record<string, unknown>>,
           };
+          continue;
+        }
+
+        if (event.kind === "source-citation") {
+          yield event.excerpt !== undefined
+            ? { type: "source-citation", uri: event.uri, excerpt: event.excerpt }
+            : { type: "source-citation", uri: event.uri };
+          continue;
+        }
+
+        if (event.kind === "step-start") {
+          yield { type: "step-start", stepId: event.stepId };
+          continue;
+        }
+
+        if (event.kind === "step-finish") {
+          yield { type: "step-finish", stepId: event.stepId };
           continue;
         }
 

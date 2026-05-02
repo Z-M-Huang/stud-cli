@@ -91,6 +91,7 @@ describe("cli-wrapper provider — runtime", () => {
       messages: [{ role: "user" as const, content: "hi" }],
       tools: [],
       modelId: "reference-model",
+      params: {},
     };
 
     const out1 = await collectDeltas(
@@ -116,7 +117,7 @@ describe("cli-wrapper provider — runtime", () => {
     await assert.rejects(
       collectDeltas(
         contract.surface.request(
-          { messages: [], tools: [], modelId: "reference-model" },
+          { messages: [], tools: [], modelId: "reference-model", params: {} },
           host,
           new AbortController().signal,
         ),

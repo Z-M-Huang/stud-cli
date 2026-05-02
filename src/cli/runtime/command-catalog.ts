@@ -42,6 +42,17 @@ const BASE_COMMANDS: readonly RuntimeCommandEntry[] = [
     turnSafe: false,
   },
   {
+    name: "/params",
+    description: "Get (no args) or set runtime provider params (audited as redacted deltas)",
+    argumentHint: "[<path>=<value> ...]",
+    category: "model",
+    source: "runtime",
+    // turnSafe per `wiki/core/Event-and-Command-Ordering.md:42` — `/params`
+    // does NOT bump the per-turn `revisionId`. The dispatcher refuses while
+    // an SM stage is mid-`Act` with reason code `StageActive`.
+    turnSafe: true,
+  },
+  {
     name: "/tools",
     description: "List registered tools",
     category: "tools",

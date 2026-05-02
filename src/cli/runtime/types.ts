@@ -4,6 +4,7 @@ import { contract as geminiContract } from "../../extensions/providers/gemini/in
 import { contract as openaiCompatibleContract } from "../../extensions/providers/openai-compatible/index.js";
 
 import type { ActiveSelectionHolder } from "./active-selection.js";
+import type { ParamsRuntimeStore } from "./params-runtime.js";
 import type { ProviderContract, ProviderToolDefinition } from "../../contracts/providers.js";
 import type { SessionManifest } from "../../contracts/session-store.js";
 import type { SecurityMode, Settings as ContractSettings } from "../../contracts/settings-shape.js";
@@ -113,6 +114,27 @@ export interface SessionBootstrap {
   readonly manifest: SessionManifest;
   readonly resumed: boolean;
   readonly yolo: boolean;
+  /**
+   * Provenance-preserving runtime params store. Holds the merged effective
+   * view of `defaultParams ← --param ← /params` per
+   * `wiki/contracts/Provider-Params.md` § "Merge layers — precedence". The
+   * store outlives `/provider` swaps; only the `defaultParams` layer is
+   * replaced when the active entry changes.
+   */
+  readonly paramsStore: ParamsRuntimeStore;
+  /**
+   * Prior-session runtime overrides scanned from the audit log at resume.
+   * Populated only when `resumed === true` AND the prior session had
+   * `--param` / `/params` mutations. The session-loop emits one
+   * `RuntimeParamsNotResumed` event + `Params`-class audit record per
+   * affected path right after the audit bus starts. Per
+   * `wiki/flows/Session-Resume.md` § "Provider params not persisted".
+   */
+  readonly priorRuntimeOverrides?: readonly {
+    readonly paramPath: readonly string[];
+    readonly sourceLayer: "launch" | "/params";
+    readonly redactedValue: unknown;
+  }[];
 }
 
 export type ProjectTrustOutcome = "aborted" | "declined" | "not-applicable" | "trusted";

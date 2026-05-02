@@ -7,10 +7,11 @@
  * `max-lines-per-function` limit and makes the audit / event-emission split
  * easy to follow.
  */
+import { assertSystemMessageModeAllowed } from "../../core/context/system-message-mode-guard.js";
 import { Session } from "../../core/errors/index.js";
 
 import {
-  assistantMessageContent,
+  assistantMessageContentFromParts,
   errorToAuditPayload,
   estimateTokens,
   safeStringify,
@@ -58,6 +59,18 @@ interface IterationAccumulator {
   finishReason: FinishReason;
   outputTokens: number;
   readonly toolCalls: Extract<ProviderContentPart, { type: "tool-call" }>[];
+  /**
+   * Persisted assistant content parts in stream order — interleaves
+   * `thinking` blocks (Anthropic; captured under `sendReasoning !== false`)
+   * with `text` chunks and `tool-call` deltas as they arrive on the
+   * ungated bridge stream. Preserving order matters because the Anthropic
+   * wire shape requires thinking/text alternation per turn per
+   * `wiki/core/Session-Manifest.md` § "Manifest message shape with reasoning content".
+   *
+   * Wiki: contracts/Provider-Params.md § "Reasoning persistence policy
+   *       (sendReasoning)" + § "Stream gates".
+   */
+  readonly orderedParts: ProviderContentPart[];
 }
 
 function newAccumulator(): IterationAccumulator {
@@ -66,7 +79,28 @@ function newAccumulator(): IterationAccumulator {
     finishReason: "stop" as FinishReason,
     outputTokens: 0,
     toolCalls: [],
+    orderedParts: [],
   };
+}
+
+/**
+ * Read the effective `sendReasoning` flag from the runtime ParamsRuntimeStore
+ * so `--param sendReasoning=false` and `/params sendReasoning=false` apply on
+ * the next turn. Default is `true` per `wiki/providers/Anthropic.md:64`.
+ * sendReasoning is Anthropic-specific per the wiki; non-Anthropic protocols
+ * treat reasoning as durable conversation content by default.
+ */
+function effectiveSendReasoning(args: AssistantIterationArgs): boolean {
+  const sel = args.session.selection.current();
+  if (sel.protocolId !== "anthropic") return true;
+  const entry = args.session.paramsStore.get(["sendReasoning"]);
+  return entry?.value !== false;
+}
+
+function effectivePassReasoningToLoop(args: AssistantIterationArgs): boolean {
+  const sel = args.session.selection.current();
+  const config = sel.config as { readonly stream?: { readonly passReasoningToLoop?: boolean } };
+  return config.stream?.passReasoningToLoop === true;
 }
 
 /** Sum a coarse token-count estimate over the request's message history. */
@@ -97,20 +131,32 @@ function dispatchStreamEvent(
       toolName: event.toolName,
       args: event.args,
     });
-    acc.toolCalls.push({
+    const callPart: Extract<ProviderContentPart, { type: "tool-call" }> = {
       type: "tool-call",
       toolCallId: event.toolCallId,
       toolName: event.toolName,
       args: event.args,
-    });
+    };
+    acc.toolCalls.push(callPart);
+    acc.orderedParts.push(callPart);
     return;
   }
   if (event.type === "thinking-delta") {
-    args.host.events.emit("ProviderReasoningStreamed", { delta: event.delta });
+    // Split sinks per `wiki/contracts/Provider-Params.md:257`: the manifest
+    // accumulator runs when the effective merged params have
+    // `sendReasoning !== false`; the event-bus / UI emission is gated by the
+    // provider config's `stream.passReasoningToLoop` flag (default false).
+    if (effectiveSendReasoning(args)) {
+      acc.orderedParts.push({ type: "thinking", text: event.delta });
+    }
+    if (effectivePassReasoningToLoop(args)) {
+      args.host.events.emit("ProviderReasoningStreamed", { delta: event.delta });
+    }
     return;
   }
   if (event.type === "text-delta") {
     acc.assistantText += event.delta;
+    appendOrCoalesceText(acc, event.delta);
     const deltaTokens = estimateTokens(event.delta);
     acc.outputTokens += deltaTokens;
     args.collector.addTokens(0, deltaTokens);
@@ -118,6 +164,25 @@ function dispatchStreamEvent(
       delta: event.delta,
       cumulativeOutputTokens: acc.outputTokens,
     });
+  }
+}
+
+/**
+ * Append a text-delta to the ordered parts, coalescing consecutive text
+ * fragments into a single `{type:"text"}` block. Thinking and tool-call
+ * boundaries naturally segment the text blocks so the persisted manifest
+ * shape matches Anthropic's `[thinking, text, thinking?, tool_use?]`
+ * alternation per wire spec.
+ */
+function appendOrCoalesceText(acc: IterationAccumulator, delta: string): void {
+  const last = acc.orderedParts[acc.orderedParts.length - 1];
+  if (last?.type === "text") {
+    acc.orderedParts[acc.orderedParts.length - 1] = {
+      type: "text",
+      text: last.text + delta,
+    };
+  } else {
+    acc.orderedParts.push({ type: "text", text: delta });
   }
 }
 
@@ -167,11 +232,37 @@ async function consumeProviderStream(
   const acc = newAccumulator();
   let providerError: unknown = undefined;
   try {
+    const sel = args.session.selection.current();
+    const streamGates = (
+      sel.config as {
+        readonly stream?: {
+          readonly passReasoningToLoop?: boolean;
+          readonly emitStepMarkers?: boolean;
+        };
+      }
+    ).stream;
+    const mergedParams = args.session.paramsStore.asMergedBag();
+    // `systemMessageMode: "remove"` cross-field check at request-assembly
+    // time. In v1 the assembled system layer carries no SM stage body or
+    // `system-message` Context Provider contribution; when those land their
+    // provenance tags flow through here.
+    assertSystemMessageModeAllowed({
+      params: mergedParams,
+      systemLayer: [{ text: "", provenance: "static-system-prompt" }],
+      providerEntryId: sel.entryId,
+      modelId: sel.modelId,
+    });
     for await (const event of args.provider.surface.request(
       {
         messages: args.history,
         tools: args.toolDefinitions,
-        modelId: args.session.selection.current().modelId,
+        modelId: sel.modelId,
+        // Effective merged params (`defaultParams ← --param ← /params`) per
+        // `wiki/contracts/Provider-Params.md` § "Merge layers". The provider's
+        // `surface.request` will spread its own `defaultParams` for any keys
+        // not yet in the runtime store; runtime overrides win on collisions.
+        params: mergedParams,
+        ...(streamGates !== undefined ? { stream: streamGates } : {}),
       },
       args.host,
       new AbortController().signal,
@@ -228,7 +319,7 @@ export async function runAssistantIteration(
   return {
     assistantMessage: {
       role: "assistant",
-      content: assistantMessageContent(acc.assistantText, acc.toolCalls),
+      content: assistantMessageContentFromParts(acc.assistantText, acc.orderedParts),
     },
     finishReason: acc.finishReason,
     toolCalls: acc.toolCalls,

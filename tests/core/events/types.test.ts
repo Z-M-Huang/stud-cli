@@ -42,8 +42,19 @@ describe("EVENT_TYPES — declared names", () => {
       "StagePostFired",
       "SessionPersisted",
       "SessionResumed",
+      "SessionClosed",
+      "RuntimeParamsNotResumed",
+      "ManifestSizeBudgetExceeded",
       "SuppressedError",
       "EnvResolved",
+      // Compaction domain (wiki/core/Event-Bus.md:124, 174)
+      "CompactionThresholdHit",
+      "CompactionStarted",
+      "CompactionCompleted",
+      "CompactionFailed",
+      "CompactionReasoningDowngraded",
+      "CompactionDoubleRan",
+      "DoubleCompactionConfigured",
       "CompactionPerformed",
       "ContextProviderFailed",
       "InteractionRaised",
@@ -55,6 +66,7 @@ describe("EVENT_TYPES — declared names", () => {
       "ProviderReasoningStreamed",
       "ProviderRequestCompleted",
       "ProviderRequestFailed",
+      "ReasoningProviderPortabilityWarning",
       // prompt-cache observability (wiki context/Prompt-Caching.md)
       "CacheHit",
       "CacheMiss",
@@ -65,6 +77,19 @@ describe("EVENT_TYPES — declared names", () => {
       "ToolInvocationSucceeded",
       "ToolInvocationFailed",
       "ToolInvocationCancelled",
+      // Capability domain (wiki/core/Event-Bus.md:122, 174)
+      "CapabilityNegotiated",
+      "CapabilityMismatch",
+      // Params domain (wiki/core/Event-Bus.md:118, 173)
+      "ParamsChanged",
+      // Provider-Params validation diagnostics
+      "ParamUnsupportedOnActive",
+      "ParamForbiddenKey",
+      "ParamSecretValue",
+      "ParamWireShape",
+      "ParamUnknown",
+      "ParamReserved",
+      "ParamCrossFieldInvalid",
     ] as const;
 
     for (const name of expected) {

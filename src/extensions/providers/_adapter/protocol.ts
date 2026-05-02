@@ -52,6 +52,9 @@ export type StreamEvent =
       readonly name: string;
       readonly args: unknown;
     }
+  | { readonly kind: "source-citation"; readonly uri: string; readonly excerpt?: string }
+  | { readonly kind: "step-start"; readonly stepId: string }
+  | { readonly kind: "step-finish"; readonly stepId: string }
   | { readonly kind: "finish"; readonly reason: FinishReason; readonly usage?: Usage }
   | {
       readonly kind: "error";

@@ -1,12 +1,17 @@
 import { join } from "node:path";
 
-import Ajv from "ajv";
-
 import { negotiate } from "../../core/capabilities/negotiator.js";
 import { ProviderCapability, Validation } from "../../core/errors/index.js";
 import { mergeSettings } from "../../core/settings/validator.js";
 
+import { validateProviderConfig } from "./provider-config-validator.js";
 import { atomicWriteJson, loadSettingsFile, studHome } from "./storage.js";
+import {
+  computeParamsAffected,
+  emitNegotiationRejected,
+  validateTargetAndDiagnose,
+  type ResolvedTarget,
+} from "./swap-helpers.js";
 import { PROTOCOLS } from "./types.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
@@ -85,42 +90,10 @@ function vectorFromCapabilities(
   };
 }
 
-function validateProviderConfig(
-  protocolId: ProviderProtocolId,
-  entryId: ProviderEntryId,
-  config: unknown,
-): asserts config is AnyProviderConfig {
-  const descriptor = PROTOCOLS[protocolId];
-  const { $schema: _ignored, ...schema } = descriptor.contract.configSchema as Record<
-    string,
-    unknown
-  >;
-  const validate = new Ajv({ allErrors: true }).compile(schema);
-  if (!validate(config)) {
-    throw new Validation(
-      `provider entry '${entryId}' (protocol '${protocolId}') failed schema validation`,
-      undefined,
-      {
-        code: "ConfigSchemaViolation",
-        entryId,
-        protocolId,
-        errors: validate.errors ?? [],
-      },
-    );
-  }
-}
-
 async function readMergedSettings(deps: SwapDeps): Promise<Settings> {
   const global = (await loadSettingsFile(deps.globalSettingsPath)) ?? {};
   const project = await loadSettingsFile(deps.projectSettingsPath);
   return mergeSettings(undefined, global, project) as Settings;
-}
-
-interface ResolvedTarget {
-  readonly entryId: ProviderEntryId;
-  readonly protocolId: ProviderProtocolId;
-  readonly config: AnyProviderConfig;
-  readonly modelId: string;
 }
 
 function isProtocolId(value: unknown): value is ProviderProtocolId {
@@ -205,29 +178,33 @@ async function performSwap(deps: SwapDeps, target: ResolvedTarget): Promise<Swap
   const protocolChanged = target.protocolId !== previous.protocolId;
   const entryChanged = target.entryId !== previous.entryId;
 
+  // Validate the *effective merged bag* (target.defaultParams ← preserved
+  // runtime overrides) for the destination so cross-protocol overrides
+  // surface as ParamUnknown BEFORE the target is published. Per gpt-5.5
+  // PR-diff review finding 2 + `wiki/contracts/Provider-Params.md:287`.
+  const targetDefaultParams =
+    (target.config as { readonly defaultParams?: Readonly<Record<string, unknown>> })
+      .defaultParams ?? {};
+  const effectiveBagForTarget =
+    deps.session.paramsStore.projectMergedBagWithDefaults(targetDefaultParams);
+  validateTargetAndDiagnose({ auditBus: deps.auditBus }, target, effectiveBagForTarget);
+
   // Step 4-5: capability negotiation against the contract's static claims.
   const advertised = vectorFromCapabilities(PROTOCOLS[target.protocolId].contract.capabilities);
+  const paramsAffected = computeParamsAffected(deps.session.paramsStore, target);
+
   try {
     negotiate(deps.requirements, advertised);
   } catch (error) {
     if (error instanceof ProviderCapability) {
-      const code =
-        typeof error.context["code"] === "string" ? error.context["code"] : "MissingCapability";
-      const reason = { code, message: error.message };
-      // Step 6: emit Rejected audit; leave holder + revisionId untouched.
-      if (protocolChanged) {
-        deps.auditBus.emit("ProviderSwitchRejected", {
-          from: previous.protocolId,
-          to: target.protocolId,
-          reason,
-        });
-      }
-      deps.auditBus.emit("ModelSwitchRejected", {
-        from: previous.modelId,
-        to: target.modelId,
-        providerId: target.entryId,
-        reason,
-      });
+      const reason = emitNegotiationRejected(
+        { auditBus: deps.auditBus },
+        target,
+        previous,
+        error,
+        paramsAffected,
+        protocolChanged,
+      );
       return { kind: "rejected", reason };
     }
     throw error;
@@ -253,7 +230,16 @@ async function performSwap(deps: SwapDeps, target: ResolvedTarget): Promise<Swap
     throw error;
   }
 
-  // Step 8: publish.
+  // Step 8: publish. Replace the `defaultParams` layer in the runtime store
+  // with the new entry's defaults; runtime overrides (`--param`, `/params`)
+  // are preserved per `wiki/runtime/Launch-Arguments.md:97`.
+  const newDefaultParams =
+    (
+      prepared.config as {
+        readonly defaultParams?: Readonly<Record<string, unknown>>;
+      }
+    ).defaultParams ?? {};
+  deps.session.paramsStore.applyDefaultParams(newDefaultParams);
   const next: ProviderSelection = {
     entryId: prepared.entryId,
     protocolId: prepared.protocolId,
@@ -272,6 +258,39 @@ async function performSwap(deps: SwapDeps, target: ResolvedTarget): Promise<Swap
     to: target.modelId,
     providerId: target.entryId,
   });
+  if (paramsAffected.length > 0) {
+    // Successful swap with paramsAffected: emit CapabilityMismatch as a
+    // soft warning so subscribers can surface it; the swap is NOT blocked
+    // (per `wiki/contracts/Provider-Params.md` § "Capability-mismatch behavior").
+    deps.auditBus.emit("CapabilityMismatch", {
+      direction: "switch-into",
+      providerId: target.entryId,
+      modelId: target.modelId,
+      paramsAffected,
+    });
+  } else {
+    deps.auditBus.emit("CapabilityNegotiated", {
+      providerId: target.entryId,
+      modelId: target.modelId,
+    });
+  }
+
+  // Cross-protocol `/provider` swap when the manifest carries reasoning
+  // blocks: emit `ReasoningProviderPortabilityWarning` per
+  // `wiki/providers/Anthropic.md:91` — Anthropic thinking blocks may not
+  // round-trip to OpenAI / Gemini; the destination adapter strips or
+  // normalizes them.
+  if (protocolChanged) {
+    const fromHadReasoning = previous.protocolId === "anthropic";
+    if (fromHadReasoning) {
+      deps.auditBus.emit("ReasoningProviderPortabilityWarning", {
+        from: previous.protocolId,
+        to: target.protocolId,
+        modelId: target.modelId,
+        message: `Reasoning blocks from ${previous.protocolId} may be stripped or normalized by the ${target.protocolId} adapter`,
+      });
+    }
+  }
 
   return { kind: "swapped", selection: next };
 }

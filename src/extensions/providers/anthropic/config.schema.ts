@@ -1,3 +1,5 @@
+import { commonBucketSchema } from "../../../contracts/provider-params.js";
+
 import type { JSONSchemaObject } from "../../../contracts/meta.js";
 
 export interface AnthropicSecretRefEnv {
@@ -17,6 +19,14 @@ export interface AnthropicConfig {
   readonly baseURL?: string;
   readonly timeoutMs?: number;
   readonly defaultParams?: Readonly<Record<string, unknown>>;
+  /**
+   * Stream-gate block per `wiki/contracts/Provider-Params.md` § "Stream gates".
+   * Locked at provider config; not overridable by `/params` or `--param`.
+   */
+  readonly stream?: {
+    readonly passReasoningToLoop?: boolean;
+    readonly emitStepMarkers?: boolean;
+  };
 }
 
 const secretRefSchema = {
@@ -59,7 +69,23 @@ export const anthropicConfigSchema: JSONSchemaObject = {
     timeoutMs: { type: "integer", minimum: 1 },
     defaultParams: {
       type: "object",
+      // Common-bucket fields are AJV-validated for type/range here so a
+      // user setting `temperature: "hot"` or `maxOutputTokens: -3` fails
+      // schema validation before the seven-check Provider-Params pipeline
+      // even runs. Adapter-native fields (e.g., `effort`, `thinking`) are
+      // left permissive at the AJV layer; the Provider-Params pipeline
+      // enforces strict shape (forbidden keys, secret values, wire shape,
+      // unknown fields, reserved keys, cross-field) at swap/bootstrap time.
       additionalProperties: true,
+      properties: commonBucketSchema as Readonly<Record<string, JSONSchemaObject>>,
+    },
+    stream: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        passReasoningToLoop: { type: "boolean" },
+        emitStepMarkers: { type: "boolean" },
+      },
     },
   },
 };

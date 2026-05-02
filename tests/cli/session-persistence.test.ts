@@ -42,6 +42,7 @@ function launchArgs(projectRoot: string, overrides: Partial<LaunchArgs> = {}): L
     mode: null,
     projectRoot,
     sm: null,
+    params: [],
     help: false,
     version: false,
     rawArgv: [],

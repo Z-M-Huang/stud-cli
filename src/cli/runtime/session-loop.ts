@@ -8,16 +8,23 @@ import { mountTUI } from "../../extensions/ui/default-tui/mount.js";
 import { startSessionAuditBus, type SessionAuditBus } from "./audit-bus.js";
 import { protocolLabel } from "./bootstrap.js";
 import { runtimeCommandCatalog } from "./command-catalog.js";
+import { checkManifestSizeBudget, manifestSizeBudgetPayload } from "./manifest-size-budget.js";
 import { createProviderHost } from "./provider-host.js";
 import { runAssistantIteration } from "./provider-stream.js";
 import {
   createRuntimeContextRegistry,
   type RuntimeContextRegistry,
 } from "./runtime-context-registry.js";
+import {
+  emitLaunchOverrideAudit,
+  emitPreHydrationSizeBudget,
+  emitPriorRuntimeOverridesSurface,
+} from "./session-bootstrap-emit.js";
 import { handleRuntimeCommand } from "./session-commands.js";
 import {
   errorToAuditPayload,
   persistHistorySnapshot,
+  prepareManifestSnapshot,
   providerMessagesFromManifest,
   renderTurnError,
   toolResultMessage,
@@ -196,6 +203,7 @@ interface SessionContext {
   readonly collector: RuntimeCollector;
   readonly loadedTools: LoadedTool[];
   readonly auditBus: SessionAuditBus;
+  readonly host: HostAPI;
   readonly approvalCache: ReturnType<typeof createApprovalCache>;
   readonly history: ProviderMessage[];
   readonly ui: MountedTUI;
@@ -226,6 +234,10 @@ async function bootstrapSessionContext(
     sessionId: session.sessionId,
     globalRoot: studHome(deps.homedir()),
   });
+  emitPreHydrationSizeBudget(session, baseHost, auditBus);
+  emitPriorRuntimeOverridesSurface(session, baseHost, auditBus);
+  emitLaunchOverrideAudit(session, baseHost, auditBus);
+
   auditBus.emit(session.resumed ? "SessionResumed" : "SessionStarted", {
     storeId: "filesystem-session-store",
     projectRoot: session.projectRoot,
@@ -285,6 +297,7 @@ async function bootstrapSessionContext(
     collector,
     loadedTools,
     auditBus,
+    host: baseHost,
     approvalCache,
     history,
     ui,
@@ -327,6 +340,18 @@ async function runOneTurn(ctx: SessionContext, trimmed: string): Promise<void> {
         auditBus: turnAuditBus,
         turnId,
       });
+      // Pre-save manifest-size budget check per `wiki/core/Session-Manifest.md:59`.
+      // Build the next manifest snapshot, check its size BEFORE writing to
+      // disk so the budget event fires before persistence — including in the
+      // case where the oversized write itself would fail. Emission is
+      // informational; persistence proceeds regardless.
+      const prepared = prepareManifestSnapshot({ manifest: ctx.manifest, history });
+      const sizeCheck = checkManifestSizeBudget(prepared);
+      if (sizeCheck.exceeded) {
+        const payload = manifestSizeBudgetPayload("pre-save", sizeCheck);
+        ctx.host.events.emit("ManifestSizeBudgetExceeded", payload);
+        turnAuditBus.emit("ManifestSizeBudgetExceeded", { ...payload });
+      }
       ctx.manifest = await persistHistorySnapshot({ manifest: ctx.manifest, history, deps });
       turnAuditBus.emit("SessionPersisted", {
         storeId: "filesystem-session-store",
@@ -379,6 +404,7 @@ async function processInputLine(
     interaction: ctx.interaction,
     registry: ctx.registry,
     auditBus: ctx.auditBus,
+    host: ctx.host,
     notify: (text) => ctx.ui.renderNotice(text),
     metrics: ctx.collector.reader,
     persist: (currentManifest, currentHistory) =>

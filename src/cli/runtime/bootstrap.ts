@@ -1,8 +1,6 @@
 import { realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import Ajv from "ajv";
-
 import { Validation } from "../../core/errors/index.js";
 import { evaluateProjectTrust } from "../../core/project/trust-gate.js";
 import { openTrustStore } from "../../core/security/trust/store.js";
@@ -15,6 +13,14 @@ import {
   readTrustedProjectSettings,
   resumeUnavailable,
 } from "./bootstrap-session.js";
+import { buildSessionParamsStore } from "./params-runtime.js";
+import {
+  reportProviderEntryDiagnostics,
+  validateAllProviderEntries,
+  validateAndAssertEntryParams,
+} from "./params-validator.js";
+import { validateProviderConfig } from "./provider-config-validator.js";
+import { scanPriorRuntimeOverrides } from "./resume-params-scan.js";
 import { readLatestSessionManifest } from "./session-store.js";
 import {
   appendAudit,
@@ -47,31 +53,6 @@ export function protocolLabel(protocolId: ProviderProtocolId): string {
 
 function isProtocolId(value: unknown): value is ProviderProtocolId {
   return typeof value === "string" && value in PROTOCOLS;
-}
-
-function validateProviderConfig(
-  protocolId: ProviderProtocolId,
-  entryId: ProviderEntryId,
-  config: unknown,
-): asserts config is AnyProviderConfig {
-  const descriptor = PROTOCOLS[protocolId];
-  const { $schema: _ignored, ...schema } = descriptor.contract.configSchema as Record<
-    string,
-    unknown
-  >;
-  const validate = new Ajv({ allErrors: true }).compile(schema);
-  if (!validate(config)) {
-    throw new Validation(
-      `provider entry '${entryId}' (protocol '${protocolId}') failed schema validation`,
-      undefined,
-      {
-        code: "ConfigSchemaViolation",
-        entryId,
-        protocolId,
-        errors: validate.errors ?? [],
-      },
-    );
-  }
 }
 
 export interface ResolvedActiveEntry {
@@ -158,19 +139,35 @@ export function resolveActiveModelId(
 }
 
 export function configuredProvider(settings: Settings): ProviderSelection | null {
+  // Pass 1: walk every configured provider entry. Per-entry errors don't
+  // throw here (that's the active-entry assertion's job); they surface to
+  // stderr so non-active entries that have invalid params show up at
+  // startup. Grouped `ParamUnsupportedOnActive` warnings flow through the
+  // same surface. Per `wiki/contracts/Provider-Params.md` § "Capability-
+  // mismatch behavior" Case A and round-3 review finding HIGH-2.
+  const allEntryDiagnostics = validateAllProviderEntries(settings);
+  reportProviderEntryDiagnostics(allEntryDiagnostics, (line) => {
+    process.stderr.write(`[provider-params] ${line}\n`);
+  });
+
   const entry = resolveActiveEntry(settings);
   if (entry === null) {
     return null;
   }
-
   validateProviderConfig(entry.protocolId, entry.entryId, entry.raw);
   const config = entry.raw as unknown as AnyProviderConfig;
-  return {
+  const modelId = resolveActiveModelId(settings, entry.entryId, config);
+  const defaultParams =
+    (config as { readonly defaultParams?: Readonly<Record<string, unknown>> }).defaultParams ?? {};
+  // Active-entry hard assertion (throws on errors).
+  validateAndAssertEntryParams({
+    protocol: entry.protocolId,
     entryId: entry.entryId,
-    protocolId: entry.protocolId,
-    config,
-    modelId: resolveActiveModelId(settings, entry.entryId, config),
-  };
+    modelId,
+    params: defaultParams,
+    sourceLayer: "defaultParams",
+  });
+  return { entryId: entry.entryId, protocolId: entry.protocolId, config, modelId };
 }
 
 async function ensureProviderSettings(
@@ -391,6 +388,35 @@ async function bootstrapResumedSession(args: {
     });
   }
 
+  // Resume re-applies defaultParams only; runtime overrides not replayed
+  // (`wiki/flows/Session-Resume.md` § "Provider params not persisted").
+  // Launch-time `--param` overrides on this resume invocation still apply
+  // and go through the same Provider-Params validation as `defaultParams`.
+  const paramsStore = buildSessionParamsStore(
+    (provider.config as { readonly defaultParams?: Readonly<Record<string, unknown>> })
+      .defaultParams,
+    args.launchArgs.params,
+  );
+  if (args.launchArgs.params.length > 0) {
+    validateAndAssertEntryParams({
+      protocol: provider.protocolId,
+      entryId: provider.entryId,
+      modelId: provider.modelId,
+      params: paramsStore.asMergedBag(),
+      sourceLayer: "launch",
+    });
+  }
+
+  // Scan prior session's audit log for `--param` / `/params` overrides that
+  // resume does NOT replay (per `wiki/flows/Session-Resume.md` § "Provider
+  // params not persisted"). The session-loop emits `RuntimeParamsNotResumed`
+  // events on the bus and writes Params-class audit records once the bus
+  // starts.
+  const priorRuntimeOverrides = await scanPriorRuntimeOverrides(
+    args.globalRoot,
+    manifest.sessionId,
+  );
+
   return {
     sessionId: manifest.sessionId,
     selection: createActiveSelectionHolder(provider),
@@ -400,6 +426,8 @@ async function bootstrapResumedSession(args: {
     manifest,
     resumed: true,
     yolo: args.launchArgs.yolo,
+    paramsStore,
+    ...(priorRuntimeOverrides.length > 0 ? { priorRuntimeOverrides } : {}),
   };
 }
 

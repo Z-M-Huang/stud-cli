@@ -12,10 +12,21 @@
  *                        current choice for outgoing requests, toggled via
  *                        `/provider` or `/model`)
  *
- * contractVersion: 1.0.1
+ * contractVersion: 1.1.0
+ *
+ * 1.1.0 — `ProviderRequestArgs` shape change: `maxTokens` and `temperature` are
+ *         removed in favor of `params: Readonly<Record<string, unknown>>` (the
+ *         merged params bag) plus optional `stream: ProviderStreamGates`.
+ *         Pinned by `wiki/contracts/Provider-Params.md` v1.0.0 + `wiki/contracts/Providers.md` v1.1.0.
+ *
+ * NOTE on the wiki-vs-code surface divergence: `wiki/contracts/Providers.md:96-104`
+ * specifies `request({ system, messages, tools, params, signal }, host)` (single
+ * args object). The code keeps the existing `(args, host, signal)` shape with
+ * `modelId` inside args to bound the blast radius of this change; aligning the
+ * shape is a follow-up contract revision.
  *
  * Wiki: contracts/Providers.md, providers/Protocol-Adapters.md,
- *       contracts/Capability-Negotiation.md
+ *       contracts/Capability-Negotiation.md, contracts/Provider-Params.md
  */
 import type { ExtensionContract } from "./meta.js";
 import type { JSONSchemaObject } from "./state-slot.js";
@@ -114,12 +125,28 @@ export interface ToolResultContentPart {
   readonly content: string;
 }
 
+/**
+ * A reasoning / "thinking" fragment emitted by reasoning models (Anthropic
+ * thinking blocks; OpenAI reasoning summaries; Gemini thoughts). Persisted in
+ * the manifest when `sendReasoning: true` (Anthropic v1 default) so the model
+ * can see its own thinking from prior turns.
+ *
+ * Wiki: contracts/Provider-Params.md § "Reasoning persistence policy
+ *       (sendReasoning)"; core/Session-Manifest.md § "Manifest message shape
+ *       with reasoning content".
+ */
+export interface ThinkingContentPart {
+  readonly type: "thinking";
+  readonly text: string;
+}
+
 /** Union of all content-part kinds that may appear in a composite message. */
 export type ProviderContentPart =
   | TextContentPart
   | ImageContentPart
   | ToolCallContentPart
-  | ToolResultContentPart;
+  | ToolResultContentPart
+  | ThinkingContentPart;
 
 /**
  * A single conversation message passed to the provider.
@@ -145,6 +172,17 @@ export interface ProviderToolDefinition {
 }
 
 /**
+ * Stream-gate config (from the provider's `stream` sibling block per
+ * `wiki/contracts/Provider-Params.md` § "Stream gates"). Filters inbound
+ * stream events at the surface boundary; locked at provider config (not
+ * mutable via `/params` or `--param`).
+ */
+export interface ProviderStreamGates {
+  readonly passReasoningToLoop?: boolean;
+  readonly emitStepMarkers?: boolean;
+}
+
+/**
  * Full argument set passed to `ProviderRequestSurface.request()` on every
  * `SEND_REQUEST` stage invocation.
  *
@@ -153,16 +191,21 @@ export interface ProviderToolDefinition {
  * `messages`   — conversation history (user / assistant / tool) assembled by COMPOSE_REQUEST.
  * `tools`      — tool definitions; empty array when the tool manifest is empty.
  * `modelId`    — the model identifier the session currently targets.
- * `maxTokens`  — optional output-token budget; undefined means provider default.
- * `temperature`— optional sampling temperature; undefined means provider default.
+ * `params`     — the merged params bag (`defaultParams ← --param ← /params`)
+ *                per the two-zone shape pinned by `wiki/contracts/Provider-Params.md`.
+ *                Common-bucket fields use the canonical AI SDK camelCase names
+ *                (`maxOutputTokens`, `temperature`, `topP`, `topK`,
+ *                `stopSequences`, `seed`); adapter-native fields per the
+ *                active adapter's `configSchema` (e.g., Anthropic `effort`).
+ * `stream`     — optional stream-gate filters from the provider's `stream` block.
  */
 export interface ProviderRequestArgs {
   readonly system?: string;
   readonly messages: readonly ProviderMessage[];
   readonly tools: readonly ProviderToolDefinition[];
   readonly modelId: string;
-  readonly maxTokens?: number;
-  readonly temperature?: number;
+  readonly params: Readonly<Record<string, unknown>>;
+  readonly stream?: ProviderStreamGates;
 }
 
 /**
@@ -191,6 +234,12 @@ export type ProviderStreamEvent =
       readonly args: Readonly<Record<string, unknown>>;
     }
   | { readonly type: "thinking-delta"; readonly delta: string }
+  // V3 stream extensions per `wiki/providers/Protocol-Adapters.md` 1.1.0:
+  // `source-citation` always emitted; `step-start` / `step-finish` gated by
+  // `stream.emitStepMarkers` at the provider config level.
+  | { readonly type: "source-citation"; readonly uri: string; readonly excerpt?: string }
+  | { readonly type: "step-start"; readonly stepId: string }
+  | { readonly type: "step-finish"; readonly stepId: string }
   | {
       readonly type: "finish";
       readonly reason: "stop" | "tool-calls" | "length" | "content-filter" | "error" | "other";

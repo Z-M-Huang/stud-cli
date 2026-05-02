@@ -10,7 +10,7 @@ import type { ProviderContract } from "../../../contracts/providers.js";
 
 export const contract: ProviderContract<CLIWrapperConfig> = {
   kind: "Provider",
-  contractVersion: "1.0.1",
+  contractVersion: "1.1.0",
   requiredCoreVersion: ">=1.0.0 <2.0.0",
   lifecycle: { init, activate, deactivate, dispose },
   configSchema: cliWrapperConfigSchema,

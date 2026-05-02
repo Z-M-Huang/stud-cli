@@ -4,6 +4,8 @@ import { Session } from "../../core/errors/index.js";
 import { openTrustStore } from "../../core/security/trust/store.js";
 
 import { createActiveSelectionHolder } from "./active-selection.js";
+import { buildSessionParamsStore } from "./params-runtime.js";
+import { validateAndAssertEntryParams } from "./params-validator.js";
 import { createSessionManifest } from "./session-store.js";
 import { isDirectory, loadSettingsFile } from "./storage.js";
 
@@ -49,6 +51,23 @@ export function newSessionBootstrap(args: {
   readonly deps: ResolvedShellDeps;
 }): SessionBootstrap {
   const sessionId = args.deps.sessionIdFactory();
+  // Build the store first, then validate the merged effective bag against
+  // the active provider/model so `--param` overrides go through the same
+  // seven-check pipeline as `defaultParams`.
+  const paramsStore = buildSessionParamsStore(
+    (args.provider.config as { readonly defaultParams?: Readonly<Record<string, unknown>> })
+      .defaultParams,
+    args.launchArgs.params,
+  );
+  if (args.launchArgs.params.length > 0) {
+    validateAndAssertEntryParams({
+      protocol: args.provider.protocolId,
+      entryId: args.provider.entryId,
+      modelId: args.provider.modelId,
+      params: paramsStore.asMergedBag(),
+      sourceLayer: "launch",
+    });
+  }
   return {
     sessionId,
     selection: createActiveSelectionHolder(args.provider),
@@ -63,5 +82,6 @@ export function newSessionBootstrap(args: {
     }),
     resumed: false,
     yolo: args.launchArgs.yolo,
+    paramsStore,
   };
 }

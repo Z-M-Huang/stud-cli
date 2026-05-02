@@ -47,17 +47,43 @@ export function renderTurnError(session: SessionBootstrap, error: unknown): stri
 export function assistantMessageContent(
   assistantText: string,
   toolCalls: readonly ProviderContentPart[],
+  thinkingParts: readonly ProviderContentPart[] = [],
 ): ProviderMessage["content"] {
-  return toolCalls.length === 0
-    ? assistantText.length > 0
-      ? assistantText
-      : "(no output)"
-    : [
-        ...(assistantText.length > 0
-          ? ([{ type: "text", text: assistantText }] satisfies readonly ProviderContentPart[])
-          : []),
-        ...toolCalls,
-      ];
+  // String form is allowed only when there are no tool calls AND no thinking
+  // blocks. Reasoning persistence (sendReasoning: true v1 default for
+  // Anthropic) requires the structured content array per
+  // `wiki/core/Session-Manifest.md` § "Manifest message shape with reasoning content".
+  if (toolCalls.length === 0 && thinkingParts.length === 0) {
+    return assistantText.length > 0 ? assistantText : "(no output)";
+  }
+  return [
+    ...thinkingParts,
+    ...(assistantText.length > 0
+      ? ([{ type: "text", text: assistantText }] satisfies readonly ProviderContentPart[])
+      : []),
+    ...toolCalls,
+  ];
+}
+
+/**
+ * Build the assistant message content from the IN-ORDER parts array
+ * captured during the turn. Preserves stream order so persisted Anthropic
+ * thinking/text/tool_use blocks alternate as the model emitted them, per
+ * `wiki/core/Session-Manifest.md` § "Manifest message shape with reasoning content".
+ */
+export function assistantMessageContentFromParts(
+  assistantText: string,
+  orderedParts: readonly ProviderContentPart[],
+): ProviderMessage["content"] {
+  if (orderedParts.length === 0) {
+    return assistantText.length > 0 ? assistantText : "(no output)";
+  }
+  // String form is reserved for the simple text-only case. With a single
+  // text part and no thinking/tool-call, fall back to the plain string.
+  if (orderedParts.length === 1 && orderedParts[0]!.type === "text") {
+    return (orderedParts[0]! as { text: string }).text || "(no output)";
+  }
+  return orderedParts;
 }
 
 export function toolResultMessage(
@@ -103,16 +129,29 @@ function manifestMessagesFromHistory(
   }));
 }
 
+/**
+ * Construct the next-revision manifest snapshot WITHOUT persisting it.
+ * Used by the pre-save manifest-size budget check so the budget event fires
+ * before the disk write — a write that may itself fail on an oversized
+ * manifest. Per `wiki/core/Session-Manifest.md:59`.
+ */
+export function prepareManifestSnapshot(args: {
+  readonly manifest: SessionManifest;
+  readonly history: readonly ProviderMessage[];
+}): SessionManifest {
+  return {
+    ...args.manifest,
+    messages: manifestMessagesFromHistory(args.history),
+  };
+}
+
 export async function persistHistorySnapshot(args: {
   readonly manifest: SessionManifest;
   readonly history: readonly ProviderMessage[];
   readonly deps: ResolvedShellDeps;
 }): Promise<SessionManifest> {
   return persistSessionManifest(
-    {
-      ...args.manifest,
-      messages: manifestMessagesFromHistory(args.history),
-    },
+    prepareManifestSnapshot({ manifest: args.manifest, history: args.history }),
     args.deps,
   );
 }

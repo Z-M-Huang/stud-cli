@@ -70,11 +70,34 @@ export interface CapabilityRequirement {
 // ---------------------------------------------------------------------------
 
 /**
+ * `paramsAffected` enrichment for capability-negotiation diagnostics.
+ *
+ * Wiki: contracts/Provider-Params.md § "Capability-mismatch behavior" Case B
+ *       + contracts/Capability-Negotiation.md (1.0.1).
+ *
+ * Surfaced on `preferred-unmet` and `probe-pending` cases (the switch is NOT
+ * blocked). Tells the user exactly which params will not apply on the
+ * destination `(providerId, modelId)` and where each value came from.
+ */
+export interface ParamsAffected {
+  readonly paramPath: readonly string[];
+  readonly reason: string;
+  readonly activeModelId: string;
+  /** Already redacted at producer side via the Audit-Trail redactor. */
+  readonly currentValue: unknown;
+  readonly sourceLayer: "defaultParams" | "launch" | "/params";
+}
+
+/**
  * Returned when all `hard` requirements are met.
  *
  * `warnings` is empty on a clean pass. It carries `preferred-unmet` entries
  * for each `preferred` requirement whose capability was absent, and
  * `probe-pending` entries for each `probed` requirement (always deferred).
+ *
+ * `paramsAffected` is non-empty when the active params bag contains values
+ * that won't apply on the destination model — surfaced on both
+ * `preferred-unmet` and `probe-pending` cases. The switch is NOT blocked.
  */
 export interface CapabilityNegotiationResult {
   readonly ok: true;
@@ -82,6 +105,7 @@ export interface CapabilityNegotiationResult {
     readonly name: CapabilityName;
     readonly reason: "preferred-unmet" | "probe-pending";
   }[];
+  readonly paramsAffected?: readonly ParamsAffected[];
 }
 
 /**

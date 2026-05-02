@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { createActiveSelectionHolder } from "../../../src/cli/runtime/active-selection.js";
+import { createParamsRuntimeStore } from "../../../src/cli/runtime/params-runtime.js";
 import { createRuntimeContextRegistry } from "../../../src/cli/runtime/runtime-context-registry.js";
 import {
   dispatchModelCommand,
@@ -146,6 +147,7 @@ describe("/provider swap — entryId-keyed runtime context isolation", () => {
         manifest: { storeId: "filesystem-session-store" } as SessionBootstrap["manifest"],
         resumed: false,
         yolo: false,
+        paramsStore: createParamsRuntimeStore({}),
       };
 
       const eventBus = createEventBus({ monotonic: () => 0n });
@@ -237,6 +239,7 @@ describe("/provider swap — active.model fallback", () => {
         manifest: { storeId: "filesystem-session-store" } as SessionBootstrap["manifest"],
         resumed: false,
         yolo: false,
+        paramsStore: createParamsRuntimeStore({}),
       };
 
       const eventBus = createEventBus({ monotonic: () => 0n });
@@ -303,6 +306,7 @@ describe("/model swap — cancellation", () => {
         manifest: { storeId: "filesystem-session-store" } as SessionBootstrap["manifest"],
         resumed: false,
         yolo: false,
+        paramsStore: createParamsRuntimeStore({}),
       };
       const eventBus = createEventBus({ monotonic: () => 0n });
       const collector = createRuntimeCollector({ now: () => 0 });

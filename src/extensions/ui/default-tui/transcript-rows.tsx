@@ -31,6 +31,9 @@ function partsAsLines(content: ProviderMessage["content"]): readonly string[] {
         return [`[${part.toolName}] ${part.content}`.split(/\r?\n/u).join(" ")];
       case "image":
         return [`[image] ${part.url}`];
+      case "thinking":
+        // Persisted reasoning content; UI shows it as a single collapsed line.
+        return [`[thinking] ${part.text}`.split(/\r?\n/u).join(" ")];
     }
   });
 }
