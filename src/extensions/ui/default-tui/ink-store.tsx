@@ -24,6 +24,7 @@ import {
 
 import type { ApprovalDialogView } from "./approval-dialog.js";
 import type { SelectDialogView } from "./dialogs/select-dialog.js";
+import type { UIRegionRegistry } from "./regions.js";
 import type { ConsoleSessionView } from "./runtime.js";
 import type { Theme } from "./theme.js";
 import type { RuntimeReader } from "../../../core/host/api/metrics.js";
@@ -54,6 +55,20 @@ export interface InkState {
   readonly tabCycleIndex: number;
   readonly online: boolean;
   readonly startedAt: Date;
+  /**
+   * `true` between `TurnStarted` and `TurnEnded` / `TurnError`. Drives the
+   * "processing..." indicator that fills the gap between user submit and
+   * the first streaming token (or the gap between two tool calls), so the
+   * UI never looks frozen while the orchestrator is genuinely working.
+   */
+  readonly turnActive: boolean;
+  /**
+   * Count of user messages buffered in `InputQueue` (typed mid-turn but
+   * not yet consumed by the next `waitForInput()`). Surfaced in the
+   * status line as `{N} queued` so the user knows their typing is being
+   * received and will be processed in order.
+   */
+  readonly queuedInputCount: number;
 }
 
 export interface InkStore {
@@ -66,6 +81,10 @@ export interface InputQueue {
   enqueue(): Promise<string>;
   resolveNext(value: string): boolean;
   rejectAll(reason: unknown): void;
+  /** Number of typed values buffered but not yet consumed. */
+  pendingValueCount(): number;
+  /** Subscribe to queue-depth changes; returns an unsubscriber. */
+  onChange(listener: (depth: number) => void): () => void;
 }
 
 export function createStore(): InkStore {
@@ -106,6 +125,8 @@ export function initialState(): InkState {
     tabCycleIndex: 0,
     online: true,
     startedAt: new Date(),
+    turnActive: false,
+    queuedInputCount: 0,
   };
 }
 
@@ -120,10 +141,18 @@ export function createInputQueue(): InputQueue {
   }
   const pendingConsumers: PendingConsumer[] = [];
   const pendingValues: string[] = [];
+  const listeners = new Set<(depth: number) => void>();
+  const notify = (): void => {
+    const depth = pendingValues.length;
+    listeners.forEach((listener) => {
+      listener(depth);
+    });
+  };
   return {
     enqueue() {
       const buffered = pendingValues.shift();
       if (buffered !== undefined) {
+        notify();
         return Promise.resolve(buffered);
       }
       return new Promise<string>((resolve, reject) => {
@@ -134,6 +163,7 @@ export function createInputQueue(): InputQueue {
       const consumer = pendingConsumers.shift();
       if (consumer === undefined) {
         pendingValues.push(value);
+        notify();
       } else {
         consumer.resolve(value);
       }
@@ -141,10 +171,21 @@ export function createInputQueue(): InputQueue {
     },
     rejectAll(reason) {
       const consumers = pendingConsumers.splice(0);
+      const hadBuffered = pendingValues.length > 0;
       pendingValues.length = 0;
       for (const c of consumers) {
         c.reject(reason);
       }
+      if (hadBuffered) notify();
+    },
+    pendingValueCount() {
+      return pendingValues.length;
+    },
+    onChange(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
   };
 }
@@ -215,6 +256,13 @@ interface RootProps {
   readonly theme: Theme | undefined;
   readonly hint: string;
   readonly onComposerKey: (input: string, key: ComposerKey) => void;
+  /**
+   * Region registry that supplies bundled panel contributions (e.g., the
+   * Subagents panel). Composed into InkTUIFrame's transcript-append slot so
+   * the panel renders inline with the transcript. Wiki:
+   * reference-extensions/ui/Default-TUI.md §Region contributions.
+   */
+  readonly regionRegistry?: UIRegionRegistry;
 }
 
 function liveStatusItemsFor(
@@ -237,18 +285,43 @@ function liveStatusItemsFor(
   });
 }
 
+/**
+ * Derive the composer hint from the live state. The default hint is the
+ * "Ask anything..." caller-supplied text; we replace it when the
+ * orchestrator is busy or when typed messages are queued so the user has
+ * a clear signal that input is being received but won't run yet.
+ */
+function deriveComposerHint(snap: InkState, fallback: string): string {
+  if (snap.queuedInputCount > 0) {
+    const noun = snap.queuedInputCount === 1 ? "message" : "messages";
+    return `Working... · ${snap.queuedInputCount} ${noun} queued (will send when ready)`;
+  }
+  if (snap.turnActive) {
+    return "Working... (typing will queue)";
+  }
+  return fallback;
+}
+
 export function Root(props: RootProps): React.ReactElement {
   const snap = useStoreSnapshot(props.store);
   const metricsVersion = useMetrics(props.metrics);
   void metricsVersion; // re-render trigger
   const runtime = props.metrics?.snapshot();
   const liveStatusItems = liveStatusItemsFor(snap, runtime);
+  const transcriptRegion =
+    props.regionRegistry !== undefined
+      ? props.regionRegistry.compose(
+          "transcript",
+          { view: { region: "transcript" }, controller: {} },
+          null,
+        )
+      : null;
   const frame: InkTUIFrameProps = {
     transcriptItems: snap.transcriptItems,
     assistantDraft: snap.assistantDraft,
     runningToolCards: snap.runningToolCards,
     composerText: snap.composerText,
-    composerHint: props.hint,
+    composerHint: deriveComposerHint(snap, props.hint),
     palette: snap.palette ?? undefined,
     paletteSelectedIndex: snap.paletteSelectedIndex,
     approvalDialog: snap.approvalDialog ?? undefined,
@@ -256,6 +329,7 @@ export function Root(props: RootProps): React.ReactElement {
     statusItems: snap.statusItems.length > 0 ? snap.statusItems : liveStatusItems,
     theme: props.theme,
     onComposerKey: props.onComposerKey,
+    transcriptRegion,
   };
   return <InkTUIFrame {...frame} />;
 }

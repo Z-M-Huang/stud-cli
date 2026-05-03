@@ -35,6 +35,8 @@ function makeFakeAuditBus(): { readonly bus: SessionAuditBus; readonly events: F
       events.push({ kind, payload });
     },
     withTurn: async (_turnId, fn) => fn(),
+    query: () => [],
+    activeSubagents: () => [],
     close: async () => {
       /* no-op fake */
     },

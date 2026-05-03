@@ -40,6 +40,9 @@ interface SelectRaisedPayload {
   readonly correlationId?: string;
   readonly prompt?: string;
   readonly options?: readonly string[];
+  readonly subagentId?: string;
+  readonly depth?: number;
+  readonly subagentLabel?: string;
 }
 
 function readPayload(env: { readonly payload: unknown }): SelectRaisedPayload | null {
@@ -83,7 +86,12 @@ export function createSelectManager(args: {
   const unsubscribe = args.bus.on("InteractionRaised", (env) => {
     if (args.isUnmounted()) return;
     const payload = readPayload(env);
-    if (payload?.kind !== "select") return;
+    // The select dialog handles both `select` and `approveSubagentEnvelope`
+    // — both are option-list prompts. The subagent envelope dialog adds
+    // depth/model/envelope chips inline in the prompt text (composed by
+    // subagent-spawn.ts formatEnvelopePrompt). Wiki:
+    // reference-extensions/ui/Default-TUI.md §Dialog renderers.
+    if (payload?.kind !== "select" && payload?.kind !== "approveSubagentEnvelope") return;
     const requestId = deriveRequestId(payload);
     const options = payload.options;
     if (requestId.length === 0 || !Array.isArray(options) || options.length === 0) {
@@ -101,6 +109,8 @@ export function createSelectManager(args: {
     }
     activeRequestId = requestId;
     activeOptions = safeOptions;
+    const dialogKind: "select" | "approveSubagentEnvelope" =
+      payload.kind === "approveSubagentEnvelope" ? "approveSubagentEnvelope" : "select";
     args.store.setState((state) => ({
       ...state,
       selectDialog: {
@@ -108,6 +118,12 @@ export function createSelectManager(args: {
         prompt: payload.prompt ?? "",
         options: activeOptions,
         selectedIndex: 0,
+        kind: dialogKind,
+        ...(typeof payload.subagentId === "string" ? { subagentId: payload.subagentId } : {}),
+        ...(typeof payload.depth === "number" ? { depth: payload.depth } : {}),
+        ...(typeof payload.subagentLabel === "string"
+          ? { subagentLabel: payload.subagentLabel }
+          : {}),
       },
     }));
   });

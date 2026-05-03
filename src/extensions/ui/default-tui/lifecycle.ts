@@ -89,8 +89,15 @@ function emitSuppressedError(host: HostAPI, err: unknown, reason: string): void 
   host.observability.suppress(payload);
 }
 
-function isSupportedKind(kind: string): kind is "confirm" | "input" | "select" {
-  return kind === "confirm" || kind === "input" || kind === "select";
+function isSupportedKind(
+  kind: string,
+): kind is "confirm" | "input" | "select" | "approveSubagentEnvelope" {
+  return (
+    kind === "confirm" ||
+    kind === "input" ||
+    kind === "select" ||
+    kind === "approveSubagentEnvelope"
+  );
 }
 
 function normalizeOptions(value: unknown): readonly string[] | undefined {

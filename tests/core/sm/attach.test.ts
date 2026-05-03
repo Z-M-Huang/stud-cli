@@ -3,6 +3,11 @@ import { describe, it } from "node:test";
 
 import { createRuntimeCollector } from "../../../src/core/host/internal/runtime-collector.js";
 import { attachSM } from "../../../src/core/sm/attach.js";
+import {
+  auditActiveSubagentsStub,
+  auditQueryStub,
+  openChildStub,
+} from "../../helpers/subagent-stubs.js";
 
 import type { HostAPI } from "../../../src/core/host/host-api.js";
 import type { StateSlot } from "../../../src/core/lifecycle/extension-state.js";
@@ -49,6 +54,7 @@ function newHost(order: string[] = []): AttachTestHost {
           return Promise.resolve();
         },
       }),
+      openChild: openChildStub,
     },
     events: {
       on: () => undefined,
@@ -76,6 +82,8 @@ function newHost(order: string[] = []): AttachTestHost {
         auditRecords.push(record);
         return Promise.resolve();
       },
+      query: auditQueryStub,
+      activeSubagents: auditActiveSubagentsStub,
     },
     observability: { emit: () => undefined, suppress: () => undefined },
     interaction: { raise: () => Promise.resolve({ value: "ok" }) },
@@ -265,6 +273,7 @@ describe("attachSM — slotsEqual branches", () => {
           read: () => Promise.resolve(null),
           write: () => Promise.resolve(),
         }),
+        openChild: openChildStub,
       },
     };
     await assert.rejects(
@@ -299,6 +308,7 @@ describe("attachSM — slotsEqual branches", () => {
           read: () => Promise.resolve({ slotVersion: "0.9.0", data: { existing: true } }),
           write: () => Promise.resolve(),
         }),
+        openChild: openChildStub,
       },
     };
     const result = await attachSM({
@@ -345,6 +355,7 @@ describe("attachSM — slotsEqual branches", () => {
           // Broken write: silently drops the new value.
           write: (_next: Readonly<Record<string, unknown>>) => Promise.resolve(),
         }),
+        openChild: openChildStub,
       },
     };
     void storedState; // referenced via closure in stateSlot

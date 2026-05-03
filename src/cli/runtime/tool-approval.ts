@@ -159,6 +159,13 @@ export async function ensureToolApproval(args: {
   readonly deps: ResolvedShellDeps;
   readonly auditBus?: SessionAuditBus;
   readonly requestApproval?: RequestToolApproval;
+  /**
+   * Optional subagent envelope. Forwarded into the approval stack so
+   * in-envelope tool calls bypass the inherited mode gate (with guard
+   * hooks still running) per wiki/security/Tool-Approvals.md (1.1.0).
+   * Provided by the child runner; orchestrator calls leave it undefined.
+   */
+  readonly subagentEnvelope?: ReadonlySet<string>;
 }): Promise<boolean> {
   if (!args.tool.gated) {
     return true;
@@ -202,6 +209,9 @@ export async function ensureToolApproval(args: {
         return Promise.resolve();
       },
     },
+    ...(args.subagentEnvelope !== undefined
+      ? { subagentEnvelope: Array.from(args.subagentEnvelope) }
+      : {}),
   });
 
   return decision.kind === "approve";

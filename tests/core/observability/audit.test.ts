@@ -24,10 +24,10 @@ function assertValidationCode(error: unknown, code: string): true {
 }
 
 function registerEnumerationAndValidationTests(): void {
-  it("enumerates the 13 wiki-documented classes plus SuppressedError, including rejected variants and Provider-Params (Audit-Trail.md 1.1.0)", () => {
+  it("enumerates the 13 wiki-documented classes plus SuppressedError, including rejected variants, Provider-Params (Audit-Trail.md 1.1.0), and SubagentExecution (Audit-Trail.md 1.2.0)", () => {
     const classes = listAuditClasses();
 
-    assert.equal(classes.length, 17);
+    assert.equal(classes.length, 18);
     assert.deepEqual(classes, [
       "Approval",
       "Compaction",
@@ -46,6 +46,7 @@ function registerEnumerationAndValidationTests(): void {
       "ToolInvocation",
       "SuppressedError",
       "Params",
+      "SubagentExecution",
     ]);
   });
 
@@ -70,7 +71,9 @@ function registerEnumerationAndValidationTests(): void {
   it("every class has a typed payload shape", () => {
     const _: Parameters<typeof writeAudit> = ["SessionLifecycle", { event: "start" }];
     assert.deepEqual(_, ["SessionLifecycle", { event: "start" }]);
-    assert.equal(listAuditClasses().length, 17);
+    // 17 base classes + 1 SubagentExecution added in audit-trail 1.2.0 per
+    // wiki/operations/Audit-Trail.md §SubagentExecution.
+    assert.equal(listAuditClasses().length, 18);
   });
 }
 

@@ -54,6 +54,10 @@ export interface InkMountActions {
   renderStatusLine(items: readonly StatusLineItem[]): void;
   setPalette(entries: readonly PaletteEntry[]): void;
   clearPalette(): void;
+  /** Mark the orchestrator as actively processing a turn (drives the busy hint). */
+  setTurnActive(active: boolean): void;
+  /** Update the count of buffered mid-turn user inputs. */
+  setQueueDepth(depth: number): void;
 }
 
 export interface HeaderInfo {
@@ -146,6 +150,16 @@ export function createInkMountActions(store: InkStore): InkMountActions {
     },
     clearPalette() {
       store.setState((state) => ({ ...state, palette: null, paletteSelectedIndex: 0 }));
+    },
+    setTurnActive(active) {
+      store.setState((state) =>
+        state.turnActive === active ? state : { ...state, turnActive: active },
+      );
+    },
+    setQueueDepth(depth) {
+      store.setState((state) =>
+        state.queuedInputCount === depth ? state : { ...state, queuedInputCount: depth },
+      );
     },
   };
 }

@@ -4,6 +4,11 @@ import { describe, it } from "node:test";
 import { ExtensionHost } from "../../../src/core/errors/extension-host.js";
 import { createRuntimeCollector } from "../../../src/core/host/internal/runtime-collector.js";
 import { runParallel } from "../../../src/core/sm/fan-out.js";
+import {
+  auditActiveSubagentsStub,
+  auditQueryStub,
+  openChildStub,
+} from "../../helpers/subagent-stubs.js";
 
 import type { StageDefinition } from "../../../src/contracts/state-machines.js";
 import type { HostAPI } from "../../../src/core/host/host-api.js";
@@ -77,6 +82,7 @@ function baseHost(
       mode: "ask",
       projectRoot: "/tmp/.stud",
       stateSlot: () => ({ read: () => Promise.resolve(null), write: () => Promise.resolve() }),
+      openChild: openChildStub,
     },
     events: {
       on: () => undefined,
@@ -93,7 +99,11 @@ function baseHost(
       listTools: () => [],
       callTool: () => Promise.resolve({ content: [], isError: false }),
     },
-    audit: { write: () => Promise.resolve() },
+    audit: {
+      write: () => Promise.resolve(),
+      query: auditQueryStub,
+      activeSubagents: auditActiveSubagentsStub,
+    },
     observability: { emit: () => undefined, suppress: () => undefined },
     interaction: { raise: () => Promise.resolve({ value: "ok" }) },
     commands: { list: () => [], complete: () => [], dispatch: () => Promise.resolve({ ok: true }) },

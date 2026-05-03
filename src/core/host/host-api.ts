@@ -130,3 +130,40 @@ export interface HostAPI {
    */
   readonly metrics: RuntimeReader;
 }
+
+/**
+ * Symbol used to expose the "underlying" host through a wrapper. The
+ * per-subagent child host (`buildChildHost`) wraps the parent host with
+ * an attribution-stamping `events.emit` and a depth-aware
+ * `session.openChild`. Wrapping creates a new object reference, which
+ * breaks per-host state stored in WeakMaps keyed by the original host
+ * (e.g. each provider's `configsByHost` set up at lifecycle init time).
+ *
+ * Convention: every wrapper attaches the original (un-wrapped) host on
+ * this property. Code that looks up state by host (provider lifecycles,
+ * any future consumer of WeakMap-keyed-by-host state) walks the chain
+ * by reading `host[HOST_UNWRAP]` until undefined, falling back to the
+ * direct host on each step. This is an internal escape hatch — it is
+ * intentionally NOT on the public `HostAPI` interface.
+ */
+export const HOST_UNWRAP: unique symbol = Symbol("studcli.host.unwrap");
+
+/**
+ * Helper for the lookup-walk pattern: given a host (potentially wrapped)
+ * and a per-host getter function, try the host directly, then walk down
+ * the `HOST_UNWRAP` chain until something resolves or we run out.
+ */
+export function lookupHostState<T>(
+  host: HostAPI,
+  getter: (h: HostAPI) => T | undefined,
+): T | undefined {
+  let cursor: HostAPI | undefined = host;
+  while (cursor !== undefined) {
+    const value = getter(cursor);
+    if (value !== undefined) return value;
+    const next: HostAPI | undefined = (cursor as { [HOST_UNWRAP]?: HostAPI })[HOST_UNWRAP];
+    if (next === undefined || next === cursor) return undefined;
+    cursor = next;
+  }
+  return undefined;
+}

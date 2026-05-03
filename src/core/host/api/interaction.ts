@@ -16,7 +16,8 @@
 export type InteractionKind =
   | "confirm" // yes/no approval prompt
   | "input" // free-text input from the user
-  | "select"; // selection from a fixed list of options
+  | "select" // selection from a fixed list of options
+  | "approveSubagentEnvelope"; // subagent envelope approval (wiki: Tool-Approvals 1.1.0)
 
 /** A request to raise with the active UI interactor. */
 export interface InteractionRequest {

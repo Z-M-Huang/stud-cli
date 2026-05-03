@@ -52,6 +52,13 @@ export interface AssistantIterationArgs {
   readonly auditBus: SessionAuditBus;
   readonly deps: ResolvedShellDeps;
   readonly iteration: number;
+  /**
+   * Cancellation signal scoped to the current turn. Replaces the prior
+   * bare `new AbortController().signal` so Ctrl+C aborts the in-flight
+   * provider stream per wiki/core/Concurrency-and-Cancellation.md. When
+   * omitted, a fresh non-cancelling controller is used.
+   */
+  readonly signal?: AbortSignal;
 }
 
 interface IterationAccumulator {
@@ -252,6 +259,7 @@ async function consumeProviderStream(
       providerEntryId: sel.entryId,
       modelId: sel.modelId,
     });
+    const signal = args.signal ?? new AbortController().signal;
     for await (const event of args.provider.surface.request(
       {
         messages: args.history,
@@ -265,7 +273,7 @@ async function consumeProviderStream(
         ...(streamGates !== undefined ? { stream: streamGates } : {}),
       },
       args.host,
-      new AbortController().signal,
+      signal,
     )) {
       dispatchStreamEvent(event, acc, args);
     }

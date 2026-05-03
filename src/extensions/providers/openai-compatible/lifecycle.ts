@@ -1,3 +1,5 @@
+import { lookupHostState } from "../../../core/host/host-api.js";
+
 import type { OpenAICompatibleConfig } from "./config.schema.js";
 import type { HostAPI } from "../../../core/host/host-api.js";
 
@@ -5,7 +7,10 @@ const configsByHost = new WeakMap<HostAPI, OpenAICompatibleConfig>();
 const disposedHosts = new WeakSet<HostAPI>();
 
 export function configForHost(host: HostAPI): OpenAICompatibleConfig | undefined {
-  return configsByHost.get(host);
+  // Walk through the HOST_UNWRAP chain so wrapped hosts (the per-subagent
+  // child host) resolve to the parent host's config. Without this every
+  // child session aborts on its first provider call.
+  return lookupHostState(host, (h) => configsByHost.get(h));
 }
 
 export async function init(host: HostAPI, config: OpenAICompatibleConfig): Promise<void> {

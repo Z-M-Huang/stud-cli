@@ -85,6 +85,7 @@ export function resolveHeadless(input: HeadlessInput): HeadlessOutcome {
     case "Approve":
     case "Confirm":
     case "grantStageTool":
+    case "approveSubagentEnvelope":
       return autoRespond(input, "approve", `--yolo auto-approved ${input.request.kind} request`, {
         kind: "accepted",
         correlationId: input.request.correlationId,
@@ -120,6 +121,8 @@ function haltReasonFor(kind: InteractionRequestKind): string {
       return "selection required; rerun with --yolo to pick the first option";
     case "grantStageTool":
       return "out-of-envelope tool grant; rerun with --yolo to auto-approve";
+    case "approveSubagentEnvelope":
+      return "subagent envelope approval required; rerun with --yolo to auto-approve every IP prompt";
   }
 }
 

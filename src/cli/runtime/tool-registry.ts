@@ -23,6 +23,7 @@ import { ToolTerminal } from "../../core/errors/index.js";
 
 import { studHome } from "./storage.js";
 import { coerceBashArgs } from "./tool-arg-coercion.js";
+import { loadDelegateTool } from "./tool-registry-delegate.js";
 import {
   DEFAULT_TOOL_TIMEOUT_MS,
   DEFAULT_WEB_CONTENT_BYTES,
@@ -458,14 +459,14 @@ export async function initializeBundledTools(
 ): Promise<readonly LoadedTool[]> {
   const root = workspaceRoot(session, deps);
   const toolRegistry: Record<string, { description: string }> = {};
-  const loaded = await Promise.all([
+  const agentoolGroups = await Promise.all([
     ...filesystemToolPromises(root),
     ...integrationToolPromises(root, deps),
     ...interactionToolPromises(prompt, toolRegistry),
   ]);
-  loaded.forEach((tool) => {
-    toolRegistry[tool.name] = { description: tool.description };
-  });
+  // Bundled in-tree `delegate` per Delegate-Tool.md §Identity.
+  const loaded: LoadedTool[] = [...agentoolGroups, loadDelegateTool()];
+  loaded.forEach((tool) => (toolRegistry[tool.name] = { description: tool.description }));
   return loaded;
 }
 

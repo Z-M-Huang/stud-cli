@@ -144,6 +144,19 @@ function buildSession(
       }
       return slotHandle;
     },
+    openChild() {
+      // Mock host: openChild is restricted to bundled `delegate` per
+      // wiki/core/Host-API.md §session. Test code that needs a working
+      // delegate path constructs its own host with the runtime-impl
+      // openChild closure.
+      return Promise.reject(
+        new ExtensionHost(
+          "host.session.openChild is restricted in mock host; use runtime host for delegate tests",
+          undefined,
+          { code: "Forbidden" },
+        ),
+      );
+    },
   };
 }
 
@@ -224,6 +237,12 @@ function buildAudit(callerExtId: string, auditRec: InternalAuditRecorder): Audit
         at: Date.now(),
       });
       return Promise.resolve();
+    },
+    query() {
+      return Promise.resolve([]);
+    },
+    activeSubagents() {
+      return Promise.resolve([]);
     },
   };
 }

@@ -85,6 +85,13 @@ export interface InkTUIFrameProps {
   readonly statusItems: readonly StatusLineItem[];
   readonly theme?: Theme | undefined;
   readonly onComposerKey: (input: string, key: ComposerKey) => void;
+  /**
+   * Region contributions composed for the `transcript` region in append
+   * mode. Rendered between the running tool cards and the dialog row so
+   * panels like the Subagents panel inherit the live frame's lifecycle.
+   * Wiki: reference-extensions/ui/Default-TUI.md §Region contributions.
+   */
+  readonly transcriptRegion?: React.ReactNode;
 }
 
 const SUBMIT_HINT = "Ask anything... (Enter to send, Ctrl+K to toggle)";
@@ -370,6 +377,8 @@ export function InkTUIFrame(props: InkTUIFrameProps): React.ReactElement {
         {props.runningToolCards.map((card) => (
           <ToolCard key={card.id} card={card} theme={props.theme} />
         ))}
+
+        {props.transcriptRegion}
 
         {/* Render BOTH dialog components unconditionally so the live frame's
             child shape stays stable across open/close cycles — that's the

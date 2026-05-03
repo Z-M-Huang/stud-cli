@@ -2,11 +2,12 @@ import { join } from "node:path";
 
 import { ExtensionHost } from "../../core/errors/extension-host.js";
 
-import { createProviderHost } from "./provider-host.js";
+import { createProviderHost, type OpenChildClosure } from "./provider-host.js";
 import { studHome } from "./storage.js";
 import { PROTOCOLS } from "./types.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
+import type { IpAuthority } from "./ip-authority.js";
 import type {
   AnyProviderConfig,
   LoadedTool,
@@ -62,6 +63,19 @@ interface RegistryDeps {
   readonly getAuditBus: () => SessionAuditBus | null;
   readonly collector: RuntimeCollector;
   readonly eventBus: EventBus;
+  /**
+   * Shared IpAuthority instance — every host built by the registry routes its
+   * `host.interaction` through the same parent-session queue so subagent
+   * IP requests respect the cross-subagent comparator (Phase C / D4a).
+   */
+  readonly ipAuthority?: IpAuthority;
+  /**
+   * Runtime closure backing `host.session.openChild()` for every host built
+   * by the registry. Wired by `bootstrapSessionContext` once the
+   * SessionSubagentRegistry and child-session machinery exist (Phase E).
+   * When omitted, hosts fall back to the `Forbidden` stub.
+   */
+  readonly openChild?: OpenChildClosure;
 }
 
 export function createRuntimeContextRegistry(deps: RegistryDeps): RuntimeContextRegistry {
@@ -103,6 +117,8 @@ export function createRuntimeContextRegistry(deps: RegistryDeps): RuntimeContext
       deps.getAuditBus,
       deps.collector,
       deps.eventBus,
+      deps.ipAuthority,
+      deps.openChild,
     );
     await descriptor.contract.lifecycle.init?.(host, args.config as never);
     await descriptor.contract.lifecycle.activate?.(host);

@@ -61,6 +61,8 @@ function makeFailingStoreHost(): HostAPI {
     mode: host.session.mode,
     projectRoot: host.session.projectRoot,
     stateSlot: (_extId: string): StateSlotHandle => failingSlot,
+    openChild: (...args: Parameters<typeof host.session.openChild>) =>
+      host.session.openChild(...args),
   };
   return Object.freeze({ ...host, session: failingSession });
 }

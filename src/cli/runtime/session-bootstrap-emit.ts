@@ -12,11 +12,14 @@
  */
 import { randomUUID } from "node:crypto";
 
+import { emitSubagentResumeScan } from "../../core/subagent/resume-scan.js";
+
 import { checkManifestSizeBudget, manifestSizeBudgetPayload } from "./manifest-size-budget.js";
 import { redactedDelta } from "./params-redact.js";
+import { studHome } from "./storage.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
-import type { SessionBootstrap } from "./types.js";
+import type { ResolvedShellDeps, SessionBootstrap } from "./types.js";
 import type { HostAPI } from "../../core/host/host-api.js";
 
 export function emitPreHydrationSizeBudget(
@@ -76,6 +79,37 @@ export function emitLaunchOverrideAudit(
       paramPath: entry.paramPath,
       sourceLayer: "launch",
       redactedValue: redacted,
+    });
+  }
+}
+
+/**
+ * Emit the bootstrap-time audit chain: pre-hydration size budget, prior
+ * runtime overrides, launch override, the SessionStarted/Resumed record,
+ * and (on resume only) the dangling-subagent scan.
+ */
+export async function emitSessionStartAudits(
+  session: SessionBootstrap,
+  baseHost: HostAPI,
+  auditBus: SessionAuditBus,
+  deps: ResolvedShellDeps,
+): Promise<void> {
+  const initialSelection = session.selection.current();
+  emitPreHydrationSizeBudget(session, baseHost, auditBus);
+  emitPriorRuntimeOverridesSurface(session, baseHost, auditBus);
+  emitLaunchOverrideAudit(session, baseHost, auditBus);
+  auditBus.emit(session.resumed ? "SessionResumed" : "SessionStarted", {
+    storeId: "filesystem-session-store",
+    projectRoot: session.projectRoot,
+    mode: session.securityMode,
+    providerId: initialSelection.entryId,
+    modelId: initialSelection.modelId,
+  });
+  if (session.resumed) {
+    await emitSubagentResumeScan({
+      auditBus,
+      globalRoot: studHome(deps.homedir()),
+      priorSessionId: session.sessionId,
     });
   }
 }

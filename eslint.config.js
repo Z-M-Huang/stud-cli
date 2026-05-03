@@ -112,6 +112,13 @@ export default tseslint.config(
             "tests/core/platform/*.ts",
             // tests/core/observability/*.ts — observability bus tests.
             "tests/core/observability/*.ts",
+            // tests/core/audit/*.ts — in-memory audit record store + query tests
+            // (Phase B of the subagent implementation per
+            // /home/ubuntu/.claude/plans/ultrathink-we-have-a-magical-gem.md).
+            "tests/core/audit/*.ts",
+            // tests/core/subagent/*.ts — subagent registry, envelope validation,
+            // spawn validation, resume scan, and run-child tests.
+            "tests/core/subagent/*.ts",
             // tests/core/diagnostics/*.ts — health probe diagnostics tests.
             "tests/core/diagnostics/*.ts",
             // tests/core/extension-isolation/*.ts — extension isolation assertion tests.
@@ -173,6 +180,8 @@ export default tseslint.config(
             "tests/extensions/tools/catalog/*.ts",
             // tests/extensions/tools/context-compaction/*.ts — context-compaction reference tool tests.
             "tests/extensions/tools/context-compaction/*.ts",
+            // tests/extensions/tools/delegate/*.ts — bundled delegate tool tests.
+            "tests/extensions/tools/delegate/*.ts",
             // tests/extensions/tools/edit/*.ts — edit reference tool tests.
             "tests/extensions/tools/edit/*.ts",
             // tests/extensions/tools/simple-tools/read/*.ts — simple-tools read tests.
@@ -191,7 +200,12 @@ export default tseslint.config(
             "tests/flows/_helpers/*.ts",
             "examples/*/*/*.ts",
           ],
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 250,
+          // Bumped from 250 → 280 in Phase B/E of the subagent implementation
+          // to fit the new tests/core/audit/*, tests/core/subagent/* directories.
+          // Per /home/ubuntu/.claude/plans/ultrathink-we-have-a-magical-gem.md
+          // and the user's "no eslint-disable" preference: bump the limit, do
+          // not silence the diagnostic.
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 280,
         },
         tsconfigRootDir: import.meta.dirname,
       },

@@ -2,7 +2,14 @@ import { ExtensionHost, ToolTerminal, Validation } from "../../core/errors/index
 import { createRuntimeCollector } from "../../core/host/internal/runtime-collector.js";
 
 import { completeSlashCommand, runtimeCommandCatalog } from "./command-catalog.js";
+// `buildInteractionAPI` is retained as a fallback on hosts without an event
+// bus; the live runtime path now flows through `createIpAuthority` instead so
+// concurrent IP requests serialize per the parent-session FIFO + subagent-
+// spawn-ordered comparator (D4a). Wiki:
+// core/Interaction-Protocol.md §Multiple interactors and
+// core/Subagent-Sessions.md §Cross-subagent serialization.
 import { buildInteractionAPI } from "./host-interaction.js";
+import { createIpAuthority, type IpAuthority } from "./ip-authority.js";
 import { resolveKeyringSecret } from "./storage.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
@@ -12,16 +19,30 @@ import type { AuditAPI } from "../../core/host/api/audit.js";
 import type { CommandsAPI } from "../../core/host/api/commands.js";
 import type { EventsAPI } from "../../core/host/api/events.js";
 import type { ObservabilityAPI } from "../../core/host/api/observability.js";
+import type { OpenChildArgs, OpenChildResult } from "../../core/host/api/session.js";
 import type { ToolDescriptor } from "../../core/host/api/tools.js";
 import type { RuntimeCollector } from "../../core/host/internal/runtime-collector.js";
+
+/**
+ * Closure signature used by the runtime to back `host.session.openChild()`.
+ * Wired in `session-loop.ts bootstrapSessionContext` once the parent
+ * SessionSubagentRegistry, IpAuthority, and runtime-context registry are all
+ * available. When omitted, `host.session.openChild` rejects with `Forbidden`
+ * (the bootstrap host before Phase E wiring).
+ */
+export type OpenChildClosure = (args: OpenChildArgs) => Promise<OpenChildResult>;
 
 /**
  * Adapt the internal `EventBus` (envelope-shaped) into the `EventsAPI`
  * surface that `HostAPI` exposes (payload-shaped). Subscribers receive the
  * raw payload; emit wraps payload into an envelope with a fresh
  * correlationId and a monotonic timestamp.
+ *
+ * Exported so the session loop can build a shared IpAuthority before any
+ * runtime host exists — both the orchestrator and per-entry runtime hosts
+ * route through the same Authority.
  */
-function buildEventsAPI(bus: EventBus, sessionId: string): EventsAPI {
+export function buildEventsAPI(bus: EventBus, sessionId: string): EventsAPI {
   // Each handler registered via EventsAPI.on is wrapped into a bus-shaped
   // handler. Track the mapping so EventsAPI.off can remove the right entry.
   const wrapped = new WeakMap<(payload: unknown) => void, () => void>();
@@ -82,8 +103,21 @@ function buildAuditAPI(getAuditBus: () => SessionAuditBus | null): AuditAPI {
         severity: record.severity,
         message: record.message,
         ...(record.context ?? {}),
+        ...(record.parentSessionId !== undefined
+          ? { parentSessionId: record.parentSessionId }
+          : {}),
+        ...(record.subagentId !== undefined ? { subagentId: record.subagentId } : {}),
+        ...(record.depth !== undefined ? { depth: record.depth } : {}),
       });
       return Promise.resolve();
+    },
+    query(filter) {
+      const bus = getAuditBus();
+      return Promise.resolve(bus?.query(filter) ?? []);
+    },
+    activeSubagents() {
+      const bus = getAuditBus();
+      return Promise.resolve(bus?.activeSubagents() ?? []);
     },
   };
 }
@@ -141,7 +175,13 @@ export function createProviderHost(
   getAuditBus: () => SessionAuditBus | null = () => null,
   collector: RuntimeCollector = createRuntimeCollector({ now: () => deps.now().getTime() }),
   eventBus?: EventBus,
-): SecretsHost & { readonly collector: RuntimeCollector; readonly eventBus: EventBus | undefined } {
+  ipAuthority?: IpAuthority,
+  openChild?: OpenChildClosure,
+): SecretsHost & {
+  readonly collector: RuntimeCollector;
+  readonly eventBus: EventBus | undefined;
+  readonly ipAuthority: IpAuthority | undefined;
+} {
   const env = deps.env;
   const toolDescriptors = (): readonly ToolDescriptor[] => descriptors(loadedTools);
 
@@ -157,15 +197,41 @@ export function createProviderHost(
       ? buildEventsAPI(eventBus, session.sessionId)
       : { on: () => undefined, off: () => undefined, emit: () => undefined };
 
+  // Build the IP Authority lazily — caller may inject a pre-built one (so a
+  // single Authority spans the orchestrator and any child sessions per D4a)
+  // or rely on the host-level default for cases where no eventBus exists.
+  const authority: IpAuthority | undefined =
+    eventBus !== undefined ? (ipAuthority ?? createIpAuthority({ events })) : undefined;
+
   return {
     collector,
     eventBus,
+    ipAuthority: authority,
     session: {
       id: session.sessionId,
       mode: session.securityMode,
       projectRoot: session.projectRoot,
       stateSlot() {
         return { read: () => Promise.resolve(null), write: () => Promise.resolve() };
+      },
+      openChild(args) {
+        // Phase E wiring: when the runtime supplies an `openChild` closure
+        // (SessionSubagentRegistry + IpAuthority + runtime-context registry
+        // all live), delegate to it. The closure itself enforces the
+        // "bundled `delegate` tool only" caller restriction per
+        // wiki/core/Host-API.md §session.openChild — extensions that reach
+        // for `host.session.openChild` directly receive `Forbidden` from
+        // the runtime caller-id check.
+        if (openChild === undefined) {
+          return Promise.reject(
+            new ToolTerminal(
+              "host.session.openChild is restricted to the bundled `delegate` tool",
+              undefined,
+              { code: "Forbidden" },
+            ),
+          );
+        }
+        return openChild(args);
       },
     },
     events,
@@ -193,12 +259,13 @@ export function createProviderHost(
     audit: buildAuditAPI(getAuditBus),
     observability: buildObservabilityAPI(getAuditBus),
     interaction:
-      eventBus !== undefined
+      authority ??
+      (eventBus !== undefined
         ? buildInteractionAPI(events)
         : {
             raise: () =>
               notImplemented("Interaction requests are not available without an active event bus"),
-          },
+          }),
     commands: buildCommandsAPI(loadedTools),
     metrics: collector.reader,
     secrets: {

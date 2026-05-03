@@ -59,6 +59,15 @@ export interface InteractionRequest {
   readonly issuedAt: string;
   /** Must have `payload.kind === req.kind`; enforced at protocol boundary. */
   readonly payload: InteractionPayload;
+  /**
+   * Common attribution fields. Present when the request originates inside a
+   * subagent child session; absent for orchestrator-session requests. Wiki:
+   * core/Interaction-Protocol.md (1.1.0) §Common attribution fields.
+   * Interactors MUST surface these in their dialog UI per
+   * core/Subagent-Sessions.md §Attribution in dialogs.
+   */
+  readonly parentSessionId?: string;
+  readonly subagentId?: string;
 }
 
 export type InteractionResponse =

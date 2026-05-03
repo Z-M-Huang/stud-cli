@@ -17,6 +17,16 @@ export interface SelectDialogView {
   readonly prompt: string;
   readonly options: readonly string[];
   readonly selectedIndex: number;
+  /**
+   * IP request kind. `select` is the generic option-list prompt;
+   * `approveSubagentEnvelope` shows the subagent attribution chip. Wiki:
+   * core/Interaction-Protocol.md (1.1.1) §approveSubagentEnvelope.
+   */
+  readonly kind?: "select" | "approveSubagentEnvelope";
+  /** Subagent attribution — populated when the IP request originates from a child. */
+  readonly subagentId?: string;
+  readonly depth?: number;
+  readonly subagentLabel?: string;
 }
 
 export type SelectKeyAction =
@@ -67,6 +77,7 @@ export function SelectDialog(props: {
   if (props.dialog === null) {
     return <Box flexDirection="column" />;
   }
+  const chipText = chipForDialog(props.dialog);
   return (
     <Box
       flexDirection="column"
@@ -75,6 +86,7 @@ export function SelectDialog(props: {
       paddingX={1}
       marginBottom={1}
     >
+      {chipText !== null ? <Text {...c(props.theme?.muted)}>{chipText}</Text> : null}
       <Text {...c(props.theme?.accent)} bold>
         {props.dialog.prompt}
       </Text>
@@ -94,4 +106,25 @@ export function SelectDialog(props: {
       <Text {...c(props.theme?.muted)}>↑/↓ to move · Enter to select · Esc to cancel</Text>
     </Box>
   );
+}
+
+/**
+ * Compose the attribution chip displayed above the prompt. Returns null when
+ * the dialog has no subagent context — that branch keeps the orchestrator's
+ * dialogs visually unchanged. Wiki: core/Interaction-Protocol.md (1.1.0)
+ * §subagentId attribution.
+ */
+function chipForDialog(dialog: SelectDialogView): string | null {
+  const subagentId = dialog.subagentId;
+  if (typeof subagentId !== "string" || subagentId.length === 0) {
+    if (dialog.kind === "approveSubagentEnvelope") {
+      return "[approve subagent envelope]";
+    }
+    return null;
+  }
+  const shortId = subagentId.slice(0, 8);
+  const label = dialog.subagentLabel !== undefined ? ` "${dialog.subagentLabel}"` : "";
+  const depth = typeof dialog.depth === "number" ? ` · depth ${dialog.depth}` : "";
+  const kindLabel = dialog.kind === "approveSubagentEnvelope" ? " · envelope" : "";
+  return `[subagent ${shortId}${label}${depth}${kindLabel}]`;
 }

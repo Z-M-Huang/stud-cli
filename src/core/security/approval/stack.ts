@@ -19,9 +19,17 @@ import type { SecurityModeRecord } from "../modes/mode.js";
  * callback returned halt (e.g., headless without `--yolo`); the stack
  * propagates this terminal verdict so the tool-call dispatcher can end
  * the turn cleanly without synthesising an `ApprovalDenied` result.
+ *
+ * `source: "subagent-envelope"` is the wiki §Tool-Approvals 1.1.0
+ * short-circuit: when the calling session is a subagent child whose
+ * approved envelope contains the requested tool, the mode gate is
+ * bypassed. Guard hooks still run before the approve decision is final.
  */
 export type StackDecision =
-  | { kind: "approve"; source: "sm-envelope" | "sm-grant-token" | "mode-gate" }
+  | {
+      kind: "approve";
+      source: "sm-envelope" | "sm-grant-token" | "mode-gate" | "subagent-envelope";
+    }
   | {
       kind: "deny";
       source: "sm-envelope" | "sm-grant-token" | "mode-gate" | "guard";
@@ -72,6 +80,17 @@ export interface StackInput {
   readonly raiseApproval: RaiseApproval;
   readonly guardHooks: readonly GuardHookHandle[];
   readonly audit: AuditWriter;
+  /**
+   * Subagent envelope short-circuit. When supplied AND the SM precedence
+   * decision lands at the mode-gate step, in-envelope tool ids approve
+   * directly with `source: "subagent-envelope"` — bypassing the inherited
+   * mode gate. Out-of-envelope tools fall through to the mode gate as
+   * normal. Guard hooks run on either branch.
+   *
+   * Wiki: security/Tool-Approvals.md (1.1.0) §Subagent envelope and
+   * child-session approvals.
+   */
+  readonly subagentEnvelope?: readonly string[];
 }
 
 export interface ArgsDigest {
@@ -257,6 +276,13 @@ async function resolveInitialDecision(context: StackContext): Promise<StackDecis
   }
   if (step.kind === "sm-grant-token") {
     return resolveSmGrantDecision(context);
+  }
+  // Subagent envelope short-circuit per Tool-Approvals 1.1.0 §Subagent
+  // envelope and child-session approvals: when the calling session is a
+  // child with an approved envelope and the tool is in it, the mode gate
+  // is bypassed. Guard hooks still run on the resulting approve decision.
+  if (input.subagentEnvelope?.includes(input.toolId) === true) {
+    return { kind: "approve", source: "subagent-envelope" };
   }
   return resolveModeDecision(context);
 }

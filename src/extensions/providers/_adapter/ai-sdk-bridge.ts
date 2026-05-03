@@ -9,7 +9,7 @@
  *
  * Pinned to ai@6.0.172 V3 surfaces (LanguageModelV3, MockLanguageModelV3, V3 chunks).
  */
-import { streamText } from "ai";
+import { jsonSchema, streamText } from "ai";
 
 import { mapFinishReason, type FinishReason } from "./finish-mapper.js";
 import { createToolCallAssembler } from "./tool-call-assembler.js";
@@ -135,14 +135,18 @@ function partToSdk(part: ProviderContentPart): unknown {
 
 /**
  * Convert stud's `ProviderToolDefinition[]` into the SDK's `ToolSet` shape.
- * Each tool keeps its JSON-Schema parameters as `inputSchema`.
+ * Each tool's JSON-Schema parameters are wrapped via the SDK's `jsonSchema`
+ * helper so the SDK gets a `Schema<unknown>` (the only thing `FlexibleSchema`
+ * accepts beyond Zod / standard-schema). Passing a raw JSON-Schema object
+ * makes `streamText` throw `schema is not a function` at the first tool
+ * call when it tries to invoke the schema's internal validate hook.
  */
 function toSdkTools(tools: readonly ProviderToolDefinition[]): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const t of tools) {
     result[t.name] = {
       description: t.description,
-      inputSchema: t.parameters,
+      inputSchema: jsonSchema(t.parameters as never),
     };
   }
   return result;
@@ -251,12 +255,20 @@ export function createAiSdkAdapter(opts: AiSdkAdapterOptions): ProtocolAdapter {
       });
 
       const assembler = createToolCallAssembler();
+      // Per-request set of callIds already yielded as a complete `tool-call`
+      // event. AI SDK 6.x emits BOTH the streaming delta sequence
+      // (tool-input-start / tool-input-delta) AND a final `tool-call` chunk
+      // for the same call. Without dedupe the bridge yields the call twice
+      // — the orchestrator dispatches the tool twice, which surfaces in
+      // the TUI as two cards per invocation.
+      const yieldedCallIds = new Set<string>();
 
       try {
         for await (const chunk of result.fullStream) {
           for (const event of mapSdkChunk(chunk, {
             emitStepMarkers,
             assembler,
+            yieldedCallIds,
           })) {
             yield event;
           }
@@ -276,6 +288,7 @@ export function createAiSdkAdapter(opts: AiSdkAdapterOptions): ProtocolAdapter {
 interface MapState {
   readonly emitStepMarkers: boolean;
   readonly assembler: ReturnType<typeof createToolCallAssembler>;
+  readonly yieldedCallIds: Set<string>;
 }
 
 /**
@@ -304,6 +317,21 @@ function readString(record: Record<string, unknown>, key: string): string {
 function readOptionalString(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * Feed a delta into the assembler, yield it for downstream consumers,
+ * and yield any tool-call events the assembler can now complete —
+ * marking each as yielded so the SDK's later `tool-call` chunk does
+ * not produce a duplicate.
+ */
+function* ingestAndDrain(state: MapState, delta: StreamEvent): Iterable<StreamEvent> {
+  state.assembler.ingest(delta);
+  yield delta;
+  for (const event of state.assembler.drain()) {
+    if (event.kind === "tool-call") state.yieldedCallIds.add(event.callId);
+    yield event;
+  }
 }
 
 function* mapSdkChunk(chunk: unknown, state: MapState): Iterable<StreamEvent> {
@@ -337,9 +365,7 @@ function* mapSdkChunk(chunk: unknown, state: MapState): Iterable<StreamEvent> {
         callId,
         ...(toolName.length > 0 ? { nameDelta: toolName } : {}),
       };
-      state.assembler.ingest(delta);
-      yield delta;
-      for (const e of state.assembler.drain()) yield e;
+      yield* ingestAndDrain(state, delta);
       return;
     }
 
@@ -352,9 +378,7 @@ function* mapSdkChunk(chunk: unknown, state: MapState): Iterable<StreamEvent> {
         callId,
         ...(argsJsonDelta.length > 0 ? { argsJsonDelta } : {}),
       };
-      state.assembler.ingest(delta);
-      yield delta;
-      for (const e of state.assembler.drain()) yield e;
+      yield* ingestAndDrain(state, delta);
       return;
     }
 
@@ -362,6 +386,11 @@ function* mapSdkChunk(chunk: unknown, state: MapState): Iterable<StreamEvent> {
       const callId = readString(c, "toolCallId");
       const name = readString(c, "toolName");
       if (callId.length === 0 || name.length === 0) return;
+      // Suppress this chunk when the streaming-delta path already emitted
+      // the same call. Otherwise the orchestrator dispatches twice — the
+      // TUI shows a duplicate card per tool invocation.
+      if (state.yieldedCallIds.has(callId)) return;
+      state.yieldedCallIds.add(callId);
       yield {
         kind: "tool-call",
         callId,

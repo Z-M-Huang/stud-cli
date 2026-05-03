@@ -91,6 +91,21 @@ function makeRequest(kind: InteractionRequest["kind"]): InteractionRequest {
         issuedAt: "t",
         payload: { kind, toolId: "bash", stageExecutionId: "se1", argsDigest: "d" },
       };
+    case "approveSubagentEnvelope":
+      return {
+        kind,
+        correlationId: "c-subagent-envelope",
+        issuedAt: "t",
+        payload: {
+          kind,
+          subagentId: "s1",
+          parentSessionId: "p1",
+          depth: 1,
+          requestedEnvelope: ["read"],
+          promptSummary: "...",
+          model: { providerId: "anthropic", modelId: "haiku" },
+        },
+      };
   }
 }
 
@@ -102,6 +117,7 @@ const ALL_KINDS = [
   "Auth.DeviceCode",
   "Auth.Password",
   "grantStageTool",
+  "approveSubagentEnvelope",
 ] as const;
 
 function assertHaltFor(kind: InteractionRequest["kind"], yolo: boolean): void {

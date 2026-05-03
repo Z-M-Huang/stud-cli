@@ -11,6 +11,7 @@ import type { SecurityMode, Settings as ContractSettings } from "../../contracts
 import type { ToolTerminal } from "../../core/errors/index.js";
 import type { HostAPI } from "../../core/host/host-api.js";
 import type { Settings as CoreSettings } from "../../core/settings/shape.js";
+import type { ProviderModelLookup } from "../../core/subagent/spawn.js";
 import type { AnthropicConfig } from "../../extensions/providers/anthropic/config.schema.js";
 import type { CLIWrapperConfig } from "../../extensions/providers/cli-wrapper/config.schema.js";
 import type { GeminiConfig } from "../../extensions/providers/gemini/config.schema.js";
@@ -56,9 +57,20 @@ export interface AgentoolLike {
   readonly execute?: unknown;
 }
 
+/**
+ * Runtime audit record shape — one of three audit shapes in the codebase
+ * (the others are `core/observability/audit/classes.ts:AuditRecord<K>` and
+ * `core/host/api/audit.ts:AuditRecord`). All three carry the optional
+ * `parentSessionId`, `subagentId`, `depth` attribution fields per
+ * wiki/operations/Audit-Trail.md (1.2.0) §AuditRecord fields, populated on
+ * every record emitted from a subagent child session.
+ */
 export interface AuditRecord {
   readonly type: string;
   readonly at: string;
+  readonly parentSessionId?: string;
+  readonly subagentId?: string;
+  readonly depth?: number;
   readonly [key: string]: unknown;
 }
 
@@ -103,7 +115,83 @@ export interface LoadedTool {
   execute(args: unknown, toolCallId: string): Promise<RuntimeToolResult>;
   readonly gated: boolean;
   readonly approvalScope: "exact" | "path" | "path-set";
+  /**
+   * Optional preflight validator. Runs **before** `ensureToolApproval` and
+   * **before** `deriveApprovalKey` (so the validator's `canonicalArgs` shape
+   * what the approval-key sees). Most tools register no preflight — the
+   * resolver treats absence as `{ ok: true, canonicalArgs: args }`.
+   *
+   * The bundled `delegate` tool uses preflight to (1) reject invalid spawns
+   * before any IP fires (depth, model, envelope) and (2) canonicalize the
+   * resolved `(providerId, modelId)` into `args.model` so `deriveApprovalKey`
+   * stays pure-of-args per `contracts/Tools.md` §`deriveApprovalKey`. Wiki:
+   * reference-extensions/tools/Delegate-Tool.md §Validation order.
+   */
+  preflight?(args: unknown, ctx: ToolPreflightContext): Promise<ToolPreflightResult>;
+  /**
+   * Optional executor that receives a session-scoped `HostAPI`. The runtime
+   * resolver prefers `executeWithHost` when present; otherwise falls back to
+   * `execute(args, toolCallId)`. Bundled in-tree tools that integrate with
+   * core's host machinery (e.g., `delegate`'s `host.session.openChild`) use
+   * this overload. Existing agentool-sourced tools remain unchanged.
+   */
+  executeWithHost?(
+    args: unknown,
+    toolCallId: string,
+    host: HostAPI,
+    signal: AbortSignal,
+  ): Promise<RuntimeToolResult>;
 }
+
+/**
+ * Context passed to a tool's optional `preflight` validator. Carries the
+ * minimal session-shaped data the validator needs to canonicalize args and
+ * reject invalid invocations before any approval prompt fires.
+ *
+ * Currently used only by the bundled `delegate` tool (Phase F of the
+ * subagent implementation per
+ * /home/ubuntu/.claude/plans/ultrathink-we-have-a-magical-gem.md).
+ */
+export interface ToolPreflightContext {
+  readonly host: HostAPI;
+  /** Current session's depth in the delegation chain (0 = orchestrator). */
+  readonly currentDepth: number;
+  /** Active provider/model on the current session — the inherited fallback. */
+  readonly parentProviderId: string;
+  readonly parentModelId: string;
+  /** Currently-active tool manifest (flat names) for envelope subset checks. */
+  readonly activeToolNames: readonly string[];
+  /**
+   * Provider/model lookup for delegate's model-validation preflight (D15).
+   * When omitted, the bundled `delegate` falls back to a permissive
+   * parent-only lookup. The runtime supplies a settings-backed lookup so
+   * cross-provider overrides validate correctly.
+   */
+  readonly providerModelLookup?: ProviderModelLookup;
+  /**
+   * Resolved `delegate.maxDepth` from layered settings (or default). Used
+   * by delegate's preflight to enforce the depth cap before any IP fires.
+   */
+  readonly maxDepth?: number;
+}
+
+/**
+ * Result of a tool's optional `preflight` validator.
+ *
+ * On `ok: true`, the resolver continues with `canonicalArgs` — this becomes
+ * the input to `deriveApprovalKey`, `ensureToolApproval`, and the executor.
+ * On `denied`, the resolver short-circuits with a typed `ToolTerminal` error
+ * — **no IP fires** in this branch (depth/envelope/model rejections never
+ * prompt the user per the wiki's "no IP fires on validation failure" rule).
+ * On `earlyReturn`, the resolver short-circuits with a SUCCESSFUL tool
+ * result whose value is the supplied payload — used by tools like `delegate`
+ * whose contract surfaces typed-aborted shapes (`{aborted: ...}`) as a
+ * normal tool return rather than a tool error. **No IP fires** here either.
+ */
+export type ToolPreflightResult =
+  | { readonly ok: true; readonly canonicalArgs: unknown }
+  | { readonly denied: ToolTerminal }
+  | { readonly earlyReturn: unknown };
 
 export interface SessionBootstrap {
   readonly sessionId: string;

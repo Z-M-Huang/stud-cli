@@ -81,7 +81,8 @@ export type InteractionKind =
   | "Auth.DeviceCode"
   | "Auth.Password"
   | "Confirm"
-  | "grantStageTool";
+  | "grantStageTool"
+  | "approveSubagentEnvelope";
 
 /**
  * A typed request from core to every active interactor.
@@ -95,6 +96,15 @@ export interface InteractionRequest {
   readonly correlationId: string;
   readonly prompt: string;
   readonly payload: Readonly<Record<string, unknown>>;
+  /**
+   * Subagent attribution fields. Present iff the request originates inside a
+   * child session. Interactors MUST surface these in the dialog so users can
+   * attribute each prompt to the agent that raised it. Wiki:
+   * core/Interaction-Protocol.md (1.1.0) §Common attribution fields and
+   * core/Subagent-Sessions.md §Attribution in dialogs.
+   */
+  readonly parentSessionId?: string;
+  readonly subagentId?: string;
 }
 
 /**

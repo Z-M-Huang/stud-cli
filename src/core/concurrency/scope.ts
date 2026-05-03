@@ -1,8 +1,16 @@
 /**
  * Cancellation scope tree.
  *
- * Four scope kinds model the four granularities at which work can be cancelled:
- *   session > turn > stage > tool
+ * Five scope kinds model the granularities at which work can be cancelled:
+ *   session > child-session > turn > stage > tool
+ *
+ * `child-session` sits between `session` and `turn`. A subagent's child
+ * session is a descendant of the parent session scope; the child's turn
+ * scope is a descendant of the child-session scope. Cancelling the parent
+ * session cascades through every running child session per
+ * wiki/core/Subagent-Sessions.md §Cancellation cascade. Child cancel does
+ * NOT cascade upward — the parent's `delegate` tool call observes a
+ * `Subagent/Aborted` typed result and the parent turn continues.
  *
  * Each scope owns its own AbortController. Cancelling a scope cancels all
  * descendant scopes in creation order. Cancelling a child does NOT cancel
@@ -21,7 +29,7 @@ import { Cancellation } from "../errors/index.js";
 // Public types
 // ---------------------------------------------------------------------------
 
-export type ScopeKind = "tool" | "stage" | "turn" | "session";
+export type ScopeKind = "tool" | "stage" | "turn" | "child-session" | "session";
 
 export type CancelReason = "user" | "parent" | "cap";
 
@@ -98,6 +106,13 @@ function buildScope(kind: ScopeKind, parentSignal: AbortSignal | undefined): Sco
 function scopeCodeForKind(kind: ScopeKind): string {
   switch (kind) {
     case "session":
+      return "SessionCancelled";
+    case "child-session":
+      // Wiki/core/Subagent-Sessions.md §Cancellation cascade: a child-session
+      // cancel surfaces to the parent's `delegate` tool call as
+      // `Subagent/Aborted`. The cancellation token itself uses the
+      // session-cancellation code; the `delegate` executor maps it to the
+      // public typed result.
       return "SessionCancelled";
     case "turn":
       return "TurnCancelled";

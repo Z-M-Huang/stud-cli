@@ -20,6 +20,10 @@ export const AUDIT_CLASSES = [
   // record a redacted delta per path; `RuntimeParamsNotResumed` is also a
   // Params-class record emitted on resume.
   "Params",
+  // Wiki: operations/Audit-Trail.md (1.2.0) § "SubagentExecution audit class";
+  // core/Subagent-Sessions.md §Audit chain. Records the lifecycle of every
+  // subagent (child) session opened via the bundled `delegate` tool.
+  "SubagentExecution",
 ] as const;
 
 export type AuditClass = (typeof AUDIT_CLASSES)[number];
@@ -94,6 +98,89 @@ export type ToolInvocationPayload =
     };
 
 /**
+ * Payload variants for the `SubagentExecution` audit class. Wiki:
+ * `operations/Audit-Trail.md` (1.2.0) §SubagentExecution and
+ * `core/Subagent-Sessions.md` §Audit chain. Every record is emitted from the
+ * orchestrator session's audit stream and carries the parent/child
+ * attribution fields (`parentSessionId`, `subagentId`, `depth`) on the
+ * `AuditRecord` envelope itself.
+ *
+ * `SubagentSpawned` carries the requested + approved envelopes verbatim and
+ * the resolved `(providerId, modelId)` so reviewers see what model the user
+ * authorized — including `delegate.model` overrides per
+ * Subagent-Sessions §Model selection (1.1.0).
+ */
+export type SubagentExecutionPayload =
+  | {
+      readonly kind: "SubagentSpawned";
+      readonly parentSessionId: string;
+      readonly subagentId: string;
+      readonly depth: number;
+      readonly requestedEnvelope: readonly string[];
+      readonly approvedEnvelope: readonly string[];
+      readonly providerId: string;
+      readonly modelId: string;
+      readonly note?: string;
+    }
+  | {
+      readonly kind: "SubagentEnvelopeApproved";
+      readonly parentSessionId: string;
+      readonly subagentId: string;
+      readonly depth: number;
+      readonly requestedEnvelope: readonly string[];
+      readonly approvedEnvelope: readonly string[];
+      readonly providerId: string;
+      readonly modelId: string;
+      readonly note?: string;
+    }
+  | {
+      readonly kind: "SubagentEnvelopeDenied";
+      readonly parentSessionId: string;
+      readonly subagentId: string;
+      readonly depth: number;
+      readonly requestedEnvelope: readonly string[];
+      readonly note?: string;
+    }
+  | {
+      readonly kind: "SubagentEscalated";
+      readonly parentSessionId: string;
+      readonly subagentId: string;
+      readonly depth: number;
+      readonly toolName: string;
+      readonly approvalKey: string;
+    }
+  | {
+      readonly kind: "SubagentCompleted";
+      readonly parentSessionId: string;
+      readonly subagentId: string;
+      readonly depth: number;
+      readonly resultDigest?: string;
+    }
+  | {
+      readonly kind: "SubagentHalted";
+      readonly parentSessionId: string;
+      readonly subagentId: string;
+      readonly depth: number;
+      readonly requestKind: string;
+      readonly correlationId: string;
+    }
+  | {
+      readonly kind: "SubagentAborted";
+      readonly parentSessionId: string;
+      readonly subagentId: string;
+      readonly depth: number;
+      readonly reason:
+        | "parentCancel"
+        | "depthExceeded"
+        | "envelopeDenied"
+        | "envelopeInvalid"
+        | "modelInvalid"
+        | "modelCapabilityMismatch"
+        | "crash"
+        | "providerFailure";
+    };
+
+/**
  * Payload variants for the `Params` audit class. Wiki:
  * `operations/Audit-Trail.md` lines 66, 131-139, 212. The shape is a redacted
  * delta — `paramPath`, `sourceLayer`, and a `redactedValue` shape-marker
@@ -158,13 +245,34 @@ export interface AuditPayloads {
   readonly ProviderExchange: ProviderExchangePayload;
   readonly ToolInvocation: ToolInvocationPayload;
   readonly SuppressedError: { readonly reason: string; readonly cause: string };
+  readonly SubagentExecution: SubagentExecutionPayload;
 }
 
+/**
+ * Subagent attribution fields on every audit record emitted from a child
+ * session. Wiki: operations/Audit-Trail.md (1.2.0) §AuditRecord fields and
+ * core/Subagent-Sessions.md §Audit chain.
+ *
+ * - `parentSessionId` — orchestrator's `sessionId`. Absent on records from the
+ *   orchestrator session itself.
+ * - `subagentId` — session-unique identifier minted at the child's `Requested`
+ *   lifecycle state. Absent on parent-session records.
+ * - `depth` — orchestrator is depth 0; first-level subagents are depth 1.
+ *   Records from the orchestrator session carry depth 0 implicitly when
+ *   omitted, but may be set explicitly for uniformity.
+ *
+ * The runtime audit shape (`src/cli/runtime/types.ts:AuditRecord`) and the
+ * host-API write surface (`src/core/host/api/audit.ts:AuditRecord`) carry the
+ * same three fields. Three shapes; one source of truth on field meanings.
+ */
 export interface AuditRecord<K extends AuditClass = AuditClass> {
   readonly class: K;
   readonly correlationId: string;
   readonly timestamp: number;
   readonly payload: AuditPayloads[K];
+  readonly parentSessionId?: string;
+  readonly subagentId?: string;
+  readonly depth?: number;
 }
 
 export function listAuditClasses(): readonly AuditClass[] {

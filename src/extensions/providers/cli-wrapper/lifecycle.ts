@@ -1,6 +1,7 @@
 import { access, constants } from "node:fs/promises";
 
 import { Validation } from "../../../core/errors/validation.js";
+import { lookupHostState } from "../../../core/host/host-api.js";
 
 import type { CLIWrapperConfig } from "./config.schema.js";
 import type { HostAPI } from "../../../core/host/host-api.js";
@@ -10,7 +11,9 @@ const configsByHost = new WeakMap<HostAPI, CLIWrapperConfig>();
 const disposedHosts = new WeakSet<HostAPI>();
 
 export function configForHost(host: HostAPI): CLIWrapperConfig | undefined {
-  return configsByHost.get(host);
+  // Walk the HOST_UNWRAP chain so wrapped hosts (per-subagent child)
+  // resolve to the parent host's config.
+  return lookupHostState(host, (h) => configsByHost.get(h));
 }
 
 function toValidationError(message: string, field: string): Validation {

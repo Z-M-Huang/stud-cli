@@ -1,7 +1,13 @@
 import { render, type Instance } from "ink";
 import React from "react";
 
+import { subscribeRendererToBus } from "./bus-subscribers.js";
+// Re-export so existing test imports from `./mount.js` keep resolving;
+// the implementation lives in bus-subscribers.ts to satisfy the per-file
+// line cap on this module.
+export { subscribeRendererToBus } from "./bus-subscribers.js";
 import { createSelectManager } from "./dialogs/select-manager.js";
+import { bindFallbackInteractor } from "./fallback-interactor.js";
 import { DEFAULT_INK_FRAME_HINT, type ComposerKey, type PaletteEntry } from "./ink-app.js";
 import { createApprovalManager } from "./ink-approval.js";
 import { createComposerController } from "./ink-composer.js";
@@ -15,6 +21,11 @@ import {
   type InputQueue,
 } from "./ink-store.js";
 import {
+  createUIRegionRegistry,
+  type UIRegionContribution,
+  type UIRegionRegistry,
+} from "./regions.js";
+import {
   createDefaultConsoleUI,
   type ConsoleSessionView,
   type DefaultConsoleUI,
@@ -23,19 +34,7 @@ import { defaultTheme } from "./theme.js";
 
 import type { ApprovalDecision } from "./approval-dialog.js";
 import type { PromptIO } from "../../../cli/prompt.js";
-import type { EventBus, EventEnvelope } from "../../../core/events/bus.js";
-import type {
-  ProviderReasoningStreamedPayload,
-  ProviderRequestCompletedPayload,
-  ProviderRequestFailedPayload,
-  ProviderRequestStartedPayload,
-  ProviderTokensStreamedPayload,
-  ToolInvocationCancelledPayload,
-  ToolInvocationFailedPayload,
-  ToolInvocationProposedPayload,
-  ToolInvocationStartedPayload,
-  ToolInvocationSucceededPayload,
-} from "../../../core/events/payloads.js";
+import type { EventBus } from "../../../core/events/bus.js";
 import type { RuntimeReader } from "../../../core/host/api/metrics.js";
 
 /**
@@ -80,6 +79,8 @@ export interface MountedTUI extends Omit<DefaultConsoleUI, "renderToolStart" | "
    * frame.
    */
   renderNotice(text: string): void;
+  /** Register a region contribution; see wiki/Default-TUI.md §UI regions. */
+  registerRegion(contribution: UIRegionContribution): void;
 }
 
 export interface ToolApprovalRequest {
@@ -115,9 +116,24 @@ interface MountOptions {
   readonly eventBus?: EventBus;
 }
 
+async function awaitNextInput(
+  queue: InputQueue,
+  actions: { setTurnActive: (active: boolean) => void },
+): Promise<string> {
+  actions.setTurnActive(false);
+  const text = await queue.enqueue();
+  actions.setTurnActive(true);
+  return text;
+}
+
 function fallbackMount(opts: MountOptions): MountedTUI {
   const ui = createDefaultConsoleUI({ stdout: opts.stdout });
+  const regionRegistry = createUIRegionRegistry();
   let promptLabel = "you";
+  // Headless / non-Ink fallback: bind the IP Authority's InteractionRaised
+  // events to the headless prompt so `approveSubagentEnvelope` etc resolve
+  // (or emit-and-halt) instead of hanging forever.
+  if (opts.eventBus !== undefined) bindFallbackInteractor(opts.eventBus, opts.fallbackPrompt);
   const echoUserMessage = (text: string): void => {
     const stamp = clockString(new Date());
     opts.stdout.write(`\nyou  ${stamp}\n  ${text}\n`);
@@ -170,6 +186,9 @@ function fallbackMount(opts: MountOptions): MountedTUI {
       // can assert on stdout.
       opts.stdout.write(`${text}\n`);
     },
+    registerRegion(contribution) {
+      regionRegistry.register(contribution);
+    },
     renderStatusLine(items) {
       ui.renderStatusLine(items);
     },
@@ -217,15 +236,9 @@ function startInkRender(
   internals: {
     readonly store: InkStore;
     readonly onComposerKey: (input: string, key: ComposerKey) => void;
+    readonly regionRegistry: UIRegionRegistry;
   },
 ): Instance {
-  // The readline-based fallback prompt is left ALIVE during the Ink session.
-  // Closing readline before Ink finishes mounting causes Node to exit the
-  // event loop (stdin is briefly without a consumer). Ink's `useInput` runs
-  // stdin in raw mode; readline's line-mode parser consumes the same bytes
-  // but cannot complete a line, so its handlers stay quiescent. Runtime tool
-  // approval is handled by the Ink dialog while mounted; startup/trust prompts
-  // continue to use PromptIO before or after the Ink lifecycle.
   return render(
     <Root
       store={internals.store}
@@ -233,6 +246,7 @@ function startInkRender(
       theme={defaultTheme(opts.stdout)}
       hint={DEFAULT_INK_FRAME_HINT}
       onComposerKey={internals.onComposerKey}
+      regionRegistry={internals.regionRegistry}
     />,
     {
       stdout: opts.stdout,
@@ -251,6 +265,8 @@ function startInkRender(
 function inkMount(opts: MountOptions): MountedTUI {
   const internals: InkMountInternals = createInkInternals(opts);
   let unmounted = false;
+  // Region registry per Phase D — Phase G adds the side-door slot.
+  const regionRegistry = createUIRegionRegistry();
   const approval = createApprovalManager({
     store: internals.store,
     isUnmounted: () => unmounted,
@@ -279,13 +295,18 @@ function inkMount(opts: MountOptions): MountedTUI {
   internals.instance = startInkRender(opts, {
     store: internals.store,
     onComposerKey: (input, key) => composer.onKey(input, key),
+    regionRegistry,
   });
+  // Subscribe the queue-depth signal to the renderer so the user sees
+  // "{N} queued" as messages typed mid-turn buffer up.
+  internals.queue.onChange((depth) => actions.setQueueDepth(depth));
   return inkMountedTUI({
     opts,
     internals,
     approval,
     ...(select !== undefined ? { select } : {}),
     actions,
+    regionRegistry,
     isUnmounted: () => unmounted,
     markUnmounted: () => {
       unmounted = true;
@@ -308,10 +329,12 @@ function inkMountedTUI(args: {
   readonly approval: ReturnType<typeof createApprovalManager>;
   readonly select?: ReturnType<typeof createSelectManager>;
   readonly actions: ReturnType<typeof createInkMountActions>;
+  readonly regionRegistry: UIRegionRegistry;
   readonly isUnmounted: () => boolean;
   readonly markUnmounted: () => void;
 }): MountedTUI {
-  const { opts, internals, approval, select, actions, isUnmounted, markUnmounted } = args;
+  const { opts, internals, approval, select, actions, regionRegistry, isUnmounted, markUnmounted } =
+    args;
   return {
     renderSessionStart(session: ConsoleSessionView): void {
       actions.renderSessionStart(session, {
@@ -341,11 +364,15 @@ function inkMountedTUI(args: {
       actions.renderToolEnd(toolCallId, toolName, status, summary),
     renderTurnError: (message) => actions.renderTurnError(message),
     renderNotice: (text) => actions.renderNotice(text),
+    registerRegion: (contribution) => regionRegistry.register(contribution),
     renderStatusLine: (items) => actions.renderStatusLine(items),
     setPalette: (entries) => actions.setPalette(entries),
     clearPalette: () => actions.clearPalette(),
     requestApproval: (request) => approval.enqueue(request),
-    waitForInput: () => internals.queue.enqueue(),
+    // turnActive flips off while the session-loop awaits the next user
+    // input here, then back on when it resolves and the orchestrator
+    // resumes work — drives the busy hint on the composer.
+    waitForInput: () => awaitNextInput(internals.queue, actions),
     async unmount() {
       if (isUnmounted()) return;
       markUnmounted();
@@ -375,94 +402,6 @@ function inkSupported(stdout: NodeJS.WriteStream, stdin: NodeJS.ReadableStream):
 
 function tooLargeForInk(stdout: NodeJS.WriteStream): boolean {
   return !(typeof stdout.columns === "number" && typeof stdout.rows === "number");
-}
-
-/**
- * Wire the cross-extension event bus to the renderer's writer methods. The
- * bundled TUI becomes a normal subscriber: every provider-stream / tool-
- * lifecycle event mutates the same Ink (or console-fallback) state that the
- * imperative methods would. Tests that call the writer methods directly
- * still work — the bus is an alternative entry, not a replacement.
- *
- * Exported for tests (so they can verify event-to-method wiring without
- * also spinning up an Ink renderer or readline prompt).
- */
-export function subscribeRendererToBus(bus: EventBus, target: MountedTUI): void {
-  bus.on(
-    "ProviderRequestStarted",
-    (_env: EventEnvelope<"ProviderRequestStarted", ProviderRequestStartedPayload>) => {
-      target.beginAssistant();
-    },
-  );
-  bus.on(
-    "ProviderTokensStreamed",
-    (env: EventEnvelope<"ProviderTokensStreamed", ProviderTokensStreamedPayload>) => {
-      target.appendAssistantDelta(env.payload.delta);
-    },
-  );
-  bus.on(
-    "ProviderReasoningStreamed",
-    (env: EventEnvelope<"ProviderReasoningStreamed", ProviderReasoningStreamedPayload>) => {
-      target.appendThinkingDelta(env.payload.delta);
-    },
-  );
-  bus.on(
-    "ProviderRequestCompleted",
-    (_env: EventEnvelope<"ProviderRequestCompleted", ProviderRequestCompletedPayload>) => {
-      target.endAssistant();
-    },
-  );
-  bus.on(
-    "ProviderRequestFailed",
-    (_env: EventEnvelope<"ProviderRequestFailed", ProviderRequestFailedPayload>) => {
-      // The outer turn-level catch in `runProviderSession` is the canonical
-      // user-facing error renderer (it covers persistence and orchestrator
-      // failures, not just provider ones). The subscriber's only job is to
-      // commit any partial assistant draft so the next iteration starts from
-      // a clean state.
-      target.endAssistant();
-    },
-  );
-  bus.on(
-    "ToolInvocationProposed",
-    (env: EventEnvelope<"ToolInvocationProposed", ToolInvocationProposedPayload>) => {
-      target.appendAssistantToolCall(env.payload.toolName);
-    },
-  );
-  bus.on(
-    "ToolInvocationStarted",
-    (env: EventEnvelope<"ToolInvocationStarted", ToolInvocationStartedPayload>) => {
-      target.renderToolStart(env.payload.toolCallId, env.payload.toolName, env.payload.argsSummary);
-    },
-  );
-  bus.on(
-    "ToolInvocationSucceeded",
-    (env: EventEnvelope<"ToolInvocationSucceeded", ToolInvocationSucceededPayload>) => {
-      target.renderToolEnd(env.payload.toolCallId, env.payload.toolName, "completed");
-    },
-  );
-  bus.on(
-    "ToolInvocationFailed",
-    (env: EventEnvelope<"ToolInvocationFailed", ToolInvocationFailedPayload>) => {
-      target.renderToolEnd(
-        env.payload.toolCallId,
-        env.payload.toolName,
-        "failed",
-        env.payload.message,
-      );
-    },
-  );
-  bus.on(
-    "ToolInvocationCancelled",
-    (env: EventEnvelope<"ToolInvocationCancelled", ToolInvocationCancelledPayload>) => {
-      target.renderToolEnd(
-        env.payload.toolCallId,
-        env.payload.toolName,
-        "cancelled",
-        env.payload.reason,
-      );
-    },
-  );
 }
 
 export function mountTUI(opts: MountOptions): MountedTUI {

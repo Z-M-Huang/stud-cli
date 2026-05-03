@@ -5,6 +5,11 @@ import { ExtensionHost } from "../../../src/core/errors/index.js";
 import { createRuntimeCollector } from "../../../src/core/host/internal/runtime-collector.js";
 import { schedule } from "../../../src/core/sm/scheduler.js";
 import { runStage } from "../../../src/core/sm/stage-executor.js";
+import {
+  auditActiveSubagentsStub,
+  auditQueryStub,
+  openChildStub,
+} from "../../helpers/subagent-stubs.js";
 
 import type { StageDefinition } from "../../../src/contracts/state-machines.js";
 import type { HostAPI } from "../../../src/core/host/host-api.js";
@@ -74,6 +79,7 @@ function makeHost(stages: readonly RuntimeStage[], events: string[] = []): Fixtu
       mode: "ask",
       projectRoot: "/tmp/.stud",
       stateSlot: () => ({ read: () => Promise.resolve(null), write: () => Promise.resolve() }),
+      openChild: openChildStub,
     },
     events: {
       on: () => undefined,
@@ -98,7 +104,11 @@ function makeHost(stages: readonly RuntimeStage[], events: string[] = []): Fixtu
       listTools: () => [],
       callTool: () => Promise.resolve({ content: [], isError: false }),
     },
-    audit: { write: () => Promise.resolve() },
+    audit: {
+      write: () => Promise.resolve(),
+      query: auditQueryStub,
+      activeSubagents: auditActiveSubagentsStub,
+    },
     observability: { emit: () => undefined, suppress: () => undefined },
     interaction: { raise: () => Promise.resolve({ value: "yes" }) },
     commands: { list: () => [], complete: () => [], dispatch: () => Promise.resolve({ ok: true }) },

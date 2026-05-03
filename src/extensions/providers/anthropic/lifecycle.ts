@@ -1,3 +1,5 @@
+import { lookupHostState } from "../../../core/host/host-api.js";
+
 import type { AnthropicConfig } from "./config.schema.js";
 import type { HostAPI } from "../../../core/host/host-api.js";
 
@@ -5,7 +7,9 @@ const configsByHost = new WeakMap<HostAPI, AnthropicConfig>();
 const disposedHosts = new WeakSet<HostAPI>();
 
 export function configForHost(host: HostAPI): AnthropicConfig | undefined {
-  return configsByHost.get(host);
+  // Walk the HOST_UNWRAP chain so wrapped hosts (per-subagent child)
+  // resolve to the parent host's config.
+  return lookupHostState(host, (h) => configsByHost.get(h));
 }
 
 export async function init(host: HostAPI, config: AnthropicConfig): Promise<void> {

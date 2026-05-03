@@ -19,9 +19,11 @@ import type {
   ResolvedShellDeps,
   RuntimeToolResult,
   SessionBootstrap,
+  ToolPreflightContext,
 } from "./types.js";
 import type { ProviderContentPart } from "../../contracts/providers.js";
 import type { HostAPI } from "../../core/host/host-api.js";
+import type { ProviderModelLookup } from "../../core/subagent/spawn.js";
 import type { MountedTUI } from "../../extensions/ui/default-tui/mount.js";
 import type { PromptIO } from "../prompt.js";
 
@@ -38,6 +40,41 @@ export interface ResolveToolCallArgs {
   readonly host: HostAPI;
   readonly ui: MountedTUI;
   readonly auditBus: SessionAuditBus;
+  /**
+   * Subagent envelope when the call originates from a child session. The
+   * resolver forwards this through the approval pipeline so in-envelope
+   * tools bypass the mode gate (`source: "subagent-envelope"`) per
+   * wiki/security/Tool-Approvals.md (1.1.0).
+   */
+  readonly subagentEnvelope?: ReadonlySet<string>;
+  /**
+   * Pre-built preflight context. When omitted, the resolver derives one
+   * from the live session selection. Tests may inject a deterministic
+   * value.
+   */
+  readonly preflightContext?: ToolPreflightContext;
+  /**
+   * Cancellation signal for `executeWithHost` tool implementations. When
+   * omitted, a fresh `AbortController().signal` is used (no cancellation).
+   */
+  readonly signal?: AbortSignal;
+  /**
+   * Current session's depth in the delegation chain. 0 for the orchestrator;
+   * `record.depth` for a child session. Threaded into the preflight context
+   * so a tool's preflight (e.g., `delegate`) can enforce the depth cap
+   * correctly under nested delegation.
+   */
+  readonly currentDepth?: number;
+  /**
+   * Provider/model lookup used by tools whose preflight resolves
+   * `(providerId, modelId)` against the configured providers map. The
+   * runtime supplies a settings-backed lookup; tests may inject a stub.
+   */
+  readonly providerModelLookup?: ProviderModelLookup;
+  /**
+   * Resolved `delegate.maxDepth` from layered settings (or default).
+   */
+  readonly maxDepth?: number;
 }
 
 interface CallContext {
@@ -143,6 +180,50 @@ function rejectApprovalDenied(ctx: CallContext, tool: LoadedTool): RuntimeToolRe
   };
 }
 
+function rejectPreflightDenied(
+  ctx: CallContext,
+  tool: LoadedTool,
+  error: ToolTerminal,
+): RuntimeToolResult {
+  const durationMs = elapsed(ctx);
+  const code = typeof error.context["code"] === "string" ? error.context["code"] : "Forbidden";
+  // Preflight rejection MUST NOT raise an IP request — wiki/reference-
+  // extensions/tools/Delegate-Tool.md §Validation order: depth/envelope/model
+  // failures never surface a prompt.
+  ctx.auditBus.emit("ToolCallFailed", {
+    ...callBase(ctx.call),
+    durationMs,
+    reason: "preflight-denied",
+    code,
+    message: error.message,
+  });
+  ctx.host.events.emit("ToolInvocationFailed", {
+    toolCallId: ctx.call.toolCallId,
+    toolName: tool.id,
+    durationMs,
+    errorClass: "ToolTerminal",
+    errorCode: code,
+    message: error.message,
+  });
+  return { ok: false, error };
+}
+
+function buildPreflightContext(args: ResolveToolCallArgs): ToolPreflightContext {
+  if (args.preflightContext !== undefined) return args.preflightContext;
+  const sel = args.session.selection.current();
+  return {
+    host: args.host,
+    currentDepth: args.currentDepth ?? 0,
+    parentProviderId: sel.entryId,
+    parentModelId: sel.modelId,
+    activeToolNames: Array.from(args.toolMap.keys()),
+    ...(args.providerModelLookup !== undefined
+      ? { providerModelLookup: args.providerModelLookup }
+      : {}),
+    ...(args.maxDepth !== undefined ? { maxDepth: args.maxDepth } : {}),
+  };
+}
+
 function emitExecutionLifecycle(args: {
   readonly ctx: CallContext;
   readonly tool: LoadedTool;
@@ -205,16 +286,49 @@ export async function resolveToolCallResult(args: ResolveToolCallArgs): Promise<
     return rejectNormalizationFailed(ctx, normalized);
   }
 
+  // Preflight runs BEFORE the approval gate so depth/envelope/model
+  // rejections never raise an IP request (wiki/reference-extensions/tools/
+  // Delegate-Tool.md §Validation order). On `ok`, `canonicalArgs` becomes
+  // the input to `deriveApprovalKey`, the approval gate, and the executor —
+  // preserving `deriveApprovalKey(args)` purity per contracts/Tools.md.
+  // On `earlyReturn`, the tool's contract surfaces a typed payload (e.g.,
+  // `delegate`'s `{aborted: ...}`) without ever invoking the executor.
+  let canonicalArgs: unknown = normalized.value;
+  if (tool.preflight !== undefined) {
+    const preflightResult = await tool.preflight(normalized.value, buildPreflightContext(args));
+    if ("denied" in preflightResult) {
+      return rejectPreflightDenied(ctx, tool, preflightResult.denied);
+    }
+    if ("earlyReturn" in preflightResult) {
+      const value = preflightResult.earlyReturn;
+      const durationMs = ctx.deps.now().getTime() - ctx.startedAt;
+      ctx.auditBus.emit("ToolCallSucceeded", {
+        ...callBase(ctx.call),
+        normalizedArgs: normalized.value,
+        durationMs,
+        result: { ok: true, value },
+      });
+      ctx.host.events.emit("ToolInvocationSucceeded", {
+        toolCallId: ctx.call.toolCallId,
+        toolName: tool.id,
+        durationMs,
+      });
+      return { ok: true, value };
+    }
+    canonicalArgs = preflightResult.canonicalArgs;
+  }
+
   const approved = await ensureToolApproval({
     session: args.session,
     prompt: args.prompt,
     tool,
-    callArgs: normalized.value,
+    callArgs: canonicalArgs,
     workspaceRoot: args.workspaceRoot,
     cache: args.approvalCache,
     deps: args.deps,
     auditBus: args.auditBus,
     requestApproval: (request) => args.ui.requestApproval(request),
+    ...(args.subagentEnvelope !== undefined ? { subagentEnvelope: args.subagentEnvelope } : {}),
   });
   if (!approved) {
     return rejectApprovalDenied(ctx, tool);
@@ -225,11 +339,15 @@ export async function resolveToolCallResult(args: ResolveToolCallArgs): Promise<
     toolName: tool.id,
     argsSummary: formatToolArgs(args.call.args),
   });
-  const result = await tool.execute(normalized.value, args.call.toolCallId);
+  const signal = args.signal ?? new AbortController().signal;
+  const result =
+    tool.executeWithHost !== undefined
+      ? await tool.executeWithHost(canonicalArgs, args.call.toolCallId, args.host, signal)
+      : await tool.execute(canonicalArgs, args.call.toolCallId);
   emitExecutionLifecycle({
     ctx,
     tool,
-    normalizedArgs: normalized.value,
+    normalizedArgs: canonicalArgs,
     result,
     durationMs: ctx.deps.now().getTime() - ctx.startedAt,
   });

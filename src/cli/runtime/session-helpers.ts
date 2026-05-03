@@ -24,7 +24,18 @@ export function renderTurnError(session: SessionBootstrap, error: unknown): stri
       : error instanceof Error
         ? error.name
         : "Error";
+  const rawMessage = error instanceof Error ? error.message : "";
+  // Surface a one-line summary of the underlying message under the
+  // class/code header. Without this, generic codes like
+  // `ProviderTransient/NetworkTimeout` give the user no way to tell
+  // whether the failure is DNS, TLS, auth, etc. We deliberately TRUNCATE
+  // and STRIP stack/structured content because some upstream errors
+  // (notably AI SDK's ZodError) have multi-thousand-line `.message`
+  // bodies that would otherwise carpet-bomb the transcript. The full
+  // error chain is preserved in the audit JSONL — keep the UI succinct.
   const lines = [`assistant error [${klass}/${code}]`];
+  const summary = summarizeErrorMessage(rawMessage);
+  if (summary.length > 0) lines.push(`  ${summary}`);
 
   const selection = session.selection.current();
   if (selection.protocolId === "openai-compatible" && code === "EndpointNotFound") {
@@ -42,6 +53,30 @@ export function renderTurnError(session: SessionBootstrap, error: unknown): stri
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Produce a one-line, length-capped summary of an error's `.message`. The
+ * AI SDK throws ZodError (and other rich validation errors) whose
+ * `.message` is a multi-thousand-character JSON tree; some HTTP errors
+ * include the entire response body. Either would carpet-bomb the
+ * transcript and obscure other content. The audit log keeps the full
+ * payload — the UI gets the gist.
+ *
+ * Heuristic:
+ *   1. Trim leading/trailing whitespace.
+ *   2. Take everything before the first newline.
+ *   3. If that prefix still exceeds `MAX_RENDERED_MESSAGE`, truncate
+ *      with an ellipsis and a "(see audit log)" suffix so the user
+ *      knows where to find the full text.
+ */
+function summarizeErrorMessage(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return "";
+  const firstLine = trimmed.split(/\r?\n/u)[0] ?? trimmed;
+  const MAX_RENDERED_MESSAGE = 240;
+  if (firstLine.length <= MAX_RENDERED_MESSAGE) return firstLine;
+  return `${firstLine.slice(0, MAX_RENDERED_MESSAGE)}… (see audit log for full error)`;
 }
 
 export function assistantMessageContent(
