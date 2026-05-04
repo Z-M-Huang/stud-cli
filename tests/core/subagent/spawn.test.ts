@@ -47,7 +47,7 @@ function buildCtx(overrides: Partial<OpenChildContext> = {}): OpenChildContext {
   };
 }
 
-describe("validateSpawnArgs", () => {
+describe("validateSpawnArgs — acceptance and model validation", () => {
   it("accepts a minimal valid spawn (envelope omitted)", () => {
     const result = validateSpawnArgs(buildCtx(), { prompt: "do work" });
     assert.equal("ok" in result, true);
@@ -77,6 +77,22 @@ describe("validateSpawnArgs", () => {
     assert.equal(result.denied.context["code"], "Subagent/ModelInvalid");
   });
 
+  it("rejects unknown modelId under a known provider", () => {
+    const result = validateSpawnArgs(
+      buildCtx({
+        providerModelLookup: {
+          hasProvider: () => true,
+          hasModel: () => false,
+          satisfiesRequiredCapabilities: () => true,
+        },
+      }),
+      { prompt: "x", model: { providerId: "anthropic", modelId: "missing-model" } },
+    );
+    assert.equal("denied" in result, true);
+    if (!("denied" in result)) return;
+    assert.equal(result.denied.context["code"], "Subagent/ModelInvalid");
+  });
+
   it("rejects when model arg lacks modelId", () => {
     const result = validateSpawnArgs(buildCtx(), {
       prompt: "x",
@@ -86,7 +102,9 @@ describe("validateSpawnArgs", () => {
     if (!("denied" in result)) return;
     assert.equal(result.denied.context["code"], "Validation/InputInvalid");
   });
+});
 
+describe("validateSpawnArgs — envelope and capability validation", () => {
   it("rejects envelope members not in the active tool manifest", () => {
     const result = validateSpawnArgs(buildCtx(), {
       prompt: "x",
@@ -152,7 +170,7 @@ describe("validateSpawnArgs", () => {
   });
 });
 
-describe("openChild", () => {
+describe("openChild — success and validation mapping", () => {
   it("delegates to runChild after validation succeeds and unregisters on exit", async () => {
     const registry = createSessionSubagentRegistry();
     let runChildCalled = false;
@@ -194,6 +212,76 @@ describe("openChild", () => {
     assert.equal(result.outcome, "aborted");
     if (result.outcome !== "aborted") return;
     assert.equal(result.reason, "modelInvalid");
+  });
+
+  it("returns aborted with envelopeInvalid reason on bad requested envelope", async () => {
+    const result = await openChild(buildCtx(), {
+      prompt: "x",
+      requestedEnvelope: ["ssh"],
+    });
+    assert.equal(result.outcome, "aborted");
+    if (result.outcome !== "aborted") return;
+    assert.equal(result.reason, "envelopeInvalid");
+  });
+
+  it("returns aborted with modelCapabilityMismatch reason when capability negotiation fails", async () => {
+    const result = await openChild(
+      buildCtx({
+        providerModelLookup: {
+          hasProvider: () => true,
+          hasModel: () => true,
+          satisfiesRequiredCapabilities: () => false,
+        },
+      }),
+      { prompt: "x", requestedEnvelope: ["read"] },
+    );
+    assert.equal(result.outcome, "aborted");
+    if (result.outcome !== "aborted") return;
+    assert.equal(result.reason, "modelCapabilityMismatch");
+  });
+
+  it("maps other validation failures to providerFailure", async () => {
+    const result = await openChild(buildCtx(), { prompt: "sk-ant-abcde" });
+    assert.equal(result.outcome, "aborted");
+    if (result.outcome !== "aborted") return;
+    assert.equal(result.reason, "providerFailure");
+  });
+});
+
+describe("openChild — runtime cleanup", () => {
+  it("forwards the optional label into the spawned record", async () => {
+    let seenLabel: string | undefined;
+    const result = await openChild(
+      buildCtx({
+        runChild: ({ record }) => {
+          seenLabel = record.label;
+          return Promise.resolve({
+            outcome: "completed",
+            subagentId: record.subagentId,
+            result: "done",
+            transcriptRef: `subagent:${record.subagentId}`,
+          });
+        },
+      }),
+      { prompt: "go", label: "reviewer" },
+    );
+    assert.equal(result.outcome, "completed");
+    assert.equal(seenLabel, "reviewer");
+  });
+
+  it("always clears the registry when runChild rejects", async () => {
+    const registry = createSessionSubagentRegistry();
+    await assert.rejects(
+      openChild(
+        buildCtx({
+          registry,
+          runChild: () => Promise.reject(new Error("boom")),
+        }),
+        { prompt: "go" },
+      ),
+      /boom/u,
+    );
+    assert.equal(registry.size(), 0);
   });
 });
 

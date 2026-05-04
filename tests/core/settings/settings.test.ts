@@ -233,6 +233,16 @@ describe("mergeSettings — per-category map project override", () => {
     assert.equal(merged.runtime?.continuation?.maxIterations, 50);
   });
 
+  it("does not invent empty securityMode fields or continuation blocks", () => {
+    const merged = mergeSettings(
+      { securityMode: {}, runtime: {} } as unknown as Parameters<typeof mergeSettings>[0],
+      undefined,
+      undefined,
+    );
+    assert.deepEqual(merged.securityMode, {});
+    assert.deepEqual(merged.runtime, {});
+  });
+
   it("handles all-undefined scopes", () => {
     const merged = mergeSettings(undefined, undefined, undefined);
     assert.deepEqual(merged, {});

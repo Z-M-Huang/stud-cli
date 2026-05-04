@@ -58,6 +58,13 @@ describe("SessionSubagentRegistry", () => {
     assert.equal(record?.subagentId, "a");
   });
 
+  it("transition is a no-op for an unknown subagent id", () => {
+    const registry = createSessionSubagentRegistry();
+    registry.transition("missing", "Running");
+    assert.equal(registry.size(), 0);
+    assert.equal(registry.get("missing"), undefined);
+  });
+
   it("terminate removes the record", () => {
     const registry = createSessionSubagentRegistry();
     registry.spawn(
@@ -86,5 +93,18 @@ describe("SessionSubagentRegistry", () => {
     });
     assert.equal(record.state, "Requested");
     assert.equal(record.label, undefined);
+  });
+
+  it("buildSubagentRecord preserves label when provided", () => {
+    const record = buildSubagentRecord({
+      subagentId: "x",
+      parentSessionId: "p",
+      depth: 2,
+      model: { providerId: "anthropic", modelId: "m" },
+      approvedEnvelope: ["edit"],
+      label: "worker",
+      spawnedAt: 42,
+    });
+    assert.equal(record.label, "worker");
   });
 });

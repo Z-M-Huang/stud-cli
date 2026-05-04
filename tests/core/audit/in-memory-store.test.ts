@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import { createAuditRecordStore } from "../../../src/core/audit/in-memory-store.js";
 
-describe("createAuditRecordStore — append and query", () => {
+describe("createAuditRecordStore — append and query basics", () => {
   it("appends and queries records by class", () => {
     const store = createAuditRecordStore();
     store.append({
@@ -82,6 +82,38 @@ describe("createAuditRecordStore — append and query", () => {
     });
     assert.equal(snapshot.length, 1);
     assert.equal(store.query().length, 2);
+  });
+});
+
+describe("createAuditRecordStore — append and query filters", () => {
+  it("filters by kind, parentSessionId, and since", () => {
+    const store = createAuditRecordStore();
+    store.append({
+      class: "SubagentExecution",
+      kind: "SubagentSpawned",
+      correlationId: "c1",
+      timestamp: 100,
+      payload: { subagentId: "s1" },
+      subagentId: "s1",
+      parentSessionId: "p1",
+      depth: 1,
+    });
+    store.append({
+      class: "SubagentExecution",
+      kind: "SubagentCompleted",
+      correlationId: "c2",
+      timestamp: 200,
+      payload: { subagentId: "s1" },
+      subagentId: "s1",
+      parentSessionId: "p2",
+      depth: 1,
+    });
+
+    assert.equal(store.query({ kind: "SubagentSpawned" }).length, 1);
+    assert.equal(store.query({ parentSessionId: "p1" }).length, 1);
+    assert.equal(store.query({ since: 150 }).length, 1);
+    assert.equal(store.query({ class: "SubagentExecution", kind: "SubagentHalted" }).length, 0);
+    assert.equal(store.size(), 2);
   });
 });
 
@@ -181,5 +213,52 @@ describe("createAuditRecordStore — activeSubagents projection", () => {
     const active = store.activeSubagents();
     assert.equal(active.length, 1);
     assert.equal(active[0]!.subagentId, "s1");
+  });
+});
+
+describe("createAuditRecordStore — activeSubagents fallback parsing", () => {
+  it("ignores non-subagent records and falls back to defaults for malformed spawn payload fields", () => {
+    const store = createAuditRecordStore();
+    store.append({
+      class: "Approval",
+      kind: "ToolCallApproved",
+      correlationId: "c-approval",
+      timestamp: 50,
+      payload: {},
+    });
+    store.append({
+      class: "SubagentExecution",
+      kind: "SubagentSpawned",
+      correlationId: "c-missing-id",
+      timestamp: 60,
+      payload: { providerId: "ignored" },
+    });
+    store.append({
+      class: "SubagentExecution",
+      kind: "SubagentSpawned",
+      correlationId: "c-spawn",
+      timestamp: 100,
+      payload: {
+        subagentId: "s-defaults",
+        parentSessionId: 42,
+        depth: "bad",
+        approvedEnvelope: "not-an-array",
+        providerId: 123,
+        modelId: false,
+      },
+      subagentId: "s-defaults",
+    });
+
+    const active = store.activeSubagents();
+    assert.equal(active.length, 1);
+    assert.deepEqual(active[0], {
+      subagentId: "s-defaults",
+      parentSessionId: "",
+      depth: 1,
+      providerId: "",
+      modelId: "",
+      approvedEnvelope: [],
+      spawnedAt: 100,
+    });
   });
 });
