@@ -2,7 +2,6 @@ import { ExtensionHost } from "../../../core/errors/extension-host.js";
 import { ProviderCapability } from "../../../core/errors/provider-capability.js";
 import { ProviderTransient } from "../../../core/errors/provider-transient.js";
 
-import { createOpenAIAdapter, type OpenAICompatibleAdapterConfig } from "./adapter.js";
 import {
   openaiCompatibleConfigSchema,
   type OpenAIApiShape,
@@ -10,6 +9,7 @@ import {
 } from "./config.schema.js";
 import { activate, configForHost, deactivate, dispose, init } from "./lifecycle.js";
 
+import type { OpenAICompatibleAdapterConfig } from "./adapter.js";
 import type { ProviderContract, ProviderStreamEvent } from "../../../contracts/providers.js";
 
 export const contract: ProviderContract<OpenAICompatibleConfig> = {
@@ -62,6 +62,7 @@ export const contract: ProviderContract<OpenAICompatibleConfig> = {
         ...(args.stream !== undefined ? { stream: args.stream } : {}),
       };
 
+      const { createOpenAIAdapter } = await import("./adapter.js");
       const adapter = createOpenAIAdapter(adapterConfig, host);
 
       const mergedParams: Record<string, unknown> = {
@@ -137,5 +138,5 @@ export const contract: ProviderContract<OpenAICompatibleConfig> = {
   },
 };
 
-export { createOpenAIAdapter, openaiCompatibleConfigSchema };
+export { openaiCompatibleConfigSchema };
 export type { OpenAIApiShape, OpenAICompatibleConfig };

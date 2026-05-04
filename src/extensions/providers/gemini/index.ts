@@ -2,10 +2,10 @@ import { ExtensionHost } from "../../../core/errors/extension-host.js";
 import { ProviderCapability } from "../../../core/errors/provider-capability.js";
 import { ProviderTransient } from "../../../core/errors/provider-transient.js";
 
-import { createGeminiAdapter, type GeminiAdapterConfig } from "./adapter.js";
 import { geminiConfigSchema, type GeminiConfig } from "./config.schema.js";
 import { activate, configForHost, deactivate, dispose, init } from "./lifecycle.js";
 
+import type { GeminiAdapterConfig } from "./adapter.js";
 import type { ProviderContract, ProviderStreamEvent } from "../../../contracts/providers.js";
 
 export const contract: ProviderContract<GeminiConfig> = {
@@ -57,6 +57,7 @@ export const contract: ProviderContract<GeminiConfig> = {
         ...(args.stream !== undefined ? { stream: args.stream } : {}),
       };
 
+      const { createGeminiAdapter } = await import("./adapter.js");
       const adapter = createGeminiAdapter(adapterConfig, host);
 
       const mergedParams: Record<string, unknown> = {
@@ -132,5 +133,5 @@ export const contract: ProviderContract<GeminiConfig> = {
   },
 };
 
-export { createGeminiAdapter, geminiConfigSchema };
+export { geminiConfigSchema };
 export type { GeminiConfig };

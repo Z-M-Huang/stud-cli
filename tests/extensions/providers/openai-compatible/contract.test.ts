@@ -3,11 +3,9 @@ import { describe, it } from "node:test";
 
 import Ajv from "ajv";
 
+import { createOpenAIAdapter } from "../../../../src/extensions/providers/openai-compatible/adapter.js";
 import { openaiCompatibleConfigSchema } from "../../../../src/extensions/providers/openai-compatible/config.schema.js";
-import {
-  contract,
-  createOpenAIAdapter,
-} from "../../../../src/extensions/providers/openai-compatible/index.js";
+import { contract } from "../../../../src/extensions/providers/openai-compatible/index.js";
 import { mockHost } from "../../../helpers/mock-host.js";
 
 import type { HostAPI } from "../../../../src/core/host/host-api.js";

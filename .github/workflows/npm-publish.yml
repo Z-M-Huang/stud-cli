@@ -55,6 +55,8 @@ jobs:
         run: bun run format:check
 
       - name: Test
+        env:
+          STUD_RUN_CI_GATES: "1"
         run: bun run test
 
       - name: Coverage gate

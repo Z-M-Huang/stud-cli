@@ -121,6 +121,7 @@ export function buildChildSession(
   const childHolder = createActiveSelectionHolder(childSelection);
   return {
     sessionId: record.subagentId,
+    continuationMaxIterations: parent.continuationMaxIterations,
     selection: childHolder,
     projectRoot: parent.projectRoot,
     projectTrusted: parent.projectTrusted,

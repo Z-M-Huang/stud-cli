@@ -34,7 +34,7 @@ import {
   openaiActiveModelChecker,
 } from "../../extensions/providers/openai-compatible/native-params.js";
 
-import { PROTOCOLS } from "./types.js";
+import { PROTOCOLS } from "./provider-protocols.js";
 
 import type { ProviderProtocolId, Settings } from "./types.js";
 import type { JSONSchemaObject } from "../../contracts/state-slot.js";

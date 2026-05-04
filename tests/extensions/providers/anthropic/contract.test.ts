@@ -7,11 +7,9 @@ import {
   mapStream,
   type WireEvent,
 } from "../../../../src/extensions/providers/_adapter/stream-mapper.js";
+import { createAnthropicAdapter } from "../../../../src/extensions/providers/anthropic/adapter.js";
 import { anthropicConfigSchema } from "../../../../src/extensions/providers/anthropic/config.schema.js";
-import {
-  contract,
-  createAnthropicAdapter,
-} from "../../../../src/extensions/providers/anthropic/index.js";
+import { contract } from "../../../../src/extensions/providers/anthropic/index.js";
 import { mockHost } from "../../../helpers/mock-host.js";
 
 import type { StreamEvent } from "../../../../src/extensions/providers/_adapter/protocol.js";

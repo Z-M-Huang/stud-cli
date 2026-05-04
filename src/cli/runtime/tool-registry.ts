@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve, dirname } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
 import { createAskUser } from "agentool/ask-user";
 import { createBash } from "agentool/bash";
@@ -24,6 +24,10 @@ import { ToolTerminal } from "../../core/errors/index.js";
 import { studHome } from "./storage.js";
 import { coerceBashArgs } from "./tool-arg-coercion.js";
 import { loadDelegateTool } from "./tool-registry-delegate.js";
+import {
+  sessionWorkspaceRoot as resolveSessionWorkspaceRoot,
+  toolResultError as buildToolResultError,
+} from "./tool-runtime-utils.js";
 import {
   DEFAULT_TOOL_TIMEOUT_MS,
   DEFAULT_WEB_CONTENT_BYTES,
@@ -285,10 +289,6 @@ function loadPlainTool(
   });
 }
 
-function workspaceRoot(session: SessionBootstrap, deps: ResolvedShellDeps): string {
-  return session.projectTrusted ? dirname(session.projectRoot) : studHome(deps.homedir());
-}
-
 function filesystemToolPromises(root: string): readonly Promise<LoadedTool>[] {
   return [
     loadPlainTool(
@@ -449,7 +449,7 @@ function interactionToolPromises(
 }
 
 export function sessionWorkspaceRoot(session: SessionBootstrap, deps: ResolvedShellDeps): string {
-  return workspaceRoot(session, deps);
+  return resolveSessionWorkspaceRoot(session, deps);
 }
 
 export async function initializeBundledTools(
@@ -457,7 +457,7 @@ export async function initializeBundledTools(
   deps: ResolvedShellDeps,
   prompt: PromptIO,
 ): Promise<readonly LoadedTool[]> {
-  const root = workspaceRoot(session, deps);
+  const root = resolveSessionWorkspaceRoot(session, deps);
   const toolRegistry: Record<string, { description: string }> = {};
   const agentoolGroups = await Promise.all([
     ...filesystemToolPromises(root),
@@ -489,12 +489,5 @@ export function toolResultError(
   message: string,
   context: Record<string, unknown>,
 ): RuntimeToolResult {
-  return {
-    ok: false,
-    error: new ToolTerminal(message, undefined, {
-      code: "InputInvalid",
-      toolId,
-      ...context,
-    }),
-  };
+  return buildToolResultError(toolId, message, context);
 }

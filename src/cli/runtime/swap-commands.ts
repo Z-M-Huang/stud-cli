@@ -5,6 +5,7 @@ import { ProviderCapability, Validation } from "../../core/errors/index.js";
 import { mergeSettings } from "../../core/settings/validator.js";
 
 import { validateProviderConfig } from "./provider-config-validator.js";
+import { PROTOCOLS } from "./provider-protocols.js";
 import { atomicWriteJson, loadSettingsFile, studHome } from "./storage.js";
 import {
   computeParamsAffected,
@@ -12,7 +13,6 @@ import {
   validateTargetAndDiagnose,
   type ResolvedTarget,
 } from "./swap-helpers.js";
-import { PROTOCOLS } from "./types.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
 import type { RuntimeContextRegistry } from "./runtime-context-registry.js";
@@ -71,7 +71,7 @@ export function computeRequiredCapabilities(
 }
 
 function vectorFromCapabilities(
-  capabilities: (typeof PROTOCOLS)[ProviderProtocolId]["contract"]["capabilities"],
+  capabilities: (typeof PROTOCOLS)[ProviderProtocolId]["capabilities"],
 ): CapabilityVector {
   function levelToBoolean(level: string): boolean {
     return level === "hard" || level === "preferred";
@@ -190,7 +190,7 @@ async function performSwap(deps: SwapDeps, target: ResolvedTarget): Promise<Swap
   validateTargetAndDiagnose({ auditBus: deps.auditBus }, target, effectiveBagForTarget);
 
   // Step 4-5: capability negotiation against the contract's static claims.
-  const advertised = vectorFromCapabilities(PROTOCOLS[target.protocolId].contract.capabilities);
+  const advertised = vectorFromCapabilities(PROTOCOLS[target.protocolId].capabilities);
   const paramsAffected = computeParamsAffected(deps.session.paramsStore, target);
 
   try {

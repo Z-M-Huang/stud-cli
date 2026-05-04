@@ -125,6 +125,7 @@ const instance = render(
     statusItems={statusItems}
     theme={defaultTheme(sink)}
     onComposerKey={() => undefined}
+    onComposerPaste={() => undefined}
   />,
   { stdout: sink, stdin: fakeStdin, patchConsole: false, exitOnCtrlC: false },
 );

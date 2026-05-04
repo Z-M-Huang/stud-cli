@@ -14,6 +14,7 @@ import type { SessionBootstrap } from "../../../src/cli/runtime/types.js";
 function fakeSession(): SessionBootstrap {
   return {
     sessionId: "test",
+    continuationMaxIterations: 50,
     selection: {
       current: () => ({
         entryId: "anthropic",
@@ -88,5 +89,27 @@ describe("renderTurnError", () => {
   it("falls back to UnknownError/Error when typed fields are missing", () => {
     const text = renderTurnError(fakeSession(), new Error("boom"));
     assert.equal(text.split("\n")[0], "assistant error [Error/UnknownError]");
+  });
+
+  it("surfaces continuation-cap hits as a turn-budget failure summary", () => {
+    const err = Object.assign(
+      new Error(
+        "assistant exhausted the continuation-round budget (50); earlier tool calls may have completed successfully",
+      ),
+      {
+        class: "Session",
+        code: "ToolExecutionFailed",
+        failureKind: "ContinuationLimitExceeded",
+        limit: 50,
+      },
+    );
+    const text = renderTurnError(fakeSession(), err);
+    assert.equal(
+      text,
+      [
+        "assistant error [Session/ToolExecutionFailed]",
+        "  assistant exhausted the continuation-round budget (50); earlier tool calls may have completed successfully",
+      ].join("\n"),
+    );
   });
 });

@@ -32,6 +32,7 @@ import { registerSubagentsPanel } from "../../extensions/ui/default-tui/panels/s
 
 import { createIpAuthority, type IpAuthority } from "./ip-authority.js";
 import { buildEventsAPI } from "./provider-host.js";
+import { PROTOCOLS } from "./provider-protocols.js";
 import {
   createRuntimeContextRegistry,
   type RuntimeContextRegistry,
@@ -39,16 +40,15 @@ import {
 import { loadSettingsFile, studHome } from "./storage.js";
 import { buildChildRunner } from "./subagent-child-runner.js";
 import { buildOpenChildClosure, buildPermissiveProviderModelLookup } from "./subagent-spawn.js";
-import {
-  PROTOCOLS,
-  type LoadedTool,
-  type ProviderProtocolId,
-  type ResolvedShellDeps,
-  type SessionBootstrap,
-  type Settings,
-} from "./types.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
+import type {
+  LoadedTool,
+  ProviderProtocolId,
+  ResolvedShellDeps,
+  SessionBootstrap,
+  Settings,
+} from "./types.js";
 import type { ProviderContract } from "../../contracts/providers.js";
 import type { EventBus } from "../../core/events/bus.js";
 import type { OpenChildArgs, OpenChildResult } from "../../core/host/api/session.js";
@@ -179,7 +179,7 @@ export function buildSettingsBackedLookup(
       const protocolField = entry["protocol"];
       if (typeof protocolField !== "string") return true;
       const descriptor = PROTOCOLS[protocolField as ProviderProtocolId];
-      const caps = descriptor?.contract?.capabilities as unknown as
+      const caps = descriptor?.capabilities as unknown as
         | Readonly<Record<string, unknown>>
         | undefined;
       const toolCalling = caps?.["toolCalling"];

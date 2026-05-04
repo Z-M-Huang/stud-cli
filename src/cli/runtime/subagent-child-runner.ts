@@ -21,9 +21,8 @@ import {
   wrapAuditBusForChild,
 } from "./subagent-child-context.js";
 import { createApprovalCache, ensureToolApproval } from "./tool-approval.js";
-import { sessionWorkspaceRoot } from "./tool-registry.js";
 import { resolveToolCallResult } from "./tool-resolver.js";
-import { TOOL_CALL_CONTINUATION_LIMIT } from "./types.js";
+import { sessionWorkspaceRoot } from "./tool-runtime-utils.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
 import type { IpAuthority } from "./ip-authority.js";
@@ -172,7 +171,7 @@ async function runOneChild(
       buildToolResultMessage: (call, result) => buildChildToolResultMessage(call, result),
       audit: childAudit,
       signal,
-      maxIterations: TOOL_CALL_CONTINUATION_LIMIT,
+      maxIterations: deps.parentSession.continuationMaxIterations,
     },
   });
 }

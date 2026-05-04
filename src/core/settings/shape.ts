@@ -3,7 +3,7 @@
  *
  * Allowed top-level keys:
  *   env, securityMode, providers, tools, hooks, ui, loggers, stateMachines,
- *   commands, sessionStores, contextProviders, logging, active.
+ *   commands, sessionStores, contextProviders, logging, active, runtime.
  *
  * `additionalProperties: false` at the top level causes unknown keys to
  * fail validation with a typed `Validation` / `UnknownTopLevelKey` error.
@@ -39,6 +39,11 @@ export interface Settings {
     readonly model?: string;
     readonly sessionStore?: string;
     readonly attachedSM?: string;
+  };
+  readonly runtime?: {
+    readonly continuation?: {
+      readonly maxIterations?: number;
+    };
   };
 }
 
@@ -114,6 +119,19 @@ export const SETTINGS_SCHEMA: Readonly<Record<string, unknown>> = Object.freeze(
         model: { type: "string" },
         sessionStore: { type: "string" },
         attachedSM: { type: "string" },
+      },
+    },
+    runtime: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        continuation: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            maxIterations: { type: "integer", minimum: 1 },
+          },
+        },
       },
     },
   },

@@ -10,6 +10,19 @@ import { runShell } from "../../src/cli/shell.js";
 import type { LaunchArgs } from "../../src/cli/launch-args.js";
 import type { PromptIO } from "../../src/cli/prompt.js";
 
+class MemoryWriteStream {
+  private chunks: string[] = [];
+
+  write(chunk: string | Uint8Array): boolean {
+    this.chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
+    return true;
+  }
+
+  toString(): string {
+    return this.chunks.join("");
+  }
+}
+
 class ScriptedPrompt implements PromptIO {
   private selectAnswers: string[];
   private inputAnswers: string[];
@@ -123,15 +136,15 @@ describe("runShell (basic paths)", () => {
 
   it("prints the injected package version when --version is requested", async () => {
     const captured: { handle?: Awaited<ReturnType<typeof runShell>> } = {};
-    const stdout = await captureStdout(async () => {
-      captured.handle = await runShell(launchArgs({ version: true }), {
-        packageVersion: "9.9.9",
-      });
+    const stdout = new MemoryWriteStream();
+    captured.handle = await runShell(launchArgs({ version: true }), {
+      packageVersion: "9.9.9",
+      stdout: stdout as unknown as NodeJS.WriteStream,
     });
     assert.ok(captured.handle !== undefined);
     assert.equal(captured.handle.exitCode, 0);
     assert.equal(captured.handle.session.id, null);
-    assert.equal(stdout.trim(), "9.9.9");
+    assert.equal(stdout.toString().trim(), "9.9.9");
   });
 });
 

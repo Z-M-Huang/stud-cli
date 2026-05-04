@@ -1,8 +1,8 @@
 import { fallbackErrorShape } from "./error-utils.js";
 import { formatHelp } from "./launch-args.js";
-import { resolvePackageVersion, runRuntime, runVersion, type ShellDeps } from "./runtime.js";
 
 import type { LaunchArgs } from "./launch-args.js";
+import type { ShellDeps } from "./runtime.js";
 
 export interface ShellHandle {
   readonly exitCode: number;
@@ -48,16 +48,17 @@ export async function runShell(args: LaunchArgs, deps?: ShellDeps): Promise<Shel
   }
 
   if (args.version) {
-    return runVersion(
-      deps?.stdout ?? process.stdout,
-      deps?.packageVersion ?? (await resolvePackageVersion()),
-    );
+    const { resolvePackageVersion } = await import("./runtime/storage.js");
+    const stdout = deps?.stdout ?? process.stdout;
+    stdout.write(`${deps?.packageVersion ?? (await resolvePackageVersion())}\n`);
+    return { exitCode: 0, session: { id: null } };
   }
 
   let startupErrorView: StartupErrorView | null = null;
 
   try {
     startupErrorView = loadDefaultTuiStartupErrorView();
+    const { runRuntime } = await import("./runtime.js");
     return await runRuntime(args, deps);
   } catch (error) {
     renderStartupError(startupErrorView, error);

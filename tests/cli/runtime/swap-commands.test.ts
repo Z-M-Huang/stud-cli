@@ -140,6 +140,7 @@ describe("/provider swap — entryId-keyed runtime context isolation", () => {
 
       const session: SessionBootstrap = {
         sessionId: "session-test",
+        continuationMaxIterations: 50,
         selection,
         projectRoot,
         projectTrusted: true,
@@ -232,6 +233,7 @@ describe("/provider swap — active.model fallback", () => {
       const selection = createActiveSelectionHolder(initial);
       const session: SessionBootstrap = {
         sessionId: "session-test-2",
+        continuationMaxIterations: 50,
         selection,
         projectRoot,
         projectTrusted: true,
@@ -299,6 +301,7 @@ describe("/model swap — cancellation", () => {
       const selection = createActiveSelectionHolder(initial);
       const session: SessionBootstrap = {
         sessionId: "session-cancel",
+        continuationMaxIterations: 50,
         selection,
         projectRoot,
         projectTrusted: true,

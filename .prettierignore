@@ -2,6 +2,8 @@ dist/
 node_modules/
 coverage/
 .bun/
+.tmp-stud-cli-mcp-*/
+.tmp-stud-cli-mcp-edge-*/
 bun.lock
 *.tsbuildinfo
 src-build/

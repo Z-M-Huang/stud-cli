@@ -8,6 +8,7 @@
  *   - `env`: shallow-merged; project-scope key wins on collision.
  *   - `logging`: shallow-merged; project-scope key wins on collision.
  *   - `active`: shallow-merged; project-scope field wins on collision.
+ *   - `runtime.continuation.maxIterations`: later-layer wins.
  *   - `securityMode.mode`: project > global > bundled (scalar — highest wins).
  *   - `securityMode.allowlist`: additive union across all three scopes
  *     (bundled ∪ global ∪ project, preserving encounter order, deduped).
@@ -128,6 +129,24 @@ export function mergeSettings(
   const pActive = project?.active;
   if (bActive !== undefined || gActive !== undefined || pActive !== undefined) {
     result["active"] = { ...bActive, ...gActive, ...pActive };
+  }
+
+  // -- runtime -------------------------------------------------------------
+  const bRuntime = bundled?.runtime;
+  const gRuntime = global?.runtime;
+  const pRuntime = project?.runtime;
+  if (bRuntime !== undefined || gRuntime !== undefined || pRuntime !== undefined) {
+    const continuation = {
+      ...(bRuntime?.continuation ?? {}),
+      ...(gRuntime?.continuation ?? {}),
+      ...(pRuntime?.continuation ?? {}),
+    };
+    result["runtime"] = {
+      ...(bRuntime ?? {}),
+      ...(gRuntime ?? {}),
+      ...(pRuntime ?? {}),
+      ...(Object.keys(continuation).length > 0 ? { continuation } : {}),
+    };
   }
 
   return result as Settings;

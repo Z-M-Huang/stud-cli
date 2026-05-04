@@ -5,13 +5,12 @@
  *    — `HostAPI` exposes exactly the twelve sanctioned sub-surfaces.
  *    — `contractVersion` is a SemVer triple; `requiredCoreVersion` is a
  *            SemVer range string (type-level static part; runtime mismatch
- *            throwing `Validation/ContractVersionMismatch` is deferred to the
- *            contract-loader unit).
+ *            coverage lives in the validation/discovery units).
  *    — Lifecycle interface (`LifecycleFns`) declares all four phases
  *            (`init → activate → deactivate → dispose`), each optional and
  *            `dispose` documented as idempotent (type-level static part;
- *            the lifecycle manager that enforces ordering and idempotency at
- *            runtime is deferred to the lifecycle-manager unit).
+ *            runtime ordering/idempotency coverage lives in the lifecycle
+ *            manager unit).
  *
  * Wiki: core/Host-API.md + contracts/Versioning-and-Compatibility.md +
  *       core/Extension-Lifecycle.md
@@ -121,8 +120,8 @@ describe("HostAPI shape", () => {
 // Static part (type-level): enforced by the `SemVer` template-literal type
 // (`${number}.${number}.${number}`) on `ExtensionContract.contractVersion`.
 //
-// Runtime part (Validation/ContractVersionMismatch on load): deferred to the
-// contract-loader unit; see test.skip stubs below.
+// Runtime part (Validation/ContractVersionMismatch / version-range mismatch)
+// is covered in the validation/discovery units.
 // ---------------------------------------------------------------------------
 
 describe("contractVersion / requiredCoreVersion typing", () => {
@@ -156,23 +155,6 @@ describe("contractVersion / requiredCoreVersion typing", () => {
     assert.ok(v.length > 0);
     assert.ok(r.length > 0);
   });
-
-  // Runtime enforcement is deferred: the contract-loader unit validates the
-  // SemVer regex at extension-load time and throws
-  // `Validation/ContractVersionMismatch` on incompatibility.
-  it.skip("incompatible requiredCoreVersion throws Validation/ContractVersionMismatch (deferred — contract-loader unit)", () => {
-    // TODO: implement in the contract-loader unit.
-    // Verify: loading an extension whose `requiredCoreVersion` excludes
-    // the running core version throws a `Validation` error with
-    // `code === 'ContractVersionMismatch'` carrying both the claimed and
-    // expected ranges.
-  });
-
-  it.skip("non-SemVer contractVersion string is rejected at load time (deferred — contract-loader unit)", () => {
-    // TODO: implement in the contract-loader unit.
-    // Verify: loading an extension with `contractVersion: '1.2'` (missing
-    // patch segment) throws `Validation/ContractVersionMismatch`.
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -181,8 +163,8 @@ describe("contractVersion / requiredCoreVersion typing", () => {
 //
 // Static part (type-level): `LifecycleFns` declares all four optional phases.
 //
-// Runtime part (manager ordering + idempotent dispose): deferred to the
-// lifecycle-manager unit; see test.skip stubs below.
+// Runtime part (manager ordering + idempotent dispose) is covered in the
+// lifecycle-manager unit.
 // ---------------------------------------------------------------------------
 
 describe("LifecycleFns interface shape", () => {
@@ -228,21 +210,5 @@ describe("LifecycleFns interface shape", () => {
     type HasInit = "init" extends keyof LifecycleField ? true : false;
     const hasInit: HasInit = true;
     assert.equal(hasInit, true);
-  });
-
-  // Runtime lifecycle enforcement is deferred to the lifecycle-manager unit.
-  it.skip("manager invokes lifecycle functions in init→activate→deactivate→dispose order (deferred — lifecycle-manager unit)", () => {
-    // TODO: implement in the lifecycle-manager unit (src/core/lifecycle/).
-    // Verify: the lifecycle manager calls each phase in the declared order;
-    // a dependency-resolved sequence means dependencies init before dependants.
-  });
-
-  it.skip("dispose is idempotent — safe to call more than once without error (deferred — lifecycle-manager unit)", () => {
-    // TODO: implement in the lifecycle-manager unit (src/core/lifecycle/).
-    // Verify: calling dispose a second time on any extension does not throw.
-  });
-
-  it.skip("deactivate releases active resources but leaves subscriptions for dispose (deferred — lifecycle-manager unit)", () => {
-    // TODO: implement in the lifecycle-manager unit (src/core/lifecycle/).
   });
 });

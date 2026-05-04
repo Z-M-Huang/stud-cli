@@ -1,4 +1,4 @@
-import { Box, Static, Text, useInput } from "ink";
+import { Box, Static, Text, useInput, usePaste } from "ink";
 import React, { useEffect, useState } from "react";
 
 import { ApprovalDialog, type ApprovalDialogView } from "./approval-dialog.js";
@@ -85,6 +85,7 @@ export interface InkTUIFrameProps {
   readonly statusItems: readonly StatusLineItem[];
   readonly theme?: Theme | undefined;
   readonly onComposerKey: (input: string, key: ComposerKey) => void;
+  readonly onComposerPaste: (text: string) => void;
   /**
    * Region contributions composed for the `transcript` region in append
    * mode. Rendered between the running tool cards and the dialog row so
@@ -252,9 +253,14 @@ function Composer(props: {
   readonly theme?: Theme | undefined;
   /** Called for every keypress chunk. The mount owns buffer state. */
   readonly onKey: (input: string, key: ComposerKey) => void;
+  /** Called for terminal paste events. */
+  readonly onPaste: (text: string) => void;
 }): React.ReactElement {
   useInput((input, key) => {
     props.onKey(input, key);
+  });
+  usePaste((text) => {
+    props.onPaste(text);
   });
   return (
     <Box borderStyle="round" {...b(props.theme?.border)} paddingX={1}>
@@ -408,6 +414,7 @@ export function InkTUIFrame(props: InkTUIFrameProps): React.ReactElement {
           hint={props.composerHint}
           theme={props.theme}
           onKey={props.onComposerKey}
+          onPaste={props.onComposerPaste}
         />
 
         <Box marginTop={1}>

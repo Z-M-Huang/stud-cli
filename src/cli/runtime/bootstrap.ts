@@ -20,7 +20,9 @@ import {
   validateAndAssertEntryParams,
 } from "./params-validator.js";
 import { validateProviderConfig } from "./provider-config-validator.js";
+import { PROTOCOLS } from "./provider-protocols.js";
 import { scanPriorRuntimeOverrides } from "./resume-params-scan.js";
+import { resolveContinuationMaxIterations } from "./runtime-settings.js";
 import { readLatestSessionManifest } from "./session-store.js";
 import {
   appendAudit,
@@ -31,7 +33,6 @@ import {
   nowIso,
   studHome,
 } from "./storage.js";
-import { PROTOCOLS } from "./types.js";
 
 import type { TrustStore } from "../../core/security/trust/model.js";
 import type { LaunchArgs } from "../launch-args.js";
@@ -70,7 +71,6 @@ export function resolveActiveEntry(settings: Settings): ResolvedActiveEntry | nu
   if (entryId === undefined) {
     return null;
   }
-
   const raw = providers[entryId];
   if (raw === undefined) {
     throw new Validation(`provider entry '${entryId}' is not configured`, undefined, {
@@ -105,7 +105,6 @@ export function resolveActiveEntry(settings: Settings): ResolvedActiveEntry | nu
       },
     );
   }
-
   return { entryId, protocolId: protocol, raw };
 }
 
@@ -210,7 +209,6 @@ async function ensureProviderSettings(
     deps,
   );
   validateProviderConfig(protocolId, configured.entryId, configured.config);
-
   const firstModel = (configured.config as { readonly models: readonly [string, ...string[]] })
     .models[0];
   const nextSettings: Settings = {
@@ -419,6 +417,7 @@ async function bootstrapResumedSession(args: {
 
   return {
     sessionId: manifest.sessionId,
+    continuationMaxIterations: resolveContinuationMaxIterations(mergedSettings),
     selection: createActiveSelectionHolder(provider),
     projectRoot: manifest.projectRoot,
     projectTrusted: project.projectTrusted,
@@ -492,6 +491,7 @@ export async function bootstrapSession(
   return newSessionBootstrap({
     launchArgs: args,
     provider,
+    settings: mergedSettings,
     projectTrusted: trustOutcome === "trusted",
     securityMode: resolveSecurityMode(args, mergedSettings),
     deps,

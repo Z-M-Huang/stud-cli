@@ -4,9 +4,6 @@ import { homedir } from "node:os";
 import { Validation } from "../core/errors/index.js";
 
 import { createPromptIO } from "./prompt.js";
-import { bootstrapSession } from "./runtime/bootstrap.js";
-import { createHeadlessPrompt } from "./runtime/headless-prompt.js";
-import { runProviderSession } from "./runtime/session-loop.js";
 import { resolvePackageVersion } from "./runtime/storage.js";
 
 import type { LaunchArgs } from "./launch-args.js";
@@ -17,6 +14,8 @@ export { resolvePackageVersion };
 export type { ShellDeps } from "./runtime/types.js";
 
 async function resolvedShellDeps(deps: ShellDeps): Promise<ResolvedShellDeps> {
+  const runSession =
+    deps.runSession ?? (await import("./runtime/session-loop.js")).runProviderSession;
   return {
     env: deps.env ?? process.env,
     homedir: deps.homedir ?? homedir,
@@ -26,7 +25,7 @@ async function resolvedShellDeps(deps: ShellDeps): Promise<ResolvedShellDeps> {
     packageVersion: deps.packageVersion ?? (await resolvePackageVersion()),
     now: deps.now ?? (() => new Date()),
     sessionIdFactory: deps.sessionIdFactory ?? (() => randomUUID()),
-    runSession: deps.runSession ?? runProviderSession,
+    runSession,
   };
 }
 
@@ -39,6 +38,7 @@ export async function runRuntime(args: LaunchArgs, deps: ShellDeps = {}): Promis
   const resolved = await resolvedShellDeps(deps);
   let prompt = deps.prompt;
   const ownsPrompt = deps.prompt === undefined && !args.headless;
+  const { bootstrapSession } = await import("./runtime/bootstrap.js");
 
   try {
     if (prompt === undefined && !args.headless) {
@@ -50,6 +50,7 @@ export async function runRuntime(args: LaunchArgs, deps: ShellDeps = {}): Promis
       return { exitCode: 0, session: { id: null } };
     }
     if (args.headless) {
+      const { createHeadlessPrompt } = await import("./runtime/headless-prompt.js");
       prompt = await createHeadlessPrompt(resolved, { yolo: args.yolo });
     }
     if (prompt === undefined) {

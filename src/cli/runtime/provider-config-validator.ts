@@ -9,7 +9,7 @@ import Ajv from "ajv";
 
 import { Validation } from "../../core/errors/index.js";
 
-import { PROTOCOLS } from "./types.js";
+import { PROTOCOLS } from "./provider-protocols.js";
 
 import type { AnyProviderConfig, ProviderEntryId, ProviderProtocolId } from "./types.js";
 
@@ -19,10 +19,7 @@ export function validateProviderConfig(
   config: unknown,
 ): asserts config is AnyProviderConfig {
   const descriptor = PROTOCOLS[protocolId];
-  const { $schema: _ignored, ...schema } = descriptor.contract.configSchema as Record<
-    string,
-    unknown
-  >;
+  const { $schema: _ignored, ...schema } = descriptor.configSchema as Record<string, unknown>;
   const validate = new Ajv({ allErrors: true }).compile(schema);
   if (!validate(config)) {
     throw new Validation(

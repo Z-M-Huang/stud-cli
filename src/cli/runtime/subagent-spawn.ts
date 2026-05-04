@@ -311,7 +311,7 @@ export function buildPermissiveProviderModelLookup(
 /**
  * Race a Promise against an AbortSignal. When the signal aborts before the
  * promise resolves, throws a typed Cancellation so callers map it to
- * `parentCancel`. Used for IpAuthority raises that lack a built-in abort
+ * `parentCancel`. Used for IpAuthority raises that lack a native abort
  * surface (the fallback interactor and Ink dialog don't wire one in).
  */
 async function raceWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {

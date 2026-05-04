@@ -256,6 +256,7 @@ interface RootProps {
   readonly theme: Theme | undefined;
   readonly hint: string;
   readonly onComposerKey: (input: string, key: ComposerKey) => void;
+  readonly onComposerPaste: (text: string) => void;
   /**
    * Region registry that supplies bundled panel contributions (e.g., the
    * Subagents panel). Composed into InkTUIFrame's transcript-append slot so
@@ -329,6 +330,7 @@ export function Root(props: RootProps): React.ReactElement {
     statusItems: snap.statusItems.length > 0 ? snap.statusItems : liveStatusItems,
     theme: props.theme,
     onComposerKey: props.onComposerKey,
+    onComposerPaste: props.onComposerPaste,
     transcriptRegion,
   };
   return <InkTUIFrame {...frame} />;

@@ -9,7 +9,7 @@
  * Merge semantics across scope layers live in Configuration Scopes; this module
  * owns only the per-field type shapes and the validating JSON Schema.
  *
- * contractVersion: 1.0.1
+ * contractVersion: 1.1.0
  *
  * Wiki: contracts/Settings-Shape.md, runtime/Configuration-Scopes.md
  */
@@ -131,6 +131,25 @@ export interface ActiveSelectors {
 }
 
 // ---------------------------------------------------------------------------
+// Runtime settings
+// ---------------------------------------------------------------------------
+
+/**
+ * Runtime execution-policy settings.
+ *
+ * `continuation.maxIterations` bounds how many default-chat continuation
+ * rounds (`TOOL_CALL -> COMPOSE_REQUEST`) a single assistant turn may consume
+ * before the runtime halts the turn with a safety error.
+ *
+ * Wiki: contracts/Settings-Shape.md § runtime, core/Message-Loop.md
+ */
+export interface RuntimeSettings {
+  readonly continuation?: {
+    readonly maxIterations?: number;
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Top-level Settings
 // ---------------------------------------------------------------------------
 
@@ -169,6 +188,8 @@ export interface Settings {
   readonly logging?: LoggingSettings;
   /** Active-selector fields for the single-active categories. */
   readonly active?: ActiveSelectors;
+  /** Runtime execution-policy settings. */
+  readonly runtime?: RuntimeSettings;
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +285,19 @@ export const settingsSchema: JSONSchemaObject = {
         model: { type: "string", minLength: 1 },
         sessionStore: { type: "string", minLength: 1 },
         attachedSM: { type: "string", minLength: 1 },
+      },
+    },
+    runtime: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        continuation: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            maxIterations: { type: "integer", minimum: 1 },
+          },
+        },
       },
     },
   },

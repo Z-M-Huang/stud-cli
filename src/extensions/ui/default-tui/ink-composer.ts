@@ -24,6 +24,8 @@ import type { InkState, InkStore, InputQueue } from "./ink-store.js";
 export interface ComposerController {
   /** The Ink composer key handler — the function `Root` forwards keystrokes to. */
   onKey(input: string, key: ComposerKey): void;
+  /** The Ink composer paste handler — receives the full pasted string. */
+  onPaste(text: string): void;
 }
 
 function isControlKey(key: ComposerKey): boolean {
@@ -227,5 +229,11 @@ export function createComposerController(args: {
     }
   };
 
-  return { onKey };
+  const onPaste = (text: string): void => {
+    if (text.length === 0) return;
+    buffer = appendBuffer(buffer, text, { forcePaste: true });
+    refreshDisplay();
+  };
+
+  return { onKey, onPaste };
 }

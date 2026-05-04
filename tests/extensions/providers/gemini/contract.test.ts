@@ -3,11 +3,9 @@ import { describe, it } from "node:test";
 
 import Ajv from "ajv";
 
+import { createGeminiAdapter } from "../../../../src/extensions/providers/gemini/adapter.js";
 import { geminiConfigSchema } from "../../../../src/extensions/providers/gemini/config.schema.js";
-import {
-  contract,
-  createGeminiAdapter,
-} from "../../../../src/extensions/providers/gemini/index.js";
+import { contract } from "../../../../src/extensions/providers/gemini/index.js";
 import { normalizeGeminiParts } from "../../../../src/extensions/providers/gemini/parts.js";
 import { mockHost } from "../../../helpers/mock-host.js";
 

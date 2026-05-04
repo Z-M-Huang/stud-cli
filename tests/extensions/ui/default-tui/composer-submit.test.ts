@@ -11,7 +11,9 @@ import {
 describe("default-tui composer submit echo", () => {
   function harness(): {
     typeChars: (input: string) => void;
+    paste: (input: string) => void;
     pressEnter: () => Promise<string>;
+    composerText: () => string;
     echoes: string[];
   } {
     const store = createStore();
@@ -30,10 +32,16 @@ describe("default-tui composer submit echo", () => {
           composer.onKey(ch, {});
         }
       },
+      paste(input) {
+        composer.onPaste(input);
+      },
       async pressEnter() {
         const next = queue.enqueue();
         composer.onKey("", { return: true });
         return next;
+      },
+      composerText() {
+        return store.getState().composerText;
       },
       echoes,
     };
@@ -76,5 +84,16 @@ describe("default-tui composer submit echo", () => {
     const submitted = await h.pressEnter();
     assert.equal(submitted, "");
     assert.deepEqual(h.echoes, []);
+  });
+
+  it("collapses pasted multiline content in the composer but submits the resolved text", async () => {
+    const h = harness();
+    h.typeChars("before ");
+    h.paste("line 1\nline 2\nline 3");
+    h.typeChars(" after");
+    assert.equal(h.composerText(), "before [pasted content #1] after");
+    const submitted = await h.pressEnter();
+    assert.equal(submitted, "before line 1\nline 2\nline 3 after");
+    assert.deepEqual(h.echoes, ["before line 1\nline 2\nline 3 after"]);
   });
 });

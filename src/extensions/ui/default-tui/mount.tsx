@@ -1,4 +1,3 @@
-import { render, type Instance } from "ink";
 import React from "react";
 
 import { subscribeRendererToBus } from "./bus-subscribers.js";
@@ -36,6 +35,7 @@ import type { ApprovalDecision } from "./approval-dialog.js";
 import type { PromptIO } from "../../../cli/prompt.js";
 import type { EventBus } from "../../../core/events/bus.js";
 import type { RuntimeReader } from "../../../core/host/api/metrics.js";
+import type { Instance } from "ink";
 
 /**
  * Unified output + input surface used by `session-loop.ts`. Implementations
@@ -231,14 +231,16 @@ interface InkMountInternals {
   instance: Instance;
 }
 
-function startInkRender(
+async function startInkRender(
   opts: MountOptions,
   internals: {
     readonly store: InkStore;
     readonly onComposerKey: (input: string, key: ComposerKey) => void;
+    readonly onComposerPaste: (text: string) => void;
     readonly regionRegistry: UIRegionRegistry;
   },
-): Instance {
+): Promise<Instance> {
+  const { render } = await import("ink");
   return render(
     <Root
       store={internals.store}
@@ -246,6 +248,7 @@ function startInkRender(
       theme={defaultTheme(opts.stdout)}
       hint={DEFAULT_INK_FRAME_HINT}
       onComposerKey={internals.onComposerKey}
+      onComposerPaste={internals.onComposerPaste}
       regionRegistry={internals.regionRegistry}
     />,
     {
@@ -262,7 +265,7 @@ function startInkRender(
   );
 }
 
-function inkMount(opts: MountOptions): MountedTUI {
+async function inkMount(opts: MountOptions): Promise<MountedTUI> {
   const internals: InkMountInternals = createInkInternals(opts);
   let unmounted = false;
   // Region registry per Phase D — Phase G adds the side-door slot.
@@ -292,9 +295,10 @@ function inkMount(opts: MountOptions): MountedTUI {
     appendUserMessage: (text) => actions.appendUserMessage(text),
     ...(opts.catalog !== undefined ? { catalog: opts.catalog } : {}),
   });
-  internals.instance = startInkRender(opts, {
+  internals.instance = await startInkRender(opts, {
     store: internals.store,
     onComposerKey: (input, key) => composer.onKey(input, key),
+    onComposerPaste: (text) => composer.onPaste(text),
     regionRegistry,
   });
   // Subscribe the queue-depth signal to the renderer so the user sees
@@ -404,11 +408,11 @@ function tooLargeForInk(stdout: NodeJS.WriteStream): boolean {
   return !(typeof stdout.columns === "number" && typeof stdout.rows === "number");
 }
 
-export function mountTUI(opts: MountOptions): MountedTUI {
+export async function mountTUI(opts: MountOptions): Promise<MountedTUI> {
   const mounted =
     !inkSupported(opts.stdout, opts.stdin) || tooLargeForInk(opts.stdout)
       ? fallbackMount(opts)
-      : inkMount(opts);
+      : await inkMount(opts);
   if (opts.eventBus !== undefined) {
     subscribeRendererToBus(opts.eventBus, mounted);
   }

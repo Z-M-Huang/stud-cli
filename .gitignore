@@ -11,6 +11,8 @@ yarn-error.log*
 dist/
 coverage/
 .bun/
+.tmp-stud-cli-mcp-*/
+.tmp-stud-cli-mcp-edge-*/
 *.tsbuildinfo
 .claude/settings.json
 

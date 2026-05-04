@@ -3,13 +3,11 @@ import { join } from "node:path";
 
 import { Session } from "../../core/errors/index.js";
 import { createEventBus } from "../../core/events/bus.js";
-import { mountTUI } from "../../extensions/ui/default-tui/mount.js";
 
 import { startSessionAuditBus } from "./audit-bus.js";
-import { protocolLabel } from "./bootstrap.js";
-import { runtimeCommandCatalog } from "./command-catalog.js";
 import { checkManifestSizeBudget, manifestSizeBudgetPayload } from "./manifest-size-budget.js";
 import { createProviderHost } from "./provider-host.js";
+import { PROTOCOLS } from "./provider-protocols.js";
 import { runAssistantIteration } from "./provider-stream.js";
 import { emitSessionStartAudits } from "./session-bootstrap-emit.js";
 import { handleRuntimeCommand } from "./session-commands.js";
@@ -21,6 +19,11 @@ import {
   renderTurnError,
   toolResultMessage,
 } from "./session-helpers.js";
+import {
+  loadToolRegistryModule,
+  mountSessionUI,
+  seedRuntimeMetrics,
+} from "./session-runtime-support.js";
 import { persistSessionManifest } from "./session-store.js";
 import { studHome } from "./storage.js";
 import {
@@ -31,24 +34,13 @@ import {
   wireChildSessionAndPanel,
 } from "./subagent-bootstrap.js";
 import { createApprovalCache } from "./tool-approval.js";
-import {
-  disposeBundledTools,
-  initializeBundledTools,
-  providerToolDefinitions,
-  sessionWorkspaceRoot,
-} from "./tool-registry.js";
 import { resolveToolCallResult } from "./tool-resolver.js";
-import { PROTOCOLS, TOOL_CALL_CONTINUATION_LIMIT } from "./types.js";
+import { sessionWorkspaceRoot } from "./tool-runtime-utils.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
 import type { IpAuthority } from "./ip-authority.js";
 import type { RuntimeContextRegistry } from "./runtime-context-registry.js";
-import type {
-  LoadedTool,
-  ProviderProtocolId,
-  ResolvedShellDeps,
-  SessionBootstrap,
-} from "./types.js";
+import type { LoadedTool, ResolvedShellDeps, SessionBootstrap } from "./types.js";
 import type {
   ProviderContract,
   ProviderMessage,
@@ -90,7 +82,7 @@ async function continueAssistantTurn(args: ContinueAssistantTurnArgs): Promise<v
   const toolMap = new Map(args.tools.map((tool) => [tool.name, tool] as const));
   const workspaceRoot = sessionWorkspaceRoot(args.session, args.deps);
 
-  for (let iteration = 0; iteration < TOOL_CALL_CONTINUATION_LIMIT; iteration += 1) {
+  for (let iteration = 0; iteration < args.session.continuationMaxIterations; iteration += 1) {
     const assistantTurn = await runAssistantIteration({
       session: args.session,
       provider: args.provider,
@@ -133,82 +125,15 @@ async function continueAssistantTurn(args: ContinueAssistantTurnArgs): Promise<v
     }
   }
 
-  throw new Session("assistant exceeded the tool-call continuation limit", undefined, {
-    code: "ToolExecutionFailed",
-    limit: TOOL_CALL_CONTINUATION_LIMIT,
-  });
-}
-
-function seedRuntimeMetrics(
-  collector: RuntimeCollector,
-  descriptor: (typeof PROTOCOLS)[ProviderProtocolId],
-  session: SessionBootstrap,
-  loadedTools: readonly LoadedTool[],
-): void {
-  const selection = session.selection.current();
-  collector.setProvider(
+  throw new Session(
+    `assistant exhausted the continuation-round budget (${args.session.continuationMaxIterations}); earlier tool calls may have completed successfully`,
+    undefined,
     {
-      id: selection.entryId,
-      label: descriptor.label,
-      modelId: selection.modelId,
-      capabilities: { streaming: true, toolCalling: true, thinking: false },
+      code: "ToolExecutionFailed",
+      failureKind: "ContinuationLimitExceeded",
+      limit: args.session.continuationMaxIterations,
     },
-    Object.values(PROTOCOLS).map((d) => ({
-      id: d.protocolId,
-      label: d.label,
-      modelId: d.defaultModels[0],
-      capabilities: { streaming: true, toolCalling: true, thinking: false },
-    })),
   );
-  collector.setTools(
-    loadedTools.map((tool) => ({
-      id: tool.id,
-      name: tool.name,
-      description: tool.description,
-      source: "bundled",
-      sensitivity: tool.gated ? "guarded" : "safe",
-      allowedNow: !tool.gated || session.yolo,
-      invocations: { total: 0, succeeded: 0, failed: 0 },
-    })),
-  );
-}
-
-function mountSessionUI(args: {
-  readonly deps: ResolvedShellDeps;
-  readonly prompt: PromptIO;
-  readonly collector: RuntimeCollector;
-  readonly session: SessionBootstrap;
-  readonly workspaceRoot: string;
-  readonly resumedHistory: readonly ProviderMessage[];
-  readonly eventBus: ReturnType<typeof createEventBus>;
-}): MountedTUI {
-  const catalog = runtimeCommandCatalog().map((entry) => ({
-    name: entry.name,
-    description: entry.description,
-    category: entry.category,
-  }));
-  const ui = mountTUI({
-    stdout: args.deps.stdout,
-    stdin: args.deps.stdin,
-    fallbackPrompt: args.prompt,
-    version: args.deps.packageVersion,
-    metrics: args.collector.reader,
-    catalog,
-    eventBus: args.eventBus,
-  });
-  const selection = args.session.selection.current();
-  ui.renderSessionStart({
-    sessionId: args.session.sessionId,
-    providerLabel: protocolLabel(selection.protocolId),
-    modelId: selection.modelId,
-    mode: args.session.securityMode,
-    projectTrust: args.session.projectTrusted ? "granted" : "global-only",
-    cwd: args.workspaceRoot,
-  });
-  if (args.session.resumed) {
-    ui.renderHistory(args.resumedHistory);
-  }
-  return ui;
 }
 
 interface SessionContext {
@@ -221,7 +146,7 @@ interface SessionContext {
   readonly loadedTools: LoadedTool[];
   readonly auditBus: SessionAuditBus;
   readonly host: HostAPI;
-  readonly approvalCache: ReturnType<typeof createApprovalCache>;
+  approvalCache: ReturnType<typeof createApprovalCache>;
   readonly history: ProviderMessage[];
   readonly ui: MountedTUI;
   readonly sessionScope: Scope;
@@ -273,13 +198,12 @@ async function bootstrapSessionContext(
     initialSelection,
   });
 
-  loadedTools.push(...(await initializeBundledTools(session, deps, prompt)));
   seedRuntimeMetrics(collector, PROTOCOLS[initialSelection.protocolId], session, loadedTools);
   const manifest = await persistSessionManifest(session.manifest, deps);
   const history = providerMessagesFromManifest(manifest);
-  const approvalCache = createApprovalCache(loadedTools);
+  const approvalCache = createApprovalCache([]);
   const workspaceRoot = sessionWorkspaceRoot(session, deps);
-  const ui = mountSessionUI({
+  const ui = await mountSessionUI({
     deps,
     prompt,
     collector,
@@ -339,8 +263,26 @@ async function bootstrapSessionContext(
   };
 }
 
+async function ensureBundledToolsLoaded(ctx: SessionContext): Promise<void> {
+  if (ctx.loadedTools.length > 0) {
+    return;
+  }
+  const toolRegistry = await loadToolRegistryModule();
+  ctx.loadedTools.push(
+    ...(await toolRegistry.initializeBundledTools(ctx.session, ctx.deps, ctx.prompt)),
+  );
+  ctx.approvalCache = createApprovalCache(ctx.loadedTools);
+  seedRuntimeMetrics(
+    ctx.collector,
+    PROTOCOLS[ctx.session.selection.current().protocolId],
+    ctx.session,
+    ctx.loadedTools,
+  );
+}
+
 async function runOneTurn(ctx: SessionContext, trimmed: string): Promise<void> {
   const { ui, history, collector, deps, session, auditBus } = ctx;
+  await ensureBundledToolsLoaded(ctx);
   history.push({ role: "user", content: trimmed });
   collector.beginTurn();
   const turnId = `turn-${randomUUID()}`;
@@ -358,6 +300,7 @@ async function runOneTurn(ctx: SessionContext, trimmed: string): Promise<void> {
     try {
       const currentEntry = ctx.session.selection.current();
       const runtime = ctx.registry.get(currentEntry.entryId);
+      const { providerToolDefinitions } = await loadToolRegistryModule();
       await continueAssistantTurn({
         session,
         provider: runtime.contract,
@@ -432,6 +375,7 @@ async function processInputLine(
   if (trimmed === "/exit" || trimmed === "/quit") {
     return "exit";
   }
+  await ensureBundledToolsLoaded(ctx);
   const command = await handleRuntimeCommand({
     line: trimmed,
     session: ctx.session,
@@ -462,6 +406,7 @@ async function teardownSession(ctx: SessionContext): Promise<void> {
   process.off("SIGINT", ctx.sigintHandler);
   await ctx.ui.unmount();
   ctx.auditBus.emit("SessionClosed", { storeId: "filesystem-session-store" });
+  const { disposeBundledTools } = await loadToolRegistryModule();
   await disposeBundledTools();
   await ctx.registry.disposeAll();
   await ctx.auditBus.close();

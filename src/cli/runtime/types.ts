@@ -1,13 +1,9 @@
-import { contract as anthropicContract } from "../../extensions/providers/anthropic/index.js";
-import { contract as cliWrapperContract } from "../../extensions/providers/cli-wrapper/index.js";
-import { contract as geminiContract } from "../../extensions/providers/gemini/index.js";
-import { contract as openaiCompatibleContract } from "../../extensions/providers/openai-compatible/index.js";
-
 import type { ActiveSelectionHolder } from "./active-selection.js";
 import type { ParamsRuntimeStore } from "./params-runtime.js";
 import type { ProviderContract, ProviderToolDefinition } from "../../contracts/providers.js";
 import type { SessionManifest } from "../../contracts/session-store.js";
 import type { SecurityMode, Settings as ContractSettings } from "../../contracts/settings-shape.js";
+import type { JSONSchemaObject } from "../../contracts/state-slot.js";
 import type { ToolTerminal } from "../../core/errors/index.js";
 import type { HostAPI } from "../../core/host/host-api.js";
 import type { Settings as CoreSettings } from "../../core/settings/shape.js";
@@ -89,7 +85,9 @@ export interface ProviderDescriptor {
   readonly defaultModels: readonly [string, ...string[]];
   readonly defaultEnvName?: string;
   readonly defaultBaseURL?: string;
-  readonly contract: ProviderContract<unknown>;
+  readonly configSchema: JSONSchemaObject;
+  readonly capabilities: ProviderContract<unknown>["capabilities"];
+  loadContract(): Promise<ProviderContract<unknown>>;
 }
 
 export interface ProviderSelection {
@@ -195,6 +193,7 @@ export type ToolPreflightResult =
 
 export interface SessionBootstrap {
   readonly sessionId: string;
+  readonly continuationMaxIterations: number;
   readonly selection: ActiveSelectionHolder;
   readonly projectRoot: string;
   readonly projectTrusted: boolean;
@@ -266,46 +265,5 @@ export type SecretsHost = HostAPI & {
   };
 };
 
-/**
- * The bundled protocol descriptors, keyed by `ProviderProtocolId`. Provider
- * **entries** in `settings.json.providers` are user-keyed and may multiply
- * (two `openai-compatible` entries differing in `baseURL`); this table indexes
- * the closed set of *protocol adapters* the entries dispatch to via their
- * `protocol` field.
- */
-export const PROTOCOLS: Record<ProviderProtocolId, ProviderDescriptor> = {
-  anthropic: {
-    protocolId: "anthropic",
-    label: "anthropic",
-    defaultModels: ["claude-opus-4-7"],
-    defaultEnvName: "ANTHROPIC_API_KEY",
-    defaultBaseURL: "https://api.anthropic.com",
-    contract: anthropicContract as unknown as ProviderContract<unknown>,
-  },
-  "cli-wrapper": {
-    protocolId: "cli-wrapper",
-    label: "cli-wrapper (local subscription/test double)",
-    defaultModels: ["reference-model"],
-    contract: cliWrapperContract as unknown as ProviderContract<unknown>,
-  },
-  gemini: {
-    protocolId: "gemini",
-    label: "gemini",
-    defaultModels: ["gemini-2.0-flash"],
-    defaultEnvName: "GEMINI_API_KEY",
-    defaultBaseURL: "https://generativelanguage.googleapis.com/v1beta",
-    contract: geminiContract as unknown as ProviderContract<unknown>,
-  },
-  "openai-compatible": {
-    protocolId: "openai-compatible",
-    label: "openai-compatible",
-    defaultModels: ["gpt-4o"],
-    defaultEnvName: "OPENAI_API_KEY",
-    defaultBaseURL: "https://api.openai.com/v1",
-    contract: openaiCompatibleContract as unknown as ProviderContract<unknown>,
-  },
-};
-
 export const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 export const DEFAULT_WEB_CONTENT_BYTES = 5 * 1024 * 1024;
-export const TOOL_CALL_CONTINUATION_LIMIT = 12;

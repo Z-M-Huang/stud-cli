@@ -1,7 +1,7 @@
 import { Validation } from "../../core/errors/index.js";
 
+import { PROTOCOLS } from "./provider-protocols.js";
 import { storeSecret } from "./storage.js";
-import { PROTOCOLS } from "./types.js";
 
 import type {
   AnyProviderConfig,

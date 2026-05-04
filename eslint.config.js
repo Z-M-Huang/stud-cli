@@ -15,6 +15,8 @@ export default tseslint.config(
       "node_modules/**",
       "coverage/**",
       ".bun/**",
+      ".tmp-stud-cli-mcp-*/**",
+      ".tmp-stud-cli-mcp-edge-*/**",
       "*.tsbuildinfo",
       "bin/**",
       "tests/fixtures/**",

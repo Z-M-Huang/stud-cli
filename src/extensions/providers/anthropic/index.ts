@@ -2,11 +2,20 @@ import { ExtensionHost } from "../../../core/errors/extension-host.js";
 import { ProviderCapability } from "../../../core/errors/provider-capability.js";
 import { ProviderTransient } from "../../../core/errors/provider-transient.js";
 
-import { createAnthropicAdapter, type AnthropicAdapterConfig } from "./adapter.js";
 import { anthropicConfigSchema, type AnthropicConfig } from "./config.schema.js";
 import { activate, configForHost, deactivate, dispose, init } from "./lifecycle.js";
 
+import type { AnthropicAdapterConfig } from "./adapter.js";
 import type { ProviderContract, ProviderStreamEvent } from "../../../contracts/providers.js";
+
+function sourceCitationEvent(event: {
+  readonly uri: string;
+  readonly excerpt?: string;
+}): Extract<ProviderStreamEvent, { type: "source-citation" }> {
+  return event.excerpt !== undefined
+    ? { type: "source-citation", uri: event.uri, excerpt: event.excerpt }
+    : { type: "source-citation", uri: event.uri };
+}
 
 export const contract: ProviderContract<AnthropicConfig> = {
   kind: "Provider",
@@ -37,7 +46,6 @@ export const contract: ProviderContract<AnthropicConfig> = {
           code: "LifecycleFailure",
         });
       }
-
       if (!loadedConfig.models.includes(args.modelId)) {
         throw new ProviderCapability(
           `model '${args.modelId}' is not declared in this Anthropic provider entry`,
@@ -57,8 +65,8 @@ export const contract: ProviderContract<AnthropicConfig> = {
         ...(args.stream !== undefined ? { stream: args.stream } : {}),
       };
 
+      const { createAnthropicAdapter } = await import("./adapter.js");
       const adapter = createAnthropicAdapter(adapterConfig, host);
-
       // Merge order is fixed by `wiki/contracts/Provider-Params.md` § Merge layers:
       // settings `defaultParams` ← runtime overrides (already encoded in `args.params`).
       // The provider's static `defaultParams` provide the floor; `args.params`
@@ -82,7 +90,6 @@ export const contract: ProviderContract<AnthropicConfig> = {
           yield { type: "text-delta", delta: event.text };
           continue;
         }
-
         if (event.kind === "reasoning") {
           yield { type: "thinking-delta", delta: event.text };
           continue;
@@ -99,9 +106,7 @@ export const contract: ProviderContract<AnthropicConfig> = {
         }
 
         if (event.kind === "source-citation") {
-          yield event.excerpt !== undefined
-            ? { type: "source-citation", uri: event.uri, excerpt: event.excerpt }
-            : { type: "source-citation", uri: event.uri };
+          yield sourceCitationEvent(event);
           continue;
         }
 
@@ -149,5 +154,5 @@ export const contract: ProviderContract<AnthropicConfig> = {
   },
 };
 
-export { anthropicConfigSchema, createAnthropicAdapter };
+export { anthropicConfigSchema };
 export type { AnthropicConfig };

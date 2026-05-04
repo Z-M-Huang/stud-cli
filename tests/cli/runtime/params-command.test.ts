@@ -63,6 +63,7 @@ function fakeSession(
   const paramsStore = buildSessionParamsStore(defaultParams, []);
   return {
     sessionId: "s-test",
+    continuationMaxIterations: 50,
     selection: createActiveSelectionHolder(selection),
     projectRoot: "/tmp/x",
     projectTrusted: true,

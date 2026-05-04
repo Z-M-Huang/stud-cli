@@ -10,7 +10,7 @@ import { ToolTerminal } from "../../core/errors/index.js";
 import { formatToolArgs } from "../../extensions/ui/default-tui/format-tool-args.js";
 
 import { ensureToolApproval } from "./tool-approval.js";
-import { toolResultError } from "./tool-registry.js";
+import { toolResultError } from "./tool-runtime-utils.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
 import type { createApprovalCache } from "./tool-approval.js";

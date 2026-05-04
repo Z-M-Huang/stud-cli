@@ -2,7 +2,7 @@
  * Tests for Settings shape validation and scope merge.
  *
  * Covers :
- *   - validateSettings accepts the fourteen allowed top-level keys.
+ *   - validateSettings accepts the allowed top-level keys, including runtime.
  *   - validateSettings rejects unknown top-level keys with a path in context.
  *   - mergeSettings unions securityMode.allowlist across all three scopes.
  *   - mergeSettings applies project > global > bundled for per-category maps.
@@ -19,7 +19,7 @@ import { mergeSettings, validateSettings } from "../../../src/core/settings/vali
 // ---------------------------------------------------------------------------
 
 describe("validateSettings — accept valid shapes", () => {
-  it("accepts the nine category maps + env + securityMode + logging + active", () => {
+  it("accepts the nine category maps + env + securityMode + logging + active + runtime", () => {
     const s = validateSettings({
       env: { MY_KEY: "x" },
       securityMode: { mode: "ask", allowlist: ["fs.read"] },
@@ -39,6 +39,11 @@ describe("validateSettings — accept valid shapes", () => {
         sessionStore: "fs.reference",
         attachedSM: "ralph",
       },
+      runtime: {
+        continuation: {
+          maxIterations: 50,
+        },
+      },
     });
 
     assert.equal(s.env?.["MY_KEY"], "x");
@@ -48,6 +53,7 @@ describe("validateSettings — accept valid shapes", () => {
     assert.equal(s.active?.attachedSM, "ralph");
     assert.equal(s.securityMode?.mode, "ask");
     assert.deepEqual(s.securityMode?.allowlist, ["fs.read"]);
+    assert.equal(s.runtime?.continuation?.maxIterations, 50);
   });
 
   it("accepts an empty object (all fields optional)", () => {
@@ -216,6 +222,15 @@ describe("mergeSettings — per-category map project override", () => {
     );
     assert.equal(merged.active?.provider, "p.b");
     assert.equal(merged.active?.sessionStore, "fs.b");
+  });
+
+  it("merges runtime continuation settings with later-layer wins", () => {
+    const merged = mergeSettings(
+      { runtime: { continuation: { maxIterations: 12 } } },
+      { runtime: { continuation: { maxIterations: 24 } } },
+      { runtime: { continuation: { maxIterations: 50 } } },
+    );
+    assert.equal(merged.runtime?.continuation?.maxIterations, 50);
   });
 
   it("handles all-undefined scopes", () => {

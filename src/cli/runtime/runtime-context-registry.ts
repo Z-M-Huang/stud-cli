@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { ExtensionHost } from "../../core/errors/extension-host.js";
 
 import { createProviderHost, type OpenChildClosure } from "./provider-host.js";
+import { PROTOCOLS } from "./provider-protocols.js";
 import { studHome } from "./storage.js";
-import { PROTOCOLS } from "./types.js";
 
 import type { SessionAuditBus } from "./audit-bus.js";
 import type { IpAuthority } from "./ip-authority.js";
@@ -109,6 +109,7 @@ export function createRuntimeContextRegistry(deps: RegistryDeps): RuntimeContext
     }
 
     const descriptor = PROTOCOLS[args.protocolId];
+    const contract = await descriptor.loadContract();
     const host = createProviderHost(
       deps.session,
       deps.deps,
@@ -120,13 +121,13 @@ export function createRuntimeContextRegistry(deps: RegistryDeps): RuntimeContext
       deps.ipAuthority,
       deps.openChild,
     );
-    await descriptor.contract.lifecycle.init?.(host, args.config as never);
-    await descriptor.contract.lifecycle.activate?.(host);
+    await contract.lifecycle.init?.(host, args.config as never);
+    await contract.lifecycle.activate?.(host);
 
     const ctx: RuntimeContext = {
       entryId: args.entryId,
       protocolId: args.protocolId,
-      contract: descriptor.contract as unknown as ProviderContract<unknown>,
+      contract,
       host,
       config: args.config,
     };

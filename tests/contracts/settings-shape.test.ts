@@ -60,6 +60,17 @@ describe("settingsSchema — valid inputs", () => {
       `Expected allowlist array to be accepted; errors: ${JSON.stringify(validate.errors)}`,
     );
   });
+
+  it("accepts runtime.continuation.maxIterations when present", () => {
+    const result = validate({
+      runtime: { continuation: { maxIterations: 50 } },
+    });
+    assert.equal(
+      result,
+      true,
+      `Expected runtime.continuation.maxIterations to be accepted; errors: ${JSON.stringify(validate.errors)}`,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -116,6 +127,13 @@ describe("settingsSchema — invalid inputs", () => {
       errorPath.includes("allowlist"),
       `Expected rejection path to reference allowlist, got '${errorPath}'`,
     );
+  });
+
+  it("rejects runtime.continuation.maxIterations below 1", () => {
+    const result = validate({
+      runtime: { continuation: { maxIterations: 0 } },
+    });
+    assert.equal(result, false, "Expected maxIterations=0 to be rejected");
   });
 
   it("rejects worst-plausible input without crashing", () => {

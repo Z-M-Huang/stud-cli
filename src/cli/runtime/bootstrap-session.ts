@@ -6,6 +6,7 @@ import { openTrustStore } from "../../core/security/trust/store.js";
 import { createActiveSelectionHolder } from "./active-selection.js";
 import { buildSessionParamsStore } from "./params-runtime.js";
 import { validateAndAssertEntryParams } from "./params-validator.js";
+import { resolveContinuationMaxIterations } from "./runtime-settings.js";
 import { createSessionManifest } from "./session-store.js";
 import { isDirectory, loadSettingsFile } from "./storage.js";
 
@@ -46,6 +47,7 @@ export async function readTrustedProjectSettings(args: {
 export function newSessionBootstrap(args: {
   readonly launchArgs: LaunchArgs;
   readonly provider: ProviderSelection;
+  readonly settings: Settings;
   readonly projectTrusted: boolean;
   readonly securityMode: SessionManifest["mode"];
   readonly deps: ResolvedShellDeps;
@@ -70,6 +72,7 @@ export function newSessionBootstrap(args: {
   }
   return {
     sessionId,
+    continuationMaxIterations: resolveContinuationMaxIterations(args.settings),
     selection: createActiveSelectionHolder(args.provider),
     projectRoot: args.launchArgs.projectRoot,
     projectTrusted: args.projectTrusted,

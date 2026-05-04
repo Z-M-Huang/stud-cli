@@ -70,6 +70,7 @@ const baseProps: InkTUIFrameProps = {
   composerHint: "Ask...",
   statusItems: [],
   onComposerKey: () => undefined,
+  onComposerPaste: () => undefined,
 };
 
 describe("default-tui frame shape", () => {
