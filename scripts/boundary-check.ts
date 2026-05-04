@@ -70,6 +70,8 @@ const CORE_ALLOWLIST = new Set([
   // — operations/{Observability,Health-and-Diagnostics}.md
   "observability",
   "diagnostics",
+  // Audit record projection store — operations/Observability.md
+  "audit",
   // Capability negotiation runtime — contracts/Capability-Negotiation.md
   "capabilities",
   // Hook runner (kernel; extensions live in src/extensions/hooks/) — contracts/Hooks.md
@@ -82,6 +84,9 @@ const CORE_ALLOWLIST = new Set([
   "concurrency",
   "execution-model",
   "platform",
+  // Subagent child-session runtime and safety envelope handling
+  // — core/Subagent-Sessions.md + core/Delegate-Tool.md
+  "subagent",
   // Error classes (load-bearing for typed-error invariant) — core/Error-Model.md
   "errors",
 ]);
